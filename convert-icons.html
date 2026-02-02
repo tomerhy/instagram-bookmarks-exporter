@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Convert X Icons to Instagram Colors</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a0a1f;
+      color: #f0e6f6;
+    }
+    h1 {
+      background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .icon-row {
+      display: flex;
+      gap: 30px;
+      align-items: flex-start;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .icon-item {
+      text-align: center;
+    }
+    .icon-item h3 {
+      margin: 10px 0 5px;
+      font-size: 14px;
+    }
+    canvas, img {
+      border: 1px solid #333;
+      border-radius: 8px;
+      display: block;
+      margin: 0 auto;
+    }
+    button {
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #833ab4, #fd1d1d);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .instructions {
+      margin: 20px 0;
+      padding: 15px;
+      background: rgba(131, 58, 180, 0.1);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    input[type="file"] {
+      margin: 10px 0;
+    }
+    .compare {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .arrow {
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Convert Icons to Instagram Colors</h1>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>The icons from your X extension are loaded below</li>
+      <li>They will be automatically converted to Instagram pink/red colors</li>
+      <li>Click "Download All" to save the converted icons</li>
+      <li>Move the downloaded files to <code>assets/icons/</code></li>
+    </ol>
+  </div>
+
+  <div id="icons"></div>
+  
+  <button onclick="downloadAll()">Download All Converted Icons</button>
+
+  <script>
+    const sizes = [16, 32, 48, 128];
+    const container = document.getElementById('icons');
+    const convertedCanvases = {};
+    
+    // Path to X extension icons - adjust if needed
+    const xIconBasePath = '../x-bookmarks-exporter/assets/icons/';
+
+    function convertBlueToInstagram(imageData) {
+      const data = imageData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        
+        // Skip transparent pixels
+        if (a < 10) continue;
+        
+        // Detect blue-ish pixels (the background)
+        // Blue has high B value, lower R and G
+        const isBlue = b > 100 && b > r * 0.8 && b > g * 0.9;
+        const isBluish = (b > r && b > g) || (b > 80 && r < 150 && g < 150);
+        
+        if (isBlue || isBluish) {
+          // Convert blue to Instagram gradient pink/red
+          // Map the blue intensity to a gradient from purple to red to orange
+          const intensity = b / 255;
+          
+          // Instagram gradient: #833ab4 (purple) -> #fd1d1d (red) -> #fcb045 (orange)
+          // We'll use a simplified pink/red: #E1306C (Instagram pink)
+          const newR = Math.min(255, 225 + (r - b) * 0.3);
+          const newG = Math.min(255, 48 + g * 0.2);
+          const newB = Math.min(255, 108 + (255 - b) * 0.2);
+          
+          data[i] = newR;
+          data[i + 1] = newG;
+          data[i + 2] = newB;
+        }
+      }
+      
+      return imageData;
+    }
+
+    function processIcon(size) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+          // Create canvas for converted icon
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          
+          // Draw original image
+          ctx.drawImage(img, 0, 0, size, size);
+          
+          // Get and convert pixel data
+          const imageData = ctx.getImageData(0, 0, size, size);
+          const converted = convertBlueToInstagram(imageData);
+          ctx.putImageData(converted, 0, 0);
+          
+          convertedCanvases[size] = canvas;
+          
+          // Create display row
+          const row = document.createElement('div');
+          row.className = 'icon-item';
+          
+          const label = document.createElement('h3');
+          label.textContent = `${size}x${size}`;
+          
+          const compare = document.createElement('div');
+          compare.className = 'compare';
+          
+          const origImg = document.createElement('img');
+          origImg.src = img.src;
+          origImg.width = Math.max(size, 48);
+          origImg.height = Math.max(size, 48);
+          origImg.title = 'Original';
+          
+          const arrow = document.createElement('span');
+          arrow.className = 'arrow';
+          arrow.textContent = '→';
+          
+          const convertedDisplay = document.createElement('canvas');
+          convertedDisplay.width = Math.max(size, 48);
+          convertedDisplay.height = Math.max(size, 48);
+          const displayCtx = convertedDisplay.getContext('2d');
+          displayCtx.drawImage(canvas, 0, 0, Math.max(size, 48), Math.max(size, 48));
+          convertedDisplay.title = 'Converted';
+          convertedDisplay.style.cursor = 'pointer';
+          convertedDisplay.onclick = () => downloadCanvas(canvas, size);
+          
+          compare.appendChild(origImg);
+          compare.appendChild(arrow);
+          compare.appendChild(convertedDisplay);
+          
+          row.appendChild(label);
+          row.appendChild(compare);
+          container.appendChild(row);
+          
+          resolve();
+        };
+        
+        img.onerror = () => {
+          console.error(`Failed to load icon-${size}.png`);
+          reject(new Error(`Failed to load icon-${size}.png`));
+        };
+        
+        img.src = xIconBasePath + `icon-${size}.png`;
+      });
+    }
+
+    function downloadCanvas(canvas, size) {
+      const link = document.createElement('a');
+      link.download = `icon-${size}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function downloadAll() {
+      sizes.forEach((size, index) => {
+        if (convertedCanvases[size]) {
+          setTimeout(() => downloadCanvas(convertedCanvases[size], size), index * 200);
+        }
+      });
+    }
+
+    // Load and process all icons
+    async function init() {
+      container.innerHTML = '<p>Loading icons from X extension...</p>';
+      
+      try {
+        container.innerHTML = '';
+        for (const size of sizes) {
+          await processIcon(size);
+        }
+      } catch (error) {
+        container.innerHTML = `
+          <p style="color: #fd1d1d;">Error loading icons. Make sure:</p>
+          <ul>
+            <li>This file is in the instagram-bookmarks-exporter folder</li>
+            <li>The x-bookmarks-exporter folder is at the same level</li>
+            <li>You're running this from a local server (not file://)</li>
+          </ul>
+          <p>Alternative: Open this file, then manually drag the X extension icons onto this page.</p>
+        `;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

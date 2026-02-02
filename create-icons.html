@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Instagram Extension Icons</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a0a1f;
+      color: #f0e6f6;
+    }
+    h1 {
+      background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .icon-row {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .icon-item {
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #333;
+      border-radius: 4px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #833ab4, #fd1d1d);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    .instructions {
+      margin-top: 30px;
+      padding: 15px;
+      background: rgba(131, 58, 180, 0.1);
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    a {
+      color: #fcb045;
+    }
+  </style>
+</head>
+<body>
+  <h1>Instagram Extension Icons</h1>
+  <p>Click each icon to download the PNG file.</p>
+  
+  <div class="icon-row" id="icons"></div>
+  
+  <button onclick="downloadAll()">Download All Icons</button>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Click "Download All Icons" or click individual icons</li>
+      <li>Save the PNG files to <code>assets/icons/</code> folder</li>
+      <li>Make sure files are named: icon-16.png, icon-32.png, icon-48.png, icon-128.png</li>
+    </ol>
+  </div>
+
+  <script>
+    const sizes = [16, 32, 48, 128];
+    const container = document.getElementById('icons');
+    const canvases = {};
+
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      const padding = size * 0.0625;
+      const radius = size * 0.22;
+      
+      // Create gradient
+      const gradient = ctx.createLinearGradient(0, size, size, 0);
+      gradient.addColorStop(0, '#fcb045');
+      gradient.addColorStop(0.5, '#fd1d1d');
+      gradient.addColorStop(1, '#833ab4');
+      
+      // Draw rounded rectangle
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.roundRect(padding, padding, size - padding * 2, size - padding * 2, radius);
+      ctx.fill();
+      
+      // Draw circle (camera lens)
+      const center = size / 2;
+      const circleRadius = size * 0.19;
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = size * 0.06;
+      ctx.beginPath();
+      ctx.arc(center, center, circleRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Draw flash dot
+      const dotX = size * 0.75;
+      const dotY = size * 0.25;
+      const dotRadius = size * 0.06;
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function downloadCanvas(canvas, size) {
+      const link = document.createElement('a');
+      link.download = `icon-${size}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function downloadAll() {
+      sizes.forEach(size => {
+        setTimeout(() => downloadCanvas(canvases[size], size), size * 2);
+      });
+    }
+
+    // Create icons
+    sizes.forEach(size => {
+      const item = document.createElement('div');
+      item.className = 'icon-item';
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      canvas.style.cursor = 'pointer';
+      canvas.onclick = () => downloadCanvas(canvas, size);
+      
+      drawIcon(canvas, size);
+      canvases[size] = canvas;
+      
+      const label = document.createElement('div');
+      label.textContent = `${size}x${size}`;
+      label.style.marginTop = '5px';
+      label.style.fontSize = '12px';
+      
+      item.appendChild(canvas);
+      item.appendChild(label);
+      container.appendChild(item);
+    });
+  </script>
+</body>
+</html>

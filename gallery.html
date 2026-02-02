@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Instagram Media Gallery</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ig-pink: #E1306C;
+      --ig-pink-dark: #c13584;
+      --ig-bg: #1a1a2e;
+      --ig-card: #16213e;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+      color: #fff;
+      min-height: 100vh;
+    }
+    h2 {
+      margin: 0 0 20px;
+      font-size: 24px;
+      color: var(--ig-pink);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #version {
+      font-size: 11px;
+      color: var(--ig-pink);
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--ig-pink);
+      background: rgba(225, 48, 108, 0.1);
+    }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #333;
+    }
+    .tab {
+      padding: 14px 32px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: #888;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 150ms ease;
+    }
+    .tab:hover {
+      color: #ccc;
+    }
+    .tab.active {
+      color: var(--ig-pink);
+      border-bottom-color: var(--ig-pink);
+    }
+    .tab-count {
+      margin-left: 8px;
+      padding: 2px 8px;
+      font-size: 11px;
+      background: rgba(225, 48, 108, 0.2);
+      border-radius: 10px;
+      color: var(--ig-pink);
+    }
+    .tab.active .tab-count {
+      background: var(--ig-pink);
+      color: #fff;
+    }
+
+    /* Layout - 40/60 split (viewer 40%, grid 60%) */
+    #layout {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    
+    /* Viewer Panel - 40% */
+    #viewer-wrap {
+      position: sticky;
+      top: 20px;
+      background: var(--ig-card);
+      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 16px;
+      flex: 0 0 38%;
+      max-width: 38%;
+    }
+    #viewer-container {
+      position: relative;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    #player {
+      width: 100%;
+      max-height: 400px;
+      background: #000;
+      display: none;
+      cursor: pointer;
+    }
+    #image-viewer {
+      width: 100%;
+      max-height: 400px;
+      background: #000;
+      object-fit: contain;
+      display: none;
+      cursor: pointer;
+    }
+    #viewer-placeholder {
+      width: 100%;
+      height: 250px;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #555;
+      font-size: 14px;
+    }
+    
+    /* Fullscreen button */
+    #fullscreen-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.7);
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #fullscreen-btn:hover {
+      background: var(--ig-pink);
+    }
+    #viewer-container:hover #fullscreen-btn {
+      display: flex;
+    }
+    
+    /* Fullscreen overlay */
+    #fullscreen-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.97);
+      z-index: 9999;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    #fullscreen-overlay.visible {
+      display: flex;
+    }
+    #fullscreen-image {
+      max-width: 90%;
+      max-height: 80%;
+      object-fit: contain;
+    }
+    #fullscreen-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    #fullscreen-close:hover {
+      background: var(--ig-pink);
+    }
+    #fullscreen-controls {
+      position: absolute;
+      bottom: 30px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .fullscreen-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .fullscreen-btn:hover {
+      background: var(--ig-pink);
+    }
+    .fullscreen-btn.active {
+      background: var(--ig-pink);
+    }
+    #fullscreen-counter {
+      color: #888;
+      font-size: 14px;
+      padding: 0 20px;
+    }
+    
+    /* Slideshow controls */
+    .slideshow-controls {
+      margin-top: 12px;
+      display: none;
+      gap: 8px;
+      align-items: center;
+    }
+    .slideshow-controls.visible {
+      display: flex;
+    }
+    .slideshow-controls label {
+      font-size: 12px;
+      color: #888;
+    }
+    .slideshow-btn {
+      padding: 6px 12px;
+      font-size: 11px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #2a2a4a;
+      color: #fff;
+      cursor: pointer;
+    }
+    .slideshow-btn:hover {
+      border-color: var(--ig-pink);
+    }
+    .slideshow-btn.active {
+      background: var(--ig-pink);
+      border-color: var(--ig-pink);
+    }
+    
+    /* Actions */
+    .actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: #2a2a4a;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    button:hover {
+      background: #3a3a5a;
+      border-color: var(--ig-pink);
+    }
+    #download-current {
+      background: var(--ig-pink);
+      border-color: var(--ig-pink);
+    }
+    #download-current:hover {
+      background: var(--ig-pink-dark);
+    }
+    #donate {
+      background: linear-gradient(135deg, #f5af19, #f12711);
+      border: none;
+    }
+
+    /* Info */
+    #status {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--ig-pink);
+    }
+    #progress {
+      margin-top: 8px;
+      height: 4px;
+      background: #333;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--ig-pink);
+      transition: width 150ms ease;
+    }
+    
+    /* Debug section */
+    #debug-section {
+      margin-top: 12px;
+      padding: 10px;
+      background: #111;
+      border-radius: 8px;
+      font-size: 10px;
+      color: #666;
+      max-height: 100px;
+      overflow-y: auto;
+      display: none;
+    }
+    #debug-section.visible {
+      display: block;
+    }
+
+    /* Grid container - 60% */
+    #grid-container {
+      flex: 0 0 60%;
+      max-width: 60%;
+    }
+
+    /* Grid - 5 columns */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+    .card {
+      background: var(--ig-card);
+      border: 2px solid transparent;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 150ms ease;
+      position: relative;
+      aspect-ratio: 1;
+    }
+    .card:hover {
+      border-color: var(--ig-pink);
+      transform: translateY(-2px);
+    }
+    .card.selected {
+      border-color: var(--ig-pink);
+      box-shadow: 0 0 15px rgba(225, 48, 108, 0.4);
+    }
+    .thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #0a0a0a;
+    }
+    .card-overlay {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      opacity: 0;
+      transition: opacity 150ms ease;
+    }
+    .card:hover .card-overlay {
+      opacity: 1;
+    }
+    .download-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.7);
+      border: none;
+      color: #fff;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .download-btn:hover {
+      background: var(--ig-pink);
+    }
+    .video-badge {
+      position: absolute;
+      bottom: 6px;
+      left: 6px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .page-btn {
+      min-width: 32px;
+      height: 32px;
+      padding: 0 10px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #2a2a4a;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .page-btn:hover {
+      border-color: var(--ig-pink);
+    }
+    .page-btn.active {
+      background: var(--ig-pink);
+      border-color: var(--ig-pink);
+    }
+    .page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .page-info {
+      font-size: 11px;
+      color: #888;
+      padding: 0 8px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+    }
+    .empty-state h3 {
+      color: #888;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+  <h2>Instagram Media Gallery <span id="version"></span></h2>
+  
+  <div class="tabs">
+    <button class="tab active" data-tab="images">
+      Images <span class="tab-count" id="image-count">0</span>
+    </button>
+    <button class="tab" data-tab="videos">
+      Videos <span class="tab-count" id="video-count">0</span>
+    </button>
+  </div>
+
+  <div id="layout">
+    <div id="viewer-wrap">
+      <div id="viewer-container">
+        <div id="viewer-placeholder">Select an item to preview</div>
+        <video id="player" controls></video>
+        <img id="image-viewer" alt="Preview" />
+        <button id="fullscreen-btn" title="Fullscreen">⛶</button>
+      </div>
+      
+      <div class="slideshow-controls" id="slideshow-controls">
+        <label>Slideshow:</label>
+        <button class="slideshow-btn" data-interval="3000">3 sec</button>
+        <button class="slideshow-btn" data-interval="5000">5 sec</button>
+        <button class="slideshow-btn" id="stop-slideshow" style="display:none;">Stop</button>
+      </div>
+      
+      <div class="actions">
+        <button id="download-current">Download</button>
+        <button id="download-all">Download All</button>
+        <button id="export">Export URLs</button>
+        <button id="import">Import</button>
+        <button id="copy">Copy URLs</button>
+        <button id="clear">Clear All</button>
+        <button id="donate">Donate</button>
+      </div>
+      <div id="status"></div>
+      <div id="progress"><div id="progress-bar"></div></div>
+      <input id="file-input" type="file" accept=".txt" />
+      
+      <div id="debug-section"></div>
+      <button id="toggle-debug" style="margin-top:8px;font-size:10px;padding:4px 8px;">Show Debug</button>
+    </div>
+    
+    <div id="grid-container">
+      <div id="grid"></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+
+  <!-- Fullscreen overlay -->
+  <div id="fullscreen-overlay">
+    <img id="fullscreen-image" alt="Fullscreen" />
+    <button id="fullscreen-close">✕</button>
+    <div id="fullscreen-controls">
+      <button class="fullscreen-btn" id="fullscreen-prev">← Prev</button>
+      <button class="fullscreen-btn" id="fs-slide-3" data-interval="3000">3s Slide</button>
+      <button class="fullscreen-btn" id="fs-slide-5" data-interval="5000">5s Slide</button>
+      <button class="fullscreen-btn" id="fs-slide-stop" style="display:none;">Stop</button>
+      <span id="fullscreen-counter"></span>
+      <button class="fullscreen-btn" id="fullscreen-next">Next →</button>
+    </div>
+  </div>
+
+  <script src="gallery.js"></script>
+</body>
+</html>

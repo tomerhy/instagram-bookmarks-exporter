@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 300px;
+      margin: 0;
+      padding: 16px;
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      color: #fff;
+    }
+    h3 {
+      margin: 0 0 14px;
+      font-size: 15px;
+      color: #E1306C;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #version {
+      font-size: 10px;
+      color: #E1306C;
+      padding: 2px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(225, 48, 108, 0.4);
+      background: rgba(225, 48, 108, 0.1);
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    button {
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #2a2a4a;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 120ms ease;
+      width: 100%;
+    }
+    button:hover {
+      background: #3a3a5a;
+      border-color: #E1306C;
+    }
+    #auto-scroll {
+      background: #E1306C;
+      border-color: #E1306C;
+      font-weight: 600;
+    }
+    #auto-scroll:hover {
+      background: #c13584;
+    }
+    #auto-scroll.running {
+      background: #ff4444;
+      border-color: #ff4444;
+    }
+    #open-gallery {
+      background: linear-gradient(135deg, #833ab4, #E1306C);
+      border: none;
+    }
+    .button-row {
+      display: flex;
+      gap: 8px;
+    }
+    .button-row button {
+      flex: 1;
+    }
+    #donate {
+      background: linear-gradient(135deg, #f5af19, #f12711);
+      border: none;
+    }
+    #media-count {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #888;
+      text-align: center;
+    }
+    #status {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #E1306C;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h3>Instagram Saved Exporter <span id="version"></span></h3>
+  <div class="actions">
+    <button id="auto-scroll">Start Auto Scroll</button>
+    <button id="open-gallery">Open Gallery</button>
+    <div class="button-row">
+      <button id="copy">Copy URLs</button>
+      <button id="clear">Clear All</button>
+    </div>
+    <button id="donate">Support Development</button>
+  </div>
+  <div id="media-count"></div>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
