@@ -202,55 +202,113 @@
   const videoUrls = new Map(); // shortcode -> videoUrl
 
   /**
-   * Fetch actual video URL from embed page
+   * Fetch actual video URL using multiple methods
    */
   function fetchVideoUrl(shortcode, postType) {
     if (fetchedShortcodes.has(shortcode)) return;
     fetchedShortcodes.add(shortcode);
     
-    const embedUrl = `https://www.instagram.com/${postType}/${shortcode}/embed/captioned/`;
+    console.log('[IG Exporter] Fetching video URL for:', shortcode, postType);
+    
+    // Method 1: Try embed page
+    const embedUrl = `https://www.instagram.com/${postType}/${shortcode}/embed/`;
     
     fetch(embedUrl, { credentials: 'include' })
       .then(res => res.text())
       .then(html => {
-        // Pattern 1: video_url in JSON
-        const match1 = html.match(/"video_url"\s*:\s*"([^"]+)"/);
-        if (match1) {
-          const url = decodeVideoUrl(match1[1]);
-          if (url) {
-            videoUrls.set(shortcode, url);
-            console.log('[IG Exporter] Got video URL for', shortcode);
-            updateVideoInState(shortcode, url);
-            return;
-          }
+        const url = extractVideoUrlFromHtml(html);
+        if (url) {
+          console.log('[IG Exporter] Got video URL from embed:', shortcode);
+          videoUrls.set(shortcode, url);
+          updateVideoInState(shortcode, url);
+          return;
         }
         
-        // Pattern 2: contentUrl
-        const match2 = html.match(/"contentUrl"\s*:\s*"([^"]+)"/);
-        if (match2) {
-          const url = decodeVideoUrl(match2[1]);
-          if (url && url.includes('.mp4')) {
-            videoUrls.set(shortcode, url);
-            console.log('[IG Exporter] Got video URL for', shortcode);
-            updateVideoInState(shortcode, url);
-            return;
-          }
-        }
-        
-        // Pattern 3: Direct .mp4 URL
-        const mp4Match = html.match(/https?:[^"'\s\\]+\.mp4[^"'\s\\]*/);
-        if (mp4Match) {
-          const url = decodeVideoUrl(mp4Match[0]);
-          if (url) {
-            videoUrls.set(shortcode, url);
-            console.log('[IG Exporter] Got video URL for', shortcode);
-            updateVideoInState(shortcode, url);
-          }
+        // Method 2: Try the post page directly
+        return tryPostPage(shortcode, postType);
+      })
+      .catch(err => {
+        console.log('[IG Exporter] Embed fetch failed for', shortcode, '- trying post page');
+        tryPostPage(shortcode, postType);
+      });
+  }
+
+  function tryPostPage(shortcode, postType) {
+    const postUrl = `https://www.instagram.com/${postType}/${shortcode}/`;
+    
+    return fetch(postUrl, { credentials: 'include' })
+      .then(res => res.text())
+      .then(html => {
+        const url = extractVideoUrlFromHtml(html);
+        if (url) {
+          console.log('[IG Exporter] Got video URL from post page:', shortcode);
+          videoUrls.set(shortcode, url);
+          updateVideoInState(shortcode, url);
+        } else {
+          console.log('[IG Exporter] No video URL found for:', shortcode);
         }
       })
       .catch(err => {
-        console.log('[IG Exporter] Failed to fetch video for', shortcode);
+        console.log('[IG Exporter] Post page fetch failed for', shortcode);
       });
+  }
+
+  function extractVideoUrlFromHtml(html) {
+    if (!html) return null;
+    
+    // Pattern 1: video_url in JSON
+    const patterns = [
+      /"video_url"\s*:\s*"([^"]+)"/g,
+      /"contentUrl"\s*:\s*"([^"]+\.mp4[^"]*)"/g,
+      /video_url=([^&"]+)/g,
+      /src="(https?:\/\/[^"]+\.mp4[^"]*)"/g
+    ];
+    
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(html)) !== null) {
+        const url = decodeVideoUrl(match[1]);
+        if (url && isValidVideoUrl(url)) {
+          return url;
+        }
+      }
+    }
+    
+    // Pattern 2: Find any .mp4 URL
+    const mp4Matches = html.match(/https?:[^"'\s\\<>]+\.mp4[^"'\s\\<>]*/g);
+    if (mp4Matches) {
+      for (const url of mp4Matches) {
+        const decoded = decodeVideoUrl(url);
+        if (decoded && isValidVideoUrl(decoded)) {
+          return decoded;
+        }
+      }
+    }
+    
+    // Pattern 3: Look for video CDN URLs (Instagram uses specific patterns)
+    const cdnPatterns = [
+      /https?:\/\/[^"'\s]+(?:instagram|fbcdn)[^"'\s]+\/v\/[^"'\s]+/g,
+      /https?:\/\/[^"'\s]+\/o1\/v\/[^"'\s]+/g
+    ];
+    
+    for (const pattern of cdnPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const decoded = decodeVideoUrl(match[0]);
+        if (decoded && isValidVideoUrl(decoded)) {
+          return decoded;
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  function isValidVideoUrl(url) {
+    if (!url) return false;
+    // Check for Instagram/Facebook CDN
+    return (url.includes('instagram') || url.includes('fbcdn') || url.includes('cdninstagram')) &&
+           (url.includes('.mp4') || url.includes('/v/') || url.includes('/video'));
   }
 
   function decodeVideoUrl(url) {

@@ -83,29 +83,51 @@ function deduplicateUrls(urls) {
 function showVideo(url) {
   viewerPlaceholder.style.display = "none";
   imageViewer.style.display = "none";
-  player.style.display = "block";
   fullscreenBtn.style.display = "none";
   
   logDebug("Playing video: " + url.substring(0, 80) + "...");
   
-  player.src = url;
-  player.load();
+  // Check if this is an Instagram post URL (not a video file)
+  var isPostUrl = url.indexOf("instagram.com/p/") !== -1 || 
+                  url.indexOf("instagram.com/reel/") !== -1;
   
-  player.onloadeddata = function() {
-    logDebug("Video loaded successfully");
-    player.play().catch(function(e) {
-      logDebug("Play error: " + e.message);
-    });
-  };
+  // Check if this is a playable video URL
+  var isVideoFile = url.indexOf(".mp4") !== -1 || 
+                    url.indexOf("/v/") !== -1 ||
+                    url.indexOf("video") !== -1 && 
+                    (url.indexOf("fbcdn") !== -1 || url.indexOf("cdninstagram") !== -1);
   
-  player.onerror = function() {
-    logDebug("Video error - trying to open in new tab");
-    setStatus("Video can't play here. Click to open in new tab.");
-  };
-  
-  player.onclick = function() {
-    window.open(url, "_blank");
-  };
+  if (isPostUrl && !isVideoFile) {
+    // It's a post URL, show a message and link
+    player.style.display = "none";
+    viewerPlaceholder.style.display = "flex";
+    viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Video URL not available</p><a href="' + url + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open on Instagram →</a></div>';
+    setStatus("Click link to view on Instagram");
+  } else {
+    // Try to play the video
+    player.style.display = "block";
+    player.src = url;
+    player.load();
+    
+    player.onloadeddata = function() {
+      logDebug("Video loaded successfully");
+      player.play().catch(function(e) {
+        logDebug("Play error: " + e.message);
+      });
+    };
+    
+    player.onerror = function() {
+      logDebug("Video error - opening in new tab");
+      setStatus("Video can't play here. Click to open.");
+      player.style.display = "none";
+      viewerPlaceholder.style.display = "flex";
+      viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Video failed to load</p><a href="' + url + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open in new tab →</a></div>';
+    };
+    
+    player.onclick = function() {
+      window.open(url, "_blank");
+    };
+  }
   
   currentViewUrl = url;
   currentViewType = "video";
@@ -286,16 +308,35 @@ function renderGrid() {
 
     var thumb;
     if (currentTab === "videos") {
-      // For videos, try to show a poster or first frame
-      thumb = document.createElement("video");
-      thumb.className = "thumb";
-      thumb.src = url;
-      thumb.muted = true;
-      thumb.preload = "metadata";
-      thumb.playsInline = true;
-      thumb.addEventListener("loadedmetadata", function() {
-        try { this.currentTime = 1; } catch(e) {}
-      });
+      // Check if this is an Instagram post URL (not a video file)
+      var isPostUrl = url.indexOf("instagram.com/p/") !== -1 || 
+                      url.indexOf("instagram.com/reel/") !== -1;
+      var isVideoFile = url.indexOf(".mp4") !== -1 || 
+                        url.indexOf("/v/") !== -1 ||
+                        (url.indexOf("video") !== -1 && 
+                         (url.indexOf("fbcdn") !== -1 || url.indexOf("cdninstagram") !== -1));
+      
+      if (isPostUrl && !isVideoFile) {
+        // It's a post URL - show placeholder image
+        thumb = document.createElement("div");
+        thumb.className = "thumb video-placeholder";
+        thumb.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#1a1a2e;"><span style="font-size:40px;">▶</span><span style="font-size:10px;margin-top:8px;color:#888;">Click to open</span></div>';
+      } else {
+        // It's a video file - try to load thumbnail
+        thumb = document.createElement("video");
+        thumb.className = "thumb";
+        thumb.src = url;
+        thumb.muted = true;
+        thumb.preload = "metadata";
+        thumb.playsInline = true;
+        thumb.addEventListener("loadedmetadata", function() {
+          try { this.currentTime = 1; } catch(e) {}
+        });
+        thumb.onerror = function() {
+          // If video fails to load, show placeholder
+          this.outerHTML = '<div class="thumb video-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#1a1a2e;"><span style="font-size:40px;">▶</span><span style="font-size:10px;margin-top:8px;color:#888;">Video</span></div>';
+        };
+      }
       
       // Add video badge
       var badge = document.createElement("div");
