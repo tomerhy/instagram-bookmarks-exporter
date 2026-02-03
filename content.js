@@ -1,444 +1,654 @@
+/**
+ * Instagram Saved Media Exporter - Content Script
+ * Detects and categorizes saved posts as videos, images, or carousels
+ */
+
 (function() {
-  if (window.__instagramSavedExporterInjected) return;
-  window.__instagramSavedExporterInjected = true;
+  'use strict';
 
-  console.log("[IG] v3.1 Content script loaded on:", location.href);
+  // Prevent double injection
+  if (window.__igExporterInjected) return;
+  window.__igExporterInjected = true;
 
-  var captured = {};
-  var stats = { images: 0, videos: 0 };
+  console.log('[IG Exporter] v2.0 Content script loaded');
 
-  function send(type, url) {
-    if (!url || typeof url !== "string" || url.length < 30) return;
-    if (url.indexOf("blob:") === 0) return;
-    if (url.indexOf("data:") === 0) return;
-    if (url.indexOf("static.cdninstagram.com") !== -1) return;
+  // ============================================
+  // STATE
+  // ============================================
+  
+  const state = {
+    posts: new Map(),        // shortcode -> post data
+    images: [],              // collected image URLs
+    videos: [],              // collected video URLs
+    carousels: [],           // collected carousel data
+    isAnalyzing: false,
+    panelVisible: false
+  };
+
+  // ============================================
+  // POST DETECTION LOGIC
+  // ============================================
+
+  /**
+   * Detect post type from a post element
+   * Returns: 'video' | 'image' | 'carousel' | 'unknown'
+   */
+  function detectPostType(postElement) {
+    // Check for video indicator (SVG with video/clip/reel icon)
+    const hasVideoIcon = postElement.querySelector([
+      'svg[aria-label="Clip"]',
+      'svg[aria-label="Reel"]', 
+      'svg[aria-label="Video"]',
+      '[aria-label="Clip"]',
+      '[aria-label="Reel"]'
+    ].join(','));
     
-    // Skip very small images (profile pics, icons)
-    if (url.indexOf("/s150x150/") !== -1) return;
-    if (url.indexOf("/s44x44/") !== -1) return;
-    if (url.indexOf("/s64x64/") !== -1) return;
-    if (url.indexOf("/s88x88/") !== -1) return;
-    if (url.indexOf("/s100x100/") !== -1) return;
-    if (url.indexOf("/s132x132/") !== -1) return;
-    if (url.indexOf("/s320x320/") !== -1) return;
+    // Check for video element
+    const hasVideoElement = postElement.querySelector('video');
     
-    // Skip profile pics pattern
-    if (url.indexOf("t51.2885-19") !== -1) return;
+    // Check for carousel indicators (multiple items indicator)
+    const hasCarouselIcon = postElement.querySelector([
+      'svg[aria-label="Carousel"]',
+      '[aria-label="Carousel"]',
+      // Carousel dot indicators
+      'div[style*="transform"]' // Carousel slides
+    ].join(','));
     
-    var key = url.split("?")[0];
-    if (captured[key]) return;
-    captured[key] = true;
-    
-    if (type === "IMAGE_URL") stats.images++;
-    if (type === "VIDEO_URL") stats.videos++;
-    
-    console.log("[IG] CAPTURED " + type + " #" + (type === "IMAGE_URL" ? stats.images : stats.videos) + ":", url.substring(0, 100));
-    
-    try {
-      chrome.runtime.sendMessage({ type: type, url: url });
-    } catch (e) {
-      console.log("[IG] Send error:", e.message);
+    // Check for multiple images icon (stacked squares)
+    const carouselSvg = postElement.querySelector('svg');
+    let isCarousel = false;
+    if (carouselSvg) {
+      const path = carouselSvg.querySelector('path');
+      if (path) {
+        const d = path.getAttribute('d') || '';
+        // Carousel icon has specific path pattern
+        if (d.includes('M19') && d.includes('M12') && d.length > 200) {
+          isCarousel = true;
+        }
+      }
     }
-  }
-
-  function isMediaUrl(url) {
-    if (!url) return false;
-    // Instagram CDN patterns
-    if (url.indexOf("instagram") !== -1) return true;
-    if (url.indexOf("cdninstagram") !== -1) return true;
-    if (url.indexOf("fbcdn") !== -1) return true;
-    if (url.indexOf("scontent") !== -1) return true;
-    return false;
-  }
-
-  function isVideoUrl(url) {
-    if (!url) return false;
-    if (url.indexOf(".mp4") !== -1) return true;
-    if (url.indexOf("video") !== -1 && isMediaUrl(url)) return true;
-    return false;
-  }
-
-  function scanDOM() {
-    // Scan all images
-    var imgs = document.querySelectorAll("img");
-    console.log("[IG] Scanning", imgs.length, "images");
     
-    imgs.forEach(function(img) {
-      var src = img.src || "";
-      var srcset = img.srcset || "";
-      
-      // Try srcset first for best quality
-      if (srcset && isMediaUrl(srcset)) {
-        var parts = srcset.split(",");
-        var bestUrl = "";
-        var bestW = 0;
-        parts.forEach(function(part) {
-          var match = part.trim().match(/^(\S+)\s+(\d+)w$/);
-          if (match) {
-            var w = parseInt(match[2]);
-            if (w > bestW) {
-              bestW = w;
-              bestUrl = match[1];
-            }
+    // Look for reels link
+    const reelLink = postElement.querySelector('a[href*="/reel/"]');
+    if (reelLink) {
+      return 'video';
+    }
+    
+    // Video detection
+    if (hasVideoElement || hasVideoIcon) {
+      return 'video';
+    }
+    
+    // Carousel detection
+    if (hasCarouselIcon || isCarousel) {
+      return 'carousel';
+    }
+    
+    // Default to image
+    return 'image';
+  }
+
+  /**
+   * Extract shortcode from post link
+   */
+  function extractShortcode(element) {
+    const link = element.querySelector('a[href*="/p/"], a[href*="/reel/"]') || 
+                 element.closest('a[href*="/p/"], a[href*="/reel/"]');
+    if (!link) return null;
+    
+    const href = link.href || link.getAttribute('href') || '';
+    const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
+    return match ? { type: match[1], code: match[2], href: href } : null;
+  }
+
+  /**
+   * Extract media URL from post element
+   */
+  function extractMediaUrl(element) {
+    // Try to get image src
+    const img = element.querySelector('img[src*="instagram"], img[src*="cdninstagram"], img[src*="fbcdn"]');
+    if (img) {
+      // Prefer srcset for higher quality
+      const srcset = img.srcset;
+      if (srcset) {
+        const parts = srcset.split(',');
+        let bestUrl = '';
+        let bestWidth = 0;
+        parts.forEach(part => {
+          const match = part.trim().match(/^(\S+)\s+(\d+)w$/);
+          if (match && parseInt(match[2]) > bestWidth) {
+            bestWidth = parseInt(match[2]);
+            bestUrl = match[1];
           }
         });
-        if (bestUrl) {
-          send("IMAGE_URL", bestUrl);
-        }
+        if (bestUrl) return bestUrl;
       }
-      
-      // Also try src
-      if (src && isMediaUrl(src)) {
-        send("IMAGE_URL", src);
-      }
-    });
-
-    // Scan all videos
-    var videos = document.querySelectorAll("video");
-    console.log("[IG] Scanning", videos.length, "videos");
-    
-    videos.forEach(function(video) {
-      var src = video.src || "";
-      if (src && isMediaUrl(src)) {
-        send("VIDEO_URL", src);
-      }
-      
-      // Check poster for thumbnail
-      var poster = video.poster || "";
-      if (poster && isMediaUrl(poster)) {
-        // Don't save poster as image if this is a video
-      }
-      
-      // Check source elements
-      var sources = video.querySelectorAll("source");
-      sources.forEach(function(source) {
-        var s = source.src || "";
-        if (s && isMediaUrl(s)) {
-          send("VIDEO_URL", s);
-        }
-      });
-    });
-    
-    console.log("[IG] Scan complete. Total:", stats.images, "images,", stats.videos, "videos");
-  }
-
-  // Process JSON from API
-  function processJson(obj, depth) {
-    if (!obj || typeof obj !== "object" || depth > 20) return;
-    depth = depth || 0;
-    
-    if (Array.isArray(obj)) {
-      for (var i = 0; i < obj.length; i++) {
-        processJson(obj[i], depth + 1);
-      }
-      return;
+      return img.src;
     }
     
-    var mediaType = obj.media_type;
-    var isVideo = mediaType === 2 || obj.is_video === true;
+    // Try video poster
+    const video = element.querySelector('video');
+    if (video && video.poster) {
+      return video.poster;
+    }
     
-    // Video
-    if (isVideo || obj.video_versions || obj.video_url) {
-      var videoUrl = null;
-      if (obj.video_versions && obj.video_versions.length > 0) {
-        var best = obj.video_versions[0];
-        for (var i = 1; i < obj.video_versions.length; i++) {
-          var v = obj.video_versions[i];
-          if ((v.width || 0) * (v.height || 0) > (best.width || 0) * (best.height || 0)) {
-            best = v;
+    return null;
+  }
+
+  /**
+   * Analyze a single post element
+   */
+  function analyzePost(postElement) {
+    const shortcodeInfo = extractShortcode(postElement);
+    if (!shortcodeInfo) return null;
+    
+    // Skip if already analyzed
+    if (state.posts.has(shortcodeInfo.code)) {
+      return state.posts.get(shortcodeInfo.code);
+    }
+    
+    const type = detectPostType(postElement);
+    const thumbnailUrl = extractMediaUrl(postElement);
+    
+    const postData = {
+      shortcode: shortcodeInfo.code,
+      type: type,
+      isReel: shortcodeInfo.type === 'reel',
+      url: shortcodeInfo.href,
+      thumbnailUrl: thumbnailUrl,
+      timestamp: Date.now()
+    };
+    
+    // Store in state
+    state.posts.set(shortcodeInfo.code, postData);
+    
+    // Categorize
+    if (type === 'video' || shortcodeInfo.type === 'reel') {
+      const videoData = {
+        shortcode: shortcodeInfo.code,
+        thumbnailUrl: thumbnailUrl,
+        videoUrl: null, // Will be fetched
+        postUrl: `https://www.instagram.com/${shortcodeInfo.type}/${shortcodeInfo.code}/`
+      };
+      state.videos.push(videoData);
+      
+      // Fetch actual video URL
+      fetchVideoUrl(shortcodeInfo.code, shortcodeInfo.type);
+      
+    } else if (type === 'carousel') {
+      state.carousels.push({
+        shortcode: shortcodeInfo.code,
+        thumbnailUrl: thumbnailUrl,
+        postUrl: `https://www.instagram.com/p/${shortcodeInfo.code}/`
+      });
+      // For carousels, also try to fetch all media
+      fetchCarouselMedia(shortcodeInfo.code);
+      
+    } else {
+      if (thumbnailUrl) {
+        state.images.push({
+          shortcode: shortcodeInfo.code,
+          imageUrl: thumbnailUrl,
+          postUrl: `https://www.instagram.com/p/${shortcodeInfo.code}/`
+        });
+      }
+    }
+    
+    return postData;
+  }
+
+  // Track fetched posts
+  const fetchedShortcodes = new Set();
+  const videoUrls = new Map(); // shortcode -> videoUrl
+
+  /**
+   * Fetch actual video URL from embed page
+   */
+  function fetchVideoUrl(shortcode, postType) {
+    if (fetchedShortcodes.has(shortcode)) return;
+    fetchedShortcodes.add(shortcode);
+    
+    const embedUrl = `https://www.instagram.com/${postType}/${shortcode}/embed/captioned/`;
+    
+    fetch(embedUrl, { credentials: 'include' })
+      .then(res => res.text())
+      .then(html => {
+        // Pattern 1: video_url in JSON
+        const match1 = html.match(/"video_url"\s*:\s*"([^"]+)"/);
+        if (match1) {
+          const url = decodeVideoUrl(match1[1]);
+          if (url) {
+            videoUrls.set(shortcode, url);
+            console.log('[IG Exporter] Got video URL for', shortcode);
+            updateVideoInState(shortcode, url);
+            return;
           }
         }
-        videoUrl = best.url;
-      }
-      if (!videoUrl && obj.video_url) {
-        videoUrl = obj.video_url;
-      }
-      if (videoUrl) {
-        send("VIDEO_URL", videoUrl);
-      }
-    }
-    
-    // Image (only if not video)
-    if (!isVideo && (obj.image_versions2 || obj.display_url)) {
-      var imageUrl = null;
-      if (obj.image_versions2 && obj.image_versions2.candidates && obj.image_versions2.candidates.length > 0) {
-        var best = obj.image_versions2.candidates[0];
-        for (var i = 1; i < obj.image_versions2.candidates.length; i++) {
-          var c = obj.image_versions2.candidates[i];
-          if ((c.width || 0) > (best.width || 0)) {
-            best = c;
-          }
-        }
-        imageUrl = best.url;
-      }
-      if (!imageUrl && obj.display_url) {
-        imageUrl = obj.display_url;
-      }
-      if (imageUrl) {
-        send("IMAGE_URL", imageUrl);
-      }
-    }
-    
-    // Carousel
-    if (obj.carousel_media) {
-      for (var i = 0; i < obj.carousel_media.length; i++) {
-        processJson(obj.carousel_media[i], depth + 1);
-      }
-    }
-    if (obj.edge_sidecar_to_children && obj.edge_sidecar_to_children.edges) {
-      for (var i = 0; i < obj.edge_sidecar_to_children.edges.length; i++) {
-        var e = obj.edge_sidecar_to_children.edges[i];
-        if (e && e.node) processJson(e.node, depth + 1);
-      }
-    }
-    
-    // Recurse into wrappers
-    if (obj.items) {
-      for (var i = 0; i < obj.items.length; i++) {
-        processJson(obj.items[i], depth + 1);
-      }
-    }
-    if (obj.edges) {
-      for (var i = 0; i < obj.edges.length; i++) {
-        if (obj.edges[i] && obj.edges[i].node) {
-          processJson(obj.edges[i].node, depth + 1);
-        }
-      }
-    }
-    if (obj.data) processJson(obj.data, depth + 1);
-    if (obj.graphql) processJson(obj.graphql, depth + 1);
-    if (obj.shortcode_media) processJson(obj.shortcode_media, depth + 1);
-    if (obj.xdt_shortcode_media) processJson(obj.xdt_shortcode_media, depth + 1);
-    
-    for (var key in obj) {
-      if (key.indexOf("edge_") === 0 && obj[key] && obj[key].edges) {
-        processJson(obj[key], depth + 1);
-      }
-    }
-  }
-
-  function processResponse(text, url) {
-    try {
-      var json = JSON.parse(text);
-      console.log("[IG] Processing API:", url.substring(0, 80));
-      processJson(json, 0);
-    } catch (e) {}
-  }
-
-  function isApiUrl(url) {
-    if (!url) return false;
-    return url.indexOf("/api/v1/") !== -1 ||
-           url.indexOf("/graphql") !== -1 ||
-           url.indexOf("i.instagram.com") !== -1;
-  }
-
-  // Intercept fetch
-  var origFetch = window.fetch;
-  window.fetch = function(input, init) {
-    var url = typeof input === "string" ? input : (input && input.url) || "";
-    
-    return origFetch.apply(this, arguments).then(function(res) {
-      if (res && res.ok && isApiUrl(url)) {
-        console.log("[IG] Intercepted fetch:", url.substring(0, 80));
-        res.clone().text().then(function(t) { processResponse(t, url); }).catch(function(){});
-      }
-      return res;
-    });
-  };
-
-  // Intercept XHR
-  var origOpen = XMLHttpRequest.prototype.open;
-  var origSend = XMLHttpRequest.prototype.send;
-  
-  XMLHttpRequest.prototype.open = function(m, url) {
-    this._url = url;
-    return origOpen.apply(this, arguments);
-  };
-  
-  XMLHttpRequest.prototype.send = function() {
-    var xhr = this;
-    if (isApiUrl(xhr._url)) {
-      console.log("[IG] Intercepted XHR:", (xhr._url || "").substring(0, 80));
-      xhr.addEventListener("load", function() {
-        try { processResponse(xhr.responseText, xhr._url); } catch(e) {}
-      });
-    }
-    return origSend.apply(this, arguments);
-  };
-
-  // Watch for DOM changes
-  var scanTimeout = null;
-  var observer = new MutationObserver(function() {
-    // Debounce scans
-    if (scanTimeout) clearTimeout(scanTimeout);
-    scanTimeout = setTimeout(function() {
-      scanDOM();
-      extractPageData();
-    }, 500);
-  });
-  
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
-  
-  // Watch for URL changes (clicking on posts)
-  var lastUrl = location.href;
-  setInterval(function() {
-    if (location.href !== lastUrl) {
-      console.log("[IG] URL changed to:", location.href);
-      lastUrl = location.href;
-      setTimeout(function() {
-        scanDOM();
-        extractPageData();
-      }, 1500);
-    }
-  }, 500);
-
-  // Extract data from page scripts
-  function extractPageData() {
-    console.log("[IG] Extracting embedded page data...");
-    
-    // Look for JSON in script tags
-    var scripts = document.querySelectorAll('script[type="application/json"]');
-    scripts.forEach(function(script, idx) {
-      try {
-        var text = script.textContent || "";
-        var data = JSON.parse(text);
-        console.log("[IG] Found JSON script #" + idx);
-        processJson(data, 0);
         
-        // Also search the raw text for video patterns
-        searchTextForVideos(text, "json#" + idx);
-      } catch(e) {}
-    });
-    
-    // Scan all inline scripts
-    var allScripts = document.querySelectorAll('script:not([src])');
-    allScripts.forEach(function(script, idx) {
-      var text = script.textContent || "";
-      if (text.length > 100) {
-        searchTextForVideos(text, "script#" + idx);
-      }
-    });
-  }
-  
-  function searchTextForVideos(text, source) {
-    // Pattern 1: Direct .mp4 URLs
-    var mp4Pattern = /https?:\\?\/\\?\/[^"'\s\\]+\.mp4[^"'\s\\]*/g;
-    var mp4Matches = text.match(mp4Pattern);
-    if (mp4Matches) {
-      mp4Matches.forEach(function(url) {
-        url = decodeUrl(url);
-        if (isMediaUrl(url)) {
-          console.log("[IG] Found .mp4 in " + source + ":", url.substring(0, 60));
-          send("VIDEO_URL", url);
+        // Pattern 2: contentUrl
+        const match2 = html.match(/"contentUrl"\s*:\s*"([^"]+)"/);
+        if (match2) {
+          const url = decodeVideoUrl(match2[1]);
+          if (url && url.includes('.mp4')) {
+            videoUrls.set(shortcode, url);
+            console.log('[IG Exporter] Got video URL for', shortcode);
+            updateVideoInState(shortcode, url);
+            return;
+          }
         }
+        
+        // Pattern 3: Direct .mp4 URL
+        const mp4Match = html.match(/https?:[^"'\s\\]+\.mp4[^"'\s\\]*/);
+        if (mp4Match) {
+          const url = decodeVideoUrl(mp4Match[0]);
+          if (url) {
+            videoUrls.set(shortcode, url);
+            console.log('[IG Exporter] Got video URL for', shortcode);
+            updateVideoInState(shortcode, url);
+          }
+        }
+      })
+      .catch(err => {
+        console.log('[IG Exporter] Failed to fetch video for', shortcode);
       });
-    }
-    
-    // Pattern 2: "video_url":"..."
-    var vuPattern = /"video_url"\s*:\s*"([^"]+)"/g;
-    var match;
-    while ((match = vuPattern.exec(text)) !== null) {
-      var url = decodeUrl(match[1]);
-      if (url && url.length > 30) {
-        console.log("[IG] Found video_url in " + source + ":", url.substring(0, 60));
-        send("VIDEO_URL", url);
-      }
-    }
-    
-    // Pattern 3: video_versions array with url
-    var vvPattern = /"url"\s*:\s*"(https?:[^"]+)"/g;
-    while ((match = vvPattern.exec(text)) !== null) {
-      var url = decodeUrl(match[1]);
-      if (url && (url.indexOf(".mp4") !== -1 || url.indexOf("/video") !== -1)) {
-        console.log("[IG] Found video version URL in " + source + ":", url.substring(0, 60));
-        send("VIDEO_URL", url);
-      }
-    }
   }
-  
-  function decodeUrl(url) {
-    if (!url) return "";
+
+  function decodeVideoUrl(url) {
+    if (!url) return null;
     return url
-      .replace(/\\u002F/g, "/")
-      .replace(/\\u0026/g, "&")
-      .replace(/\\\//g, "/")
-      .replace(/\\/g, "");
+      .replace(/\\u002F/g, '/')
+      .replace(/\\u0026/g, '&')
+      .replace(/\\\//g, '/')
+      .replace(/\\/g, '');
   }
 
-  // Initial scan
-  setTimeout(function() {
-    console.log("[IG] Running initial scan...");
-    scanDOM();
-    extractPageData();
-  }, 2000);
-
-  // Periodic scan
-  setInterval(function() {
-    scanDOM();
-  }, 5000);
-  
-  // Also extract page data periodically (less frequently)
-  setInterval(function() {
-    extractPageData();
-  }, 10000);
-
-  // Auto scroll
-  var scrolling = false;
-  var scrollTimer = null;
-
-  function toast(msg) {
-    var t = document.getElementById("ig-exp-toast");
-    if (t) t.remove();
-    t = document.createElement("div");
-    t.id = "ig-exp-toast";
-    t.textContent = msg;
-    t.style.cssText = "position:fixed;bottom:20px;right:20px;background:linear-gradient(135deg,#833ab4,#E1306C);color:#fff;padding:14px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:999999;box-shadow:0 4px 20px rgba(0,0,0,0.4);";
-    document.body.appendChild(t);
-    setTimeout(function() { if (t.parentNode) t.remove(); }, 4000);
-  }
-
-  function startScroll() {
-    if (scrolling) return;
-    scrolling = true;
-    toast("Scrolling... capturing media");
+  function updateVideoInState(shortcode, videoUrl) {
+    // Update the video in state
+    const video = state.videos.find(v => v.shortcode === shortcode);
+    if (video) {
+      video.videoUrl = videoUrl;
+    }
     
-    var lastH = 0, stable = 0;
-    scrollTimer = setInterval(function() {
+    // Save to storage
+    saveToStorage();
+  }
+
+  /**
+   * Fetch carousel media (gets all images/videos in carousel)
+   */
+  function fetchCarouselMedia(shortcode) {
+    if (fetchedShortcodes.has('carousel_' + shortcode)) return;
+    fetchedShortcodes.add('carousel_' + shortcode);
+    
+    // For carousels, we just use the thumbnail for now
+    // Full carousel extraction would require more complex API calls
+    console.log('[IG Exporter] Carousel detected:', shortcode);
+  }
+
+  /**
+   * Scan all visible posts
+   */
+  function scanPosts() {
+    // Find all post containers - Instagram uses links with /p/ or /reel/
+    const postLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
+    
+    let newCount = 0;
+    postLinks.forEach(link => {
+      // Get the parent container that has the full post UI
+      const container = link.closest('div[class*="x1lliihq"]') || link.parentElement;
+      if (container && !state.posts.has(extractShortcode(container)?.code)) {
+        const result = analyzePost(container);
+        if (result) newCount++;
+      }
+    });
+    
+    if (newCount > 0) {
+      console.log(`[IG Exporter] Found ${newCount} new posts. Total: ${state.images.length} images, ${state.videos.length} videos, ${state.carousels.length} carousels`);
+      updatePanel();
+      saveToStorage();
+    }
+    
+    return {
+      images: state.images.length,
+      videos: state.videos.length,
+      carousels: state.carousels.length,
+      total: state.posts.size
+    };
+  }
+
+  // ============================================
+  // UI PANEL
+  // ============================================
+
+  function createPanel() {
+    if (document.getElementById('ig-exporter-panel')) return;
+    
+    const panel = document.createElement('div');
+    panel.id = 'ig-exporter-panel';
+    panel.innerHTML = `
+      <div class="ig-exp-header">
+        <span class="ig-exp-title">📸 Media Exporter</span>
+        <button class="ig-exp-minimize" title="Minimize">−</button>
+      </div>
+      <div class="ig-exp-content">
+        <div class="ig-exp-stats">
+          <div class="ig-exp-stat ig-exp-stat-images">
+            <span class="ig-exp-count" id="ig-exp-images">0</span>
+            <span class="ig-exp-label">Images</span>
+          </div>
+          <div class="ig-exp-stat ig-exp-stat-videos">
+            <span class="ig-exp-count" id="ig-exp-videos">0</span>
+            <span class="ig-exp-label">Videos</span>
+          </div>
+          <div class="ig-exp-stat ig-exp-stat-carousels">
+            <span class="ig-exp-count" id="ig-exp-carousels">0</span>
+            <span class="ig-exp-label">Carousels</span>
+          </div>
+        </div>
+        <div class="ig-exp-actions">
+          <button id="ig-exp-scan" class="ig-exp-btn ig-exp-btn-primary">🔍 Scan Posts</button>
+          <button id="ig-exp-scroll" class="ig-exp-btn">📜 Auto Scroll</button>
+        </div>
+        <div class="ig-exp-actions">
+          <button id="ig-exp-export-json" class="ig-exp-btn">📄 Export JSON</button>
+          <button id="ig-exp-export-csv" class="ig-exp-btn">📊 Export CSV</button>
+        </div>
+        <div class="ig-exp-actions">
+          <button id="ig-exp-gallery" class="ig-exp-btn ig-exp-btn-secondary">🖼️ Open Gallery</button>
+        </div>
+        <div class="ig-exp-status" id="ig-exp-status"></div>
+      </div>
+    `;
+    
+    document.body.appendChild(panel);
+    
+    // Event listeners
+    panel.querySelector('.ig-exp-minimize').onclick = togglePanel;
+    panel.querySelector('#ig-exp-scan').onclick = () => {
+      setStatus('Scanning...');
+      const results = scanPosts();
+      setStatus(`Found ${results.total} posts`);
+    };
+    panel.querySelector('#ig-exp-scroll').onclick = toggleAutoScroll;
+    panel.querySelector('#ig-exp-export-json').onclick = exportJSON;
+    panel.querySelector('#ig-exp-export-csv').onclick = exportCSV;
+    panel.querySelector('#ig-exp-gallery').onclick = openGallery;
+    
+    state.panelVisible = true;
+  }
+
+  function togglePanel() {
+    const panel = document.getElementById('ig-exporter-panel');
+    if (!panel) return;
+    
+    const content = panel.querySelector('.ig-exp-content');
+    const btn = panel.querySelector('.ig-exp-minimize');
+    
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      btn.textContent = '−';
+    } else {
+      content.style.display = 'none';
+      btn.textContent = '+';
+    }
+  }
+
+  function updatePanel() {
+    const imgEl = document.getElementById('ig-exp-images');
+    const vidEl = document.getElementById('ig-exp-videos');
+    const carEl = document.getElementById('ig-exp-carousels');
+    
+    if (imgEl) imgEl.textContent = state.images.length;
+    if (vidEl) vidEl.textContent = state.videos.length;
+    if (carEl) carEl.textContent = state.carousels.length;
+  }
+
+  function setStatus(msg) {
+    const el = document.getElementById('ig-exp-status');
+    if (el) el.textContent = msg;
+  }
+
+  // ============================================
+  // AUTO SCROLL
+  // ============================================
+
+  let scrollInterval = null;
+  let scrolling = false;
+
+  function toggleAutoScroll() {
+    const btn = document.getElementById('ig-exp-scroll');
+    
+    if (scrolling) {
+      stopAutoScroll();
+      if (btn) btn.textContent = '📜 Auto Scroll';
+    } else {
+      startAutoScroll();
+      if (btn) btn.textContent = '⏹️ Stop Scroll';
+    }
+  }
+
+  function startAutoScroll() {
+    scrolling = true;
+    let lastHeight = 0;
+    let stableCount = 0;
+    
+    setStatus('Scrolling...');
+    
+    scrollInterval = setInterval(() => {
       if (!scrolling) return;
-      window.scrollTo(0, document.body.scrollHeight);
-      scanDOM();
       
-      if (document.body.scrollHeight === lastH) {
-        stable++;
-        if (stable >= 8) {
-          stopScroll();
-          toast("Done! " + stats.images + " images, " + stats.videos + " videos");
+      window.scrollTo(0, document.body.scrollHeight);
+      scanPosts();
+      
+      setStatus(`${state.posts.size} posts found...`);
+      
+      if (document.body.scrollHeight === lastHeight) {
+        stableCount++;
+        if (stableCount >= 5) {
+          stopAutoScroll();
+          setStatus(`Done! ${state.posts.size} posts`);
+          document.getElementById('ig-exp-scroll').textContent = '📜 Auto Scroll';
         }
       } else {
-        stable = 0;
-        lastH = document.body.scrollHeight;
+        stableCount = 0;
+        lastHeight = document.body.scrollHeight;
       }
     }, 1500);
   }
 
-  function stopScroll() {
+  function stopAutoScroll() {
     scrolling = false;
-    if (scrollTimer) {
-      clearInterval(scrollTimer);
-      scrollTimer = null;
+    if (scrollInterval) {
+      clearInterval(scrollInterval);
+      scrollInterval = null;
     }
   }
 
-  chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
-    if (msg.type === "PING_CONTENT") sendResponse({ ok: true });
-    if (msg.type === "START_AUTO_SCROLL") startScroll();
-    if (msg.type === "STOP_AUTO_SCROLL") stopScroll();
-    if (msg.type === "GET_AUTO_SCROLL_STATUS") sendResponse({ running: scrolling });
-    if (msg.type === "GET_POST_COUNT") sendResponse({ count: document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').length });
+  // ============================================
+  // EXPORT FUNCTIONS
+  // ============================================
+
+  function exportJSON() {
+    const data = {
+      exportDate: new Date().toISOString(),
+      stats: {
+        images: state.images.length,
+        videos: state.videos.length,
+        carousels: state.carousels.length,
+        total: state.posts.size
+      },
+      images: state.images,
+      videos: state.videos,
+      carousels: state.carousels
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    downloadFile(blob, `instagram-saved-${Date.now()}.json`);
+    setStatus('Exported JSON');
+  }
+
+  function exportCSV() {
+    let csv = 'Type,Shortcode,URL,Thumbnail\n';
+    
+    state.images.forEach(item => {
+      csv += `image,${item.shortcode},${item.postUrl},${item.imageUrl}\n`;
+    });
+    
+    state.videos.forEach(item => {
+      csv += `video,${item.shortcode},${item.postUrl},${item.thumbnailUrl}\n`;
+    });
+    
+    state.carousels.forEach(item => {
+      csv += `carousel,${item.shortcode},${item.postUrl},${item.thumbnailUrl}\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    downloadFile(blob, `instagram-saved-${Date.now()}.csv`);
+    setStatus('Exported CSV');
+  }
+
+  function downloadFile(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function openGallery() {
+    chrome.runtime.sendMessage({ type: 'OPEN_GALLERY' });
+  }
+
+  // ============================================
+  // STORAGE
+  // ============================================
+
+  function saveToStorage() {
+    const data = {
+      images: state.images,
+      videos: state.videos,
+      carousels: state.carousels
+    };
+    
+    // Collect actual video URLs (or post URLs as fallback)
+    const videoUrlList = state.videos.map(v => v.videoUrl || v.postUrl).filter(Boolean);
+    
+    // Save full data for export
+    // Also save URL arrays for gallery compatibility
+    chrome.storage.local.set({
+      igExporterData: data,
+      imageUrls: state.images.map(i => i.imageUrl).filter(Boolean),
+      videoUrls: videoUrlList
+    });
+    
+    console.log('[IG Exporter] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
+  }
+
+  function loadFromStorage() {
+    chrome.storage.local.get(['igExporterData'], (result) => {
+      if (result.igExporterData) {
+        state.images = result.igExporterData.images || [];
+        state.videos = result.igExporterData.videos || [];
+        state.carousels = result.igExporterData.carousels || [];
+        
+        // Rebuild posts map
+        [...state.images, ...state.videos, ...state.carousels].forEach(item => {
+          state.posts.set(item.shortcode, item);
+        });
+        
+        updatePanel();
+        console.log('[IG Exporter] Loaded from storage:', state.posts.size, 'posts');
+      }
+    });
+  }
+
+  // ============================================
+  // MUTATION OBSERVER
+  // ============================================
+
+  let scanDebounce = null;
+  
+  const observer = new MutationObserver((mutations) => {
+    // Debounce scans
+    if (scanDebounce) clearTimeout(scanDebounce);
+    scanDebounce = setTimeout(() => {
+      scanPosts();
+    }, 500);
   });
 
-  console.log("[IG] v3.1 Ready and watching");
+  // ============================================
+  // MESSAGE HANDLING
+  // ============================================
+
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    switch (msg.type) {
+      case 'PING':
+        sendResponse({ ok: true });
+        break;
+      case 'GET_STATS':
+        sendResponse({
+          images: state.images.length,
+          videos: state.videos.length,
+          carousels: state.carousels.length,
+          total: state.posts.size
+        });
+        break;
+      case 'SCAN':
+        const results = scanPosts();
+        sendResponse(results);
+        break;
+      case 'START_SCROLL':
+        startAutoScroll();
+        sendResponse({ ok: true });
+        break;
+      case 'STOP_SCROLL':
+        stopAutoScroll();
+        sendResponse({ ok: true });
+        break;
+      case 'CLEAR':
+        state.posts.clear();
+        state.images = [];
+        state.videos = [];
+        state.carousels = [];
+        updatePanel();
+        chrome.storage.local.remove(['igExporterData', 'imageUrls', 'videoUrls']);
+        sendResponse({ ok: true });
+        break;
+    }
+    return true;
+  });
+
+  // ============================================
+  // INITIALIZATION
+  // ============================================
+
+  function init() {
+    // Create UI panel
+    createPanel();
+    
+    // Load saved data
+    loadFromStorage();
+    
+    // Start observing DOM changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Initial scan
+    setTimeout(scanPosts, 2000);
+    
+    console.log('[IG Exporter] Initialized');
+  }
+
+  // Wait for page to be ready
+  if (document.readyState === 'complete') {
+    init();
+  } else {
+    window.addEventListener('load', init);
+  }
+
 })();

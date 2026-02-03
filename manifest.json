@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Instagram Saved Media Exporter",
-  "version": "1.0.0",
-  "description": "Extract and export images and videos from your Instagram saved posts",
+  "version": "2.0.0",
+  "description": "Analyze and export images, videos, and carousels from your Instagram saved posts",
   "icons": {
     "16": "assets/icons/icon-16.png",
     "32": "assets/icons/icon-32.png",
@@ -11,14 +11,11 @@
   },
   "permissions": [
     "storage",
-    "tabs",
-    "scripting"
+    "activeTab"
   ],
   "host_permissions": [
     "https://www.instagram.com/*",
-    "https://instagram.com/*",
-    "https://*.cdninstagram.com/*",
-    "https://scontent*.cdninstagram.com/*"
+    "https://instagram.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -29,10 +26,9 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
-      "js": [
-        "content.js"
-      ],
-      "run_at": "document_start"
+      "js": ["content.js"],
+      "css": ["content-styles.css"],
+      "run_at": "document_idle"
     }
   ],
   "action": {

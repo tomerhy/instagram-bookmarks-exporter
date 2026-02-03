@@ -1,71 +1,37 @@
-// Initialize media storage
-var mediaUrls = {
-  images: new Set(),
-  videos: new Set()
-};
+/**
+ * Instagram Saved Media Exporter - Background Script
+ * Handles data persistence and gallery management
+ */
 
-// Load existing URLs from storage on startup
-chrome.storage.local.get({ imageUrls: [], videoUrls: [] }, function(data) {
-  if (data.imageUrls) {
-    data.imageUrls.forEach(function(url) { mediaUrls.images.add(url); });
-  }
-  if (data.videoUrls) {
-    data.videoUrls.forEach(function(url) { mediaUrls.videos.add(url); });
-  }
-  console.log("[BG] Loaded", mediaUrls.images.size, "images,", mediaUrls.videos.size, "videos");
-});
+console.log('[IG Exporter] Background script loaded');
 
-// Clear storage on extension install/reload
-chrome.runtime.onInstalled.addListener(function() {
-  console.log("[BG] Extension installed/reloaded - clearing storage");
-  mediaUrls.images.clear();
-  mediaUrls.videos.clear();
-  chrome.storage.local.set({ imageUrls: [], videoUrls: [] });
-});
-
-function saveToStorage() {
-  var imgArr = Array.from(mediaUrls.images);
-  var vidArr = Array.from(mediaUrls.videos);
-  chrome.storage.local.set({
-    imageUrls: imgArr,
-    videoUrls: vidArr
-  });
-  console.log("[BG] Saved:", imgArr.length, "images,", vidArr.length, "videos");
-}
-
-chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
-  console.log("[BG] Received message:", msg.type);
+// Handle messages from content script and popup
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  console.log('[IG Exporter] Message received:', msg.type);
   
-  if (msg.type === "IMAGE_URL") {
-    if (!mediaUrls.images.has(msg.url)) {
-      mediaUrls.images.add(msg.url);
-      saveToStorage();
-      console.log("[BG] Added image, total:", mediaUrls.images.size);
-    }
-  }
-
-  if (msg.type === "VIDEO_URL") {
-    if (!mediaUrls.videos.has(msg.url)) {
-      mediaUrls.videos.add(msg.url);
-      saveToStorage();
-      console.log("[BG] Added video, total:", mediaUrls.videos.size);
-    }
-  }
-
-  if (msg.type === "GET_URLS") {
-    sendResponse({
-      images: Array.from(mediaUrls.images),
-      videos: Array.from(mediaUrls.videos)
-    });
-    return true;
-  }
-
-  if (msg.type === "CLEAR_URLS") {
-    mediaUrls.images.clear();
-    mediaUrls.videos.clear();
-    chrome.storage.local.set({ imageUrls: [], videoUrls: [] });
-    console.log("[BG] Cleared all URLs");
+  switch (msg.type) {
+    case 'OPEN_GALLERY':
+      chrome.tabs.create({ url: chrome.runtime.getURL('gallery.html') });
+      sendResponse({ ok: true });
+      break;
+      
+    case 'GET_DATA':
+      chrome.storage.local.get(['igExporterData', 'imageUrls', 'videoUrls'], (result) => {
+        sendResponse(result);
+      });
+      return true; // Async response
+      
+    case 'CLEAR_DATA':
+      chrome.storage.local.remove(['igExporterData', 'imageUrls', 'videoUrls'], () => {
+        sendResponse({ ok: true });
+      });
+      return true;
   }
 });
 
-console.log("[BG] Background script loaded");
+// Clear data on extension install/reload
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('[IG Exporter] Extension installed/reloaded');
+  // Optionally clear data on install
+  // chrome.storage.local.clear();
+});

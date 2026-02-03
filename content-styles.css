@@ -1,0 +1,160 @@
+/**
+ * Instagram Saved Media Exporter - Panel Styles
+ */
+
+#ig-exporter-panel {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 280px;
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 999999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #fff;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ig-exp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #833ab4 0%, #E1306C 50%, #fd1d1d 100%);
+  cursor: move;
+}
+
+.ig-exp-title {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+.ig-exp-minimize {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.ig-exp-minimize:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.ig-exp-content {
+  padding: 16px;
+}
+
+.ig-exp-stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ig-exp-stat {
+  flex: 1;
+  text-align: center;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s, background 0.2s;
+  cursor: pointer;
+}
+
+.ig-exp-stat:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.ig-exp-stat-images { border-color: rgba(64, 196, 99, 0.4); }
+.ig-exp-stat-videos { border-color: rgba(225, 48, 108, 0.4); }
+.ig-exp-stat-carousels { border-color: rgba(131, 58, 180, 0.4); }
+
+.ig-exp-count {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.ig-exp-stat-images .ig-exp-count { color: #40c463; }
+.ig-exp-stat-videos .ig-exp-count { color: #E1306C; }
+.ig-exp-stat-carousels .ig-exp-count { color: #833ab4; }
+
+.ig-exp-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ig-exp-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ig-exp-btn {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.ig-exp-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.ig-exp-btn-primary {
+  background: linear-gradient(135deg, #833ab4, #E1306C);
+  border: none;
+}
+
+.ig-exp-btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.ig-exp-btn-secondary {
+  background: linear-gradient(135deg, #405DE6, #833ab4);
+  border: none;
+}
+
+.ig-exp-btn-secondary:hover {
+  opacity: 0.9;
+}
+
+.ig-exp-status {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  padding-top: 8px;
+  min-height: 16px;
+}
+
+/* Animations */
+@keyframes ig-exp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ig-exp-scanning {
+  animation: ig-exp-pulse 1s ease-in-out infinite;
+}
