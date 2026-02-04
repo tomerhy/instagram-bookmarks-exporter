@@ -65,6 +65,70 @@
   }
 
   // ============================================
+  // FETCH INDIVIDUAL POSTS
+  // ============================================
+
+  const fetchedCarousels = new Set();
+
+  async function fetchCarouselItems(shortcode) {
+    if (fetchedCarousels.has(shortcode)) return;
+    fetchedCarousels.add(shortcode);
+    
+    console.log('[IG Exporter] Fetching carousel details for:', shortcode);
+    
+    try {
+      // Try the GraphQL endpoint
+      const response = await fetch(`https://www.instagram.com/p/${shortcode}/?__a=1&__d=dis`, {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[IG Exporter] Carousel fetch response:', Object.keys(data));
+        
+        // Parse the response
+        if (data.items?.[0]) {
+          const item = data.items[0];
+          if (item.carousel_media?.length > 0) {
+            console.log('[IG Exporter] Found', item.carousel_media.length, 'carousel items');
+            item.carousel_media.forEach((carouselItem, idx) => {
+              const imageUrl = carouselItem.image_versions2?.candidates?.[0]?.url;
+              const videoUrl = carouselItem.video_versions?.[0]?.url;
+              const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+              
+              if (carouselItem.media_type === 2 && videoUrl) {
+                addVideo(videoUrl, postUrl, imageUrl);
+              } else if (imageUrl) {
+                addImage(imageUrl, postUrl, imageUrl);
+              }
+            });
+            updatePanel();
+            saveToStorage();
+          }
+        } else if (data.graphql?.shortcode_media) {
+          const media = data.graphql.shortcode_media;
+          if (media.edge_sidecar_to_children?.edges) {
+            console.log('[IG Exporter] Found', media.edge_sidecar_to_children.edges.length, 'sidecar items');
+            const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+            media.edge_sidecar_to_children.edges.forEach((edge, idx) => {
+              const node = edge.node;
+              if (node.is_video && node.video_url) {
+                addVideo(node.video_url, postUrl, node.display_url);
+              } else if (node.display_url) {
+                addImage(node.display_url, postUrl, node.display_url);
+              }
+            });
+            updatePanel();
+            saveToStorage();
+          }
+        }
+      }
+    } catch (error) {
+      console.log('[IG Exporter] Carousel fetch error:', error.message);
+    }
+  }
+
+  // ============================================
   // API RESPONSE PARSING
   // ============================================
 
@@ -97,13 +161,27 @@
       
       // CAROUSEL (media_type === 8) - process children first
       if (item.media_type === 8) {
-        console.log('[IG Exporter] Found carousel with', item.carousel_media?.length || 0, 'items');
-        if (item.carousel_media?.length > 0) {
-          item.carousel_media.forEach((carouselItem, idx) => {
+        const carouselItems = item.carousel_media || [];
+        console.log('[IG Exporter] Found carousel:', { 
+          shortcode, 
+          itemCount: carouselItems.length,
+          hasCarouselMedia: !!item.carousel_media 
+        });
+        
+        if (carouselItems.length > 0) {
+          carouselItems.forEach((carouselItem, idx) => {
             parseMedia(carouselItem, shortcode, idx + 1);
           });
+        } else {
+          // Carousel detected but no items - fetch the post to get all items
+          console.log('[IG Exporter] Carousel has no items, fetching post:', shortcode);
+          fetchCarouselItems(shortcode);
+          // Still add the thumbnail as fallback
+          if (imageUrl) {
+            if (addImage(imageUrl, postUrl, imageUrl)) count++;
+          }
         }
-        return; // Don't add the carousel itself, only its children
+        return;
       }
       
       // Edge sidecar (GraphQL carousel format)
@@ -325,7 +403,42 @@
       }
     });
     
-    // Find post links (for posts we haven't captured yet)
+    // Find post links and detect carousels
+    document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(link => {
+      const href = link.href;
+      if (!href) return;
+      
+      // Extract shortcode
+      const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
+      if (!match) return;
+      const shortcode = match[2];
+      
+      // Check for carousel indicator (multiple items icon)
+      const hasCarouselIcon = link.querySelector('svg[aria-label*="Carousel"]') ||
+                              link.querySelector('[aria-label*="Carousel"]') ||
+                              link.parentElement?.querySelector('svg[aria-label*="Carousel"]');
+      
+      // Also check for the stacked squares icon (carousel indicator)
+      const svgs = link.querySelectorAll('svg');
+      let isCarousel = hasCarouselIcon;
+      svgs.forEach(svg => {
+        const path = svg.querySelector('path');
+        if (path) {
+          const d = path.getAttribute('d') || '';
+          // Carousel icon typically has a specific pattern
+          if (d.includes('M19') && d.includes('M3') && d.length > 100) {
+            isCarousel = true;
+          }
+        }
+      });
+      
+      if (isCarousel && !fetchedCarousels.has(shortcode)) {
+        console.log('[IG Exporter] Detected carousel from DOM:', shortcode);
+        fetchCarouselItems(shortcode);
+      }
+    });
+    
+    // Legacy: Find post links (for posts we haven't captured yet)
     document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(link => {
       const href = link.href;
       if (!href || state.seenUrls.has(href)) return;
