@@ -63,6 +63,13 @@ function logDebug(msg) {
 function getItemUrl(item) {
   if (!item) return null;
   if (typeof item === 'string') return item;
+  return item.url || item.imageUrl || item.videoUrl || item.postUrl || null;
+}
+
+// Helper to get the actual media URL (not post URL) - for playback
+function getMediaUrl(item) {
+  if (!item) return null;
+  if (typeof item === 'string') return item;
   return item.url || item.imageUrl || item.videoUrl || null;
 }
 
@@ -106,35 +113,38 @@ function deduplicateItems(items) {
 }
 
 function showVideo(item) {
-  var url = getItemUrl(item);
-  if (!url) return;
+  var mediaUrl = getMediaUrl(item);  // Direct video URL (may be null)
+  var postUrl = getItemPostUrl(item);  // Instagram post URL (fallback)
+  var displayUrl = mediaUrl || postUrl;
+  
+  if (!displayUrl) {
+    logDebug("No URL available for video");
+    return;
+  }
   
   viewerPlaceholder.style.display = "none";
   imageViewer.style.display = "none";
   fullscreenBtn.style.display = "none";
   
-  logDebug("Playing video: " + url.substring(0, 80) + "...");
+  logDebug("Playing video: " + displayUrl.substring(0, 80) + "...");
   
-  // Check if this is an Instagram post URL (not a video file)
-  var isPostUrl = url.indexOf("instagram.com/p/") !== -1 || 
-                  url.indexOf("instagram.com/reel/") !== -1;
+  // Check if we have a direct video file URL
+  var isVideoFile = mediaUrl && (
+    mediaUrl.indexOf(".mp4") !== -1 || 
+    mediaUrl.indexOf("/v/") !== -1 ||
+    (mediaUrl.indexOf("video") !== -1 && 
+    (mediaUrl.indexOf("fbcdn") !== -1 || mediaUrl.indexOf("cdninstagram") !== -1)));
   
-  // Check if this is a playable video URL
-  var isVideoFile = url.indexOf(".mp4") !== -1 || 
-                    url.indexOf("/v/") !== -1 ||
-                    (url.indexOf("video") !== -1 && 
-                    (url.indexOf("fbcdn") !== -1 || url.indexOf("cdninstagram") !== -1));
-  
-  if (isPostUrl && !isVideoFile) {
-    // It's a post URL, show a message and link
+  if (!isVideoFile) {
+    // No direct video URL - show link to Instagram
     player.style.display = "none";
     viewerPlaceholder.style.display = "flex";
-    viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Video URL not available</p><a href="' + url + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open on Instagram →</a></div>';
+    viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Direct video URL not captured</p><a href="' + (postUrl || displayUrl) + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open on Instagram →</a></div>';
     setStatus("Click link to view on Instagram");
   } else {
     // Try to play the video
     player.style.display = "block";
-    player.src = url;
+    player.src = mediaUrl;
     player.load();
     
     player.onloadeddata = function() {
@@ -149,12 +159,11 @@ function showVideo(item) {
       setStatus("Video can't play here. Click to open.");
       player.style.display = "none";
       viewerPlaceholder.style.display = "flex";
-      var postUrl = getItemPostUrl(item) || url;
-      viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Video failed to load</p><a href="' + postUrl + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open in new tab →</a></div>';
+      viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Video failed to load</p><a href="' + (postUrl || mediaUrl) + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open in new tab →</a></div>';
     };
     
     player.onclick = function() {
-      window.open(url, "_blank");
+      window.open(mediaUrl, "_blank");
     };
   }
   
@@ -667,44 +676,68 @@ tabs.forEach(function(tab) {
 
 downloadCurrentBtn.onclick = function() {
   if (!currentViewItem) { setStatus("Select an item first."); return; }
-  var url = getItemUrl(currentViewItem);
+  var url = getMediaUrl(currentViewItem);
   if (url) {
     downloadFile(url, getFilename(currentViewItem, currentViewType));
     setStatus("Download started!");
+  } else {
+    // Fallback: open Instagram post
+    var postUrl = getItemPostUrl(currentViewItem);
+    if (postUrl) {
+      window.open(postUrl, "_blank");
+      setStatus("Opening Instagram...");
+    } else {
+      setStatus("No URL available");
+    }
   }
 };
 
 downloadAllBtn.onclick = function() {
   var items = getCurrentItems();
   if (items.length === 0) { setStatus("No media."); return; }
-  setStatus("Downloading " + items.length + " files...");
+  
+  // Filter items that have downloadable URLs
+  var downloadableItems = items.filter(function(item) {
+    return getMediaUrl(item) !== null;
+  });
+  
+  if (downloadableItems.length === 0) {
+    setStatus("No downloadable URLs. Try scrolling Instagram to capture more.");
+    return;
+  }
+  
+  setStatus("Downloading " + downloadableItems.length + " files...");
   var i = 0;
   var next = function() {
-    if (i >= items.length) { setStatus("Complete!"); setProgress(100); return; }
-    var url = getItemUrl(items[i]);
+    if (i >= downloadableItems.length) { setStatus("Complete!"); setProgress(100); return; }
+    var url = getMediaUrl(downloadableItems[i]);
     if (url) {
-      downloadFile(url, getFilename(items[i], currentTab === "videos" ? "video" : "image"));
+      downloadFile(url, getFilename(downloadableItems[i], currentTab === "videos" ? "video" : "image"));
     }
     i++;
-    setProgress((i / items.length) * 100);
+    setProgress((i / downloadableItems.length) * 100);
     setTimeout(next, 500);
   };
   next();
 };
 
 copyBtn.onclick = function() {
-  var urls = getCurrentItems().map(getItemUrl).filter(Boolean);
-  navigator.clipboard.writeText(urls.join("\n")).then(function() { setStatus("Copied!"); });
+  var urls = getCurrentItems().map(function(item) {
+    return getMediaUrl(item) || getItemPostUrl(item);
+  }).filter(Boolean);
+  navigator.clipboard.writeText(urls.join("\n")).then(function() { setStatus("Copied " + urls.length + " URLs!"); });
 };
 
 exportBtn.onclick = function() {
-  var urls = getCurrentItems().map(getItemUrl).filter(Boolean);
+  var urls = getCurrentItems().map(function(item) {
+    return getMediaUrl(item) || getItemPostUrl(item);
+  }).filter(Boolean);
   var blob = new Blob([urls.join("\n")], { type: "text/plain" });
   var link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = "instagram-" + currentTab + ".txt";
   link.click();
-  setStatus("Exported!");
+  setStatus("Exported " + urls.length + " URLs!");
 };
 
 importBtn.onclick = function() { fileInput.click(); };
