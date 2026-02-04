@@ -17,8 +17,6 @@
   if (window.__igAutoplayInjected) return;
   window.__igAutoplayInjected = true;
 
-  console.log('[IG Autoplay] Auto-play feature loaded');
-
   // ============================================
   // CONFIGURATION
   // ============================================
@@ -339,7 +337,6 @@
       progress
     });
     
-    console.log('[IG Autoplay] Wrapped video element');
   }
 
   function toggleMute(video) {
@@ -364,7 +361,6 @@
       const nextVideo = videos[currentIndex + 1];
       if (nextVideo.preload === 'none') {
         nextVideo.preload = 'metadata';
-        console.log('[IG Autoplay] Preloading next video');
       }
     }
   }
@@ -395,14 +391,9 @@
       if (videoState?.container) {
         videoState.container.classList.add(CONFIG.classes.playing);
       }
-      
-      console.log('[IG Autoplay] Playing video');
     } catch (error) {
       if (error.name === 'NotAllowedError') {
-        // Autoplay was blocked - this is expected if not muted
-        console.log('[IG Autoplay] Autoplay blocked - ensure video is muted');
-        
-        // Try again with mute
+        // Autoplay was blocked - try again with mute
         if (!video.muted) {
           video.muted = true;
           state.muted = true;
@@ -410,14 +401,11 @@
             await video.play();
             state.currentlyPlaying = video;
           } catch (e) {
-            console.log('[IG Autoplay] Autoplay still blocked');
+            // Autoplay still blocked - user must interact
           }
         }
       } else if (error.name === 'AbortError') {
-        // Play was interrupted - this is normal during scrolling
-        console.log('[IG Autoplay] Play interrupted');
-      } else {
-        console.error('[IG Autoplay] Play error:', error);
+        // Play was interrupted - normal during scrolling
       }
     }
   }
@@ -491,7 +479,6 @@
       options
     );
     
-    console.log('[IG Autoplay] IntersectionObserver created');
   }
 
   function observeVideo(video) {
@@ -562,7 +549,6 @@
       subtree: true
     });
     
-    console.log('[IG Autoplay] MutationObserver created');
   }
 
   // ============================================
@@ -579,7 +565,6 @@
           if (result.igAutoplayMuted !== undefined) {
             state.muted = result.igAutoplayMuted;
           }
-          console.log('[IG Autoplay] Preferences loaded:', { enabled: state.enabled, muted: state.muted });
           resolve();
         });
       } else {
@@ -594,7 +579,6 @@
         igAutoplayEnabled: state.enabled,
         igAutoplayMuted: state.muted
       });
-      console.log('[IG Autoplay] Preferences saved');
     }
   }
 
@@ -605,13 +589,10 @@
     if (!enabled) {
       pauseAllVideos();
     }
-    
-    console.log('[IG Autoplay] Enabled:', enabled);
   }
 
   function scanExistingVideos() {
     const videos = document.querySelectorAll('video');
-    console.log('[IG Autoplay] Found', videos.length, 'existing videos');
     videos.forEach(video => observeVideo(video));
   }
 
@@ -621,11 +602,8 @@
     const isSavedPage = url.includes('/saved') || url.includes('instagram.com');
     
     if (!isSavedPage) {
-      console.log('[IG Autoplay] Not on Instagram, skipping initialization');
       return;
     }
-    
-    console.log('[IG Autoplay] Initializing...');
     
     // Inject styles
     injectStyles();
@@ -639,8 +617,6 @@
     
     // Scan existing videos
     scanExistingVideos();
-    
-    console.log('[IG Autoplay] Initialization complete');
   }
 
   // ============================================

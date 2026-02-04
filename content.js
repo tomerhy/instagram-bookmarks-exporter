@@ -11,7 +11,6 @@
   if (window.__igExporterInjected) return;
   window.__igExporterInjected = true;
 
-  console.log('[IG Exporter] v3.0 Content script loaded - with API interception');
 
   // ============================================
   // STATE
@@ -95,7 +94,6 @@
         });
         
         state.seenVideoUrls.add(videoUrl);
-        console.log('[IG Exporter] Captured video:', videoUrl.substring(0, 80) + '...');
       }
     }
     
@@ -125,7 +123,6 @@
         });
         
         state.seenImageUrls.add(imageUrl);
-        console.log('[IG Exporter] Captured image:', imageUrl.substring(0, 80) + '...');
       }
     }
     
@@ -140,7 +137,6 @@
     
     // Handle CAROUSEL (media_type === 8)
     if (media.media_type === 8 && media.carousel_media && media.carousel_media.length > 0) {
-      console.log('[IG Exporter] Processing carousel with', media.carousel_media.length, 'items');
       for (let i = 0; i < media.carousel_media.length; i++) {
         results.push(...parseMediaItem(media.carousel_media[i], media, i + 1));
       }
@@ -223,7 +219,6 @@
     });
     
     if (newCount > 0) {
-      console.log(`[IG Exporter] Captured ${newCount} new items. Total: ${state.images.length} images, ${state.videos.length} videos`);
       updatePanel();
       saveToStorage();
     }
@@ -276,7 +271,6 @@
     return originalXHRSend.apply(this, args);
   };
 
-  console.log('[IG Exporter] API interception active');
 
   // ============================================
   // POST DETECTION LOGIC
@@ -471,8 +465,6 @@
     if (fetchedShortcodes.has(shortcode)) return;
     fetchedShortcodes.add(shortcode);
     
-    console.log('[IG Exporter] Fetching video URL for:', shortcode, postType);
-    
     // Method 1: Try embed page
     const embedUrl = `https://www.instagram.com/${postType}/${shortcode}/embed/`;
     
@@ -481,7 +473,6 @@
       .then(html => {
         const url = extractVideoUrlFromHtml(html);
         if (url) {
-          console.log('[IG Exporter] Got video URL from embed:', shortcode);
           videoUrls.set(shortcode, url);
           updateVideoInState(shortcode, url);
           return;
@@ -491,7 +482,6 @@
         return tryPostPage(shortcode, postType);
       })
       .catch(err => {
-        console.log('[IG Exporter] Embed fetch failed for', shortcode, '- trying post page');
         tryPostPage(shortcode, postType);
       });
   }
@@ -504,15 +494,12 @@
       .then(html => {
         const url = extractVideoUrlFromHtml(html);
         if (url) {
-          console.log('[IG Exporter] Got video URL from post page:', shortcode);
           videoUrls.set(shortcode, url);
           updateVideoInState(shortcode, url);
-        } else {
-          console.log('[IG Exporter] No video URL found for:', shortcode);
         }
       })
       .catch(err => {
-        console.log('[IG Exporter] Post page fetch failed for', shortcode);
+        // Post page fetch failed
       });
   }
 
@@ -589,7 +576,6 @@
     if (video && !video.url) {
       video.url = videoUrl;
       state.seenVideoUrls.add(videoUrl);
-      console.log('[IG Exporter] Updated video URL for:', shortcode);
     }
     
     // Save to storage
@@ -605,7 +591,6 @@
     
     // For carousels, we just use the thumbnail for now
     // Full carousel extraction would require more complex API calls
-    console.log('[IG Exporter] Carousel detected:', shortcode);
   }
 
   /**
@@ -626,7 +611,6 @@
     });
     
     if (newCount > 0) {
-      console.log(`[IG Exporter] Found ${newCount} new posts. Total: ${state.images.length} images, ${state.videos.length} videos, ${state.carousels.length} carousels`);
       updatePanel();
       saveToStorage();
     }
@@ -887,8 +871,6 @@
       imageUrls: imageUrlList,
       videoUrls: videoUrlList
     });
-    
-    console.log('[IG Exporter] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
   }
 
   function loadFromStorage() {
@@ -914,7 +896,6 @@
         });
         
         updatePanel();
-        console.log('[IG Exporter] Loaded from storage:', state.images.length, 'images,', state.videos.length, 'videos');
       }
     });
   }
@@ -995,7 +976,6 @@
     // Initial scan
     setTimeout(scanPosts, 2000);
     
-    console.log('[IG Exporter] Initialized');
   }
 
   // Wait for page to be ready
