@@ -74,24 +74,49 @@
     let count = 0;
     
     // Helper to parse a single media item
-    function parseMedia(item, parentCode = null) {
+    function parseMedia(item, parentCode = null, carouselIndex = null) {
       if (!item) return;
       
       const shortcode = item.code || item.shortcode || parentCode;
       const postUrl = shortcode ? `https://www.instagram.com/p/${shortcode}/` : null;
       
-      // Get thumbnail from various possible locations
-      let thumbnail = null;
+      // Get thumbnail/image from various possible locations
+      let imageUrl = null;
       if (item.image_versions2?.candidates?.length > 0) {
-        thumbnail = item.image_versions2.candidates[0].url;
+        // Get highest quality image
+        const candidates = item.image_versions2.candidates;
+        imageUrl = candidates[0].url; // First is usually highest quality
       } else if (item.display_url) {
-        thumbnail = item.display_url;
+        imageUrl = item.display_url;
       } else if (item.thumbnail_src) {
-        thumbnail = item.thumbnail_src;
+        imageUrl = item.thumbnail_src;
+      } else if (item.display_resources?.length > 0) {
+        // Get highest resolution
+        imageUrl = item.display_resources[item.display_resources.length - 1].src;
+      }
+      
+      // CAROUSEL (media_type === 8) - process children first
+      if (item.media_type === 8) {
+        console.log('[IG Exporter] Found carousel with', item.carousel_media?.length || 0, 'items');
+        if (item.carousel_media?.length > 0) {
+          item.carousel_media.forEach((carouselItem, idx) => {
+            parseMedia(carouselItem, shortcode, idx + 1);
+          });
+        }
+        return; // Don't add the carousel itself, only its children
+      }
+      
+      // Edge sidecar (GraphQL carousel format)
+      if (item.edge_sidecar_to_children?.edges?.length > 0) {
+        console.log('[IG Exporter] Found sidecar with', item.edge_sidecar_to_children.edges.length, 'items');
+        item.edge_sidecar_to_children.edges.forEach((edge, idx) => {
+          if (edge.node) parseMedia(edge.node, shortcode, idx + 1);
+        });
+        return;
       }
       
       // VIDEO (media_type === 2 or is_video === true)
-      if (item.media_type === 2 || item.is_video) {
+      if (item.media_type === 2 || item.is_video === true) {
         let videoUrl = null;
         
         // Try multiple video URL sources
@@ -104,27 +129,23 @@
         }
         
         console.log('[IG Exporter] Found video:', { 
-          hasVideoVersions: !!item.video_versions,
-          hasVideoUrl: !!item.video_url,
-          extractedUrl: videoUrl ? 'yes' : 'no',
+          hasDirectUrl: !!videoUrl,
+          carouselIndex,
           shortcode 
         });
         
-        if (addVideo(videoUrl, postUrl, thumbnail)) count++;
+        if (addVideo(videoUrl, postUrl, imageUrl)) count++;
       }
-      // IMAGE (media_type === 1 or no media_type but has image)
-      else if (item.media_type === 1 || (!item.media_type && thumbnail)) {
-        if (thumbnail && addImage(thumbnail, postUrl, thumbnail)) count++;
-      }
-      // CAROUSEL (media_type === 8)
-      else if (item.media_type === 8 && item.carousel_media) {
-        item.carousel_media.forEach(carouselItem => parseMedia(carouselItem, shortcode));
-      }
-      // Edge sidecar (GraphQL carousel format)
-      else if (item.edge_sidecar_to_children?.edges) {
-        item.edge_sidecar_to_children.edges.forEach(edge => {
-          if (edge.node) parseMedia(edge.node, shortcode);
-        });
+      // IMAGE (media_type === 1 or just has an image URL)
+      else if (item.media_type === 1 || item.is_video === false || imageUrl) {
+        if (imageUrl) {
+          console.log('[IG Exporter] Found image:', { 
+            carouselIndex, 
+            shortcode,
+            urlPreview: imageUrl.substring(0, 50) 
+          });
+          if (addImage(imageUrl, postUrl, imageUrl)) count++;
+        }
       }
     }
     
