@@ -770,17 +770,21 @@ fileInput.onchange = function() {
 donateBtn.onclick = function() { window.open("https://www.patreon.com/join/THYProduction", "_blank"); };
 
 clearBtn.onclick = function() {
-  if (currentTab === "images") {
-    allMedia.images = [];
-    chrome.storage.local.set({ imageUrls: [] });
-  } else {
-    allMedia.videos = [];
-    chrome.storage.local.set({ videoUrls: [] });
-  }
+  // Clear ALL data (both images and videos)
+  allMedia.images = [];
+  allMedia.videos = [];
+  
+  // Clear both legacy and new formats
+  chrome.storage.local.set({ 
+    imageUrls: [], 
+    videoUrls: [], 
+    igExporterData: { images: [], videos: [], carousels: [] } 
+  });
+  
   currentPage = 1;
   updateCounts();
   renderGrid();
-  setStatus("Cleared");
+  setStatus("Cleared all data");
 };
 
 chrome.storage.onChanged.addListener(function(changes, area) {
