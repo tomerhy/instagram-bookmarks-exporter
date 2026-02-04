@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const mainContent = document.getElementById('main-content');
   const notInstagram = document.getElementById('not-instagram');
   const versionEl = document.getElementById('version');
+  const autoplayToggle = document.getElementById('autoplay-toggle');
+  const mutedToggle = document.getElementById('muted-toggle');
   
   let isScrolling = false;
   
@@ -133,6 +135,55 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('gallery-btn').addEventListener('click', function() {
     chrome.tabs.create({ url: chrome.runtime.getURL('gallery.html') });
   });
+  
+  // ============================================
+  // AUTO-PLAY SETTINGS
+  // ============================================
+  
+  // Load auto-play settings from storage
+  function loadAutoplaySettings() {
+    chrome.storage.local.get(['igAutoplayEnabled', 'igAutoplayMuted'], function(result) {
+      // Default to enabled and muted
+      const enabled = result.igAutoplayEnabled !== undefined ? result.igAutoplayEnabled : true;
+      const muted = result.igAutoplayMuted !== undefined ? result.igAutoplayMuted : true;
+      
+      autoplayToggle.checked = enabled;
+      mutedToggle.checked = muted;
+    });
+  }
+  
+  // Auto-play toggle
+  autoplayToggle.addEventListener('change', function() {
+    const enabled = this.checked;
+    
+    // Save to storage
+    chrome.storage.local.set({ igAutoplayEnabled: enabled });
+    
+    // Send to content script
+    sendToContent({ type: 'SET_AUTOPLAY_ENABLED', enabled: enabled }, function(response) {
+      if (response && response.ok) {
+        setStatus(enabled ? 'Auto-play enabled' : 'Auto-play disabled');
+      }
+    });
+  });
+  
+  // Muted toggle
+  mutedToggle.addEventListener('change', function() {
+    const muted = this.checked;
+    
+    // Save to storage
+    chrome.storage.local.set({ igAutoplayMuted: muted });
+    
+    // Send to content script
+    sendToContent({ type: 'SET_AUTOPLAY_MUTED', muted: muted }, function(response) {
+      if (response && response.ok) {
+        setStatus(muted ? 'Videos muted' : 'Videos unmuted');
+      }
+    });
+  });
+  
+  // Load settings on popup open
+  loadAutoplaySettings();
   
   // Update stats every 3 seconds
   setInterval(loadStats, 3000);
