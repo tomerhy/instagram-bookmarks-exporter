@@ -553,3 +553,185 @@ window.addEventListener('focus', function() {
 if (window.Analytics) {
   Analytics.trackPageView('gallery', 'Instagram Media Gallery');
 }
+
+// ============================================
+// FULLSCREEN & SLIDESHOW
+// ============================================
+
+var fullscreenOverlay = document.getElementById("fullscreen-overlay");
+var fullscreenImage = document.getElementById("fullscreen-image");
+var fullscreenClose = document.getElementById("fullscreen-close");
+var fullscreenPrev = document.getElementById("fullscreen-prev");
+var fullscreenNext = document.getElementById("fullscreen-next");
+var fullscreenCounter = document.getElementById("fullscreen-counter");
+var fullscreenBtn = document.getElementById("fullscreen-btn");
+var slideshowInterval = null;
+var currentFullscreenIndex = 0;
+
+// Get current items for fullscreen navigation
+function getFullscreenItems() {
+  return getCurrentItems();
+}
+
+// Update fullscreen counter
+function updateFullscreenCounter() {
+  var items = getFullscreenItems();
+  if (fullscreenCounter) {
+    fullscreenCounter.textContent = (currentFullscreenIndex + 1) + " / " + items.length;
+  }
+}
+
+// Show item in fullscreen
+function showFullscreenItem(index) {
+  var items = getFullscreenItems();
+  if (index < 0) index = items.length - 1;
+  if (index >= items.length) index = 0;
+  currentFullscreenIndex = index;
+  
+  var item = items[index];
+  var url = getUrl(item);
+  
+  if (fullscreenImage && url) {
+    fullscreenImage.src = url;
+  }
+  updateFullscreenCounter();
+}
+
+// Open fullscreen
+function openFullscreen() {
+  var items = getFullscreenItems();
+  if (items.length === 0) return;
+  
+  // Find current item index
+  if (currentItem) {
+    var url = getUrl(currentItem);
+    for (var i = 0; i < items.length; i++) {
+      if (getUrl(items[i]) === url) {
+        currentFullscreenIndex = i;
+        break;
+      }
+    }
+  } else {
+    currentFullscreenIndex = 0;
+  }
+  
+  showFullscreenItem(currentFullscreenIndex);
+  if (fullscreenOverlay) {
+    fullscreenOverlay.classList.add("visible");
+  }
+}
+
+// Close fullscreen
+function closeFullscreen() {
+  if (fullscreenOverlay) {
+    fullscreenOverlay.classList.remove("visible");
+  }
+  stopSlideshow();
+}
+
+// Next/Prev in fullscreen
+function fullscreenNextItem() {
+  showFullscreenItem(currentFullscreenIndex + 1);
+}
+
+function fullscreenPrevItem() {
+  showFullscreenItem(currentFullscreenIndex - 1);
+}
+
+// Slideshow
+function startSlideshow(intervalMs) {
+  stopSlideshow();
+  slideshowInterval = setInterval(function() {
+    fullscreenNextItem();
+  }, intervalMs);
+  
+  // Show stop button, hide start buttons
+  var stopBtn = document.getElementById("fs-slide-stop");
+  var btn3 = document.getElementById("fs-slide-3");
+  var btn5 = document.getElementById("fs-slide-5");
+  if (stopBtn) stopBtn.style.display = "inline-block";
+  if (btn3) btn3.style.display = "none";
+  if (btn5) btn5.style.display = "none";
+}
+
+function stopSlideshow() {
+  if (slideshowInterval) {
+    clearInterval(slideshowInterval);
+    slideshowInterval = null;
+  }
+  
+  // Show start buttons, hide stop button
+  var stopBtn = document.getElementById("fs-slide-stop");
+  var btn3 = document.getElementById("fs-slide-3");
+  var btn5 = document.getElementById("fs-slide-5");
+  if (stopBtn) stopBtn.style.display = "none";
+  if (btn3) btn3.style.display = "inline-block";
+  if (btn5) btn5.style.display = "inline-block";
+}
+
+// Event listeners for fullscreen
+if (fullscreenBtn) {
+  fullscreenBtn.addEventListener("click", openFullscreen);
+}
+
+if (imageViewer) {
+  imageViewer.addEventListener("click", openFullscreen);
+}
+
+if (fullscreenClose) {
+  fullscreenClose.addEventListener("click", closeFullscreen);
+}
+
+if (fullscreenPrev) {
+  fullscreenPrev.addEventListener("click", fullscreenPrevItem);
+}
+
+if (fullscreenNext) {
+  fullscreenNext.addEventListener("click", fullscreenNextItem);
+}
+
+// Slideshow buttons in fullscreen
+document.getElementById("fs-slide-3")?.addEventListener("click", function() {
+  startSlideshow(3000);
+});
+
+document.getElementById("fs-slide-5")?.addEventListener("click", function() {
+  startSlideshow(5000);
+});
+
+document.getElementById("fs-slide-stop")?.addEventListener("click", stopSlideshow);
+
+// Keyboard navigation in fullscreen
+document.addEventListener("keydown", function(e) {
+  if (!fullscreenOverlay || !fullscreenOverlay.classList.contains("visible")) return;
+  
+  if (e.key === "Escape") {
+    closeFullscreen();
+  } else if (e.key === "ArrowRight" || e.key === " ") {
+    fullscreenNextItem();
+  } else if (e.key === "ArrowLeft") {
+    fullscreenPrevItem();
+  }
+});
+
+// Close fullscreen on overlay click (but not on image)
+if (fullscreenOverlay) {
+  fullscreenOverlay.addEventListener("click", function(e) {
+    if (e.target === fullscreenOverlay) {
+      closeFullscreen();
+    }
+  });
+}
+
+// Non-fullscreen slideshow controls
+document.querySelectorAll(".slideshow-btn[data-interval]").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    var interval = parseInt(btn.getAttribute("data-interval"));
+    if (interval) {
+      openFullscreen();
+      setTimeout(function() {
+        startSlideshow(interval);
+      }, 300);
+    }
+  });
+});
