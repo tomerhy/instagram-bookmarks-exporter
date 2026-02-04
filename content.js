@@ -242,7 +242,10 @@
     
     // Find all carousel posts
     const carouselLinks = [];
-    document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(link => {
+    const allLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
+    console.log('[IG Exporter] Total post links on page:', allLinks.length);
+    
+    allLinks.forEach(link => {
       const href = link.href;
       if (!href) return;
       
@@ -250,29 +253,39 @@
       if (!match) return;
       const shortcode = match[2];
       
-      // Check for carousel indicator
-      const hasCarouselIcon = link.querySelector('svg[aria-label*="Carousel"]') ||
-                              link.parentElement?.querySelector('svg[aria-label*="Carousel"]');
+      // Check for carousel indicator - multiple methods
+      let isCarousel = false;
       
-      // Check SVG path pattern for carousel icon
-      let isCarousel = !!hasCarouselIcon;
-      const svgs = link.querySelectorAll('svg');
-      svgs.forEach(svg => {
-        const path = svg.querySelector('path');
-        if (path) {
-          const d = path.getAttribute('d') || '';
-          if (d.includes('M19') && d.includes('M3') && d.length > 100) {
-            isCarousel = true;
-          }
-        }
-      });
+      // Method 1: SVG with Carousel aria-label
+      const hasCarouselLabel = link.querySelector('[aria-label*="Carousel"]') ||
+                               link.closest('div')?.querySelector('[aria-label*="Carousel"]');
+      if (hasCarouselLabel) isCarousel = true;
       
-      if (isCarousel) {
-        carouselLinks.push({ link, shortcode });
+      // Method 2: Multiple images indicator (stacked squares icon)
+      const container = link.closest('div');
+      if (container) {
+        const svgs = container.querySelectorAll('svg');
+        svgs.forEach(svg => {
+          const paths = svg.querySelectorAll('path');
+          paths.forEach(path => {
+            const d = path.getAttribute('d') || '';
+            // Common carousel icon patterns
+            if ((d.includes('M19') && d.includes('M3')) ||
+                (d.includes('M22') && d.includes('rect')) ||
+                (d.length > 80 && d.split('M').length >= 2)) {
+              isCarousel = true;
+            }
+          });
+        });
       }
+      
+      // For debugging: capture ALL posts, not just carousels
+      // This helps test if the clicking mechanism works
+      carouselLinks.push({ link, shortcode, isCarousel });
     });
     
-    console.log('[IG Exporter] Found', carouselLinks.length, 'carousel posts to capture');
+    console.log('[IG Exporter] Found', carouselLinks.length, 'posts,', 
+                carouselLinks.filter(c => c.isCarousel).length, 'are carousels');
     setStatus(`Found ${carouselLinks.length} carousels`);
     
     // Process each carousel with random delays
@@ -1057,19 +1070,10 @@
   // ============================================
 
   function init() {
-    // Clear storage on load - start fresh
-    chrome.storage.local.clear(() => {
-      console.log('[IG Exporter] Cleared storage on load');
-    });
-    
-    // Reset state
-    state.images = [];
-    state.videos = [];
-    state.carousels = [];
-    state.seenUrls.clear();
-    
     createPanel();
-    updatePanel();
+    
+    // Load existing data (don't clear automatically - user can use Clear button)
+    loadFromStorage();
     
     console.log('[IG Exporter] Ready. Use buttons to capture media.');
     // No auto-scan - user must click button
