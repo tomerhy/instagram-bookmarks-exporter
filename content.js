@@ -1,6 +1,7 @@
 /**
  * Instagram Saved Media Exporter - Content Script
  * Detects and categorizes saved posts as videos, images, or carousels
+ * Uses API response interception for reliable media extraction
  */
 
 (function() {
@@ -10,7 +11,7 @@
   if (window.__igExporterInjected) return;
   window.__igExporterInjected = true;
 
-  console.log('[IG Exporter] v2.0 Content script loaded');
+  console.log('[IG Exporter] v3.0 Content script loaded - with API interception');
 
   // ============================================
   // STATE
@@ -22,8 +23,260 @@
     videos: [],              // collected video URLs
     carousels: [],           // collected carousel data
     isAnalyzing: false,
-    panelVisible: false
+    panelVisible: false,
+    seenImageUrls: new Set(),   // deduplication
+    seenVideoUrls: new Set()    // deduplication
   };
+
+  // ============================================
+  // API RESPONSE INTERCEPTION
+  // ============================================
+
+  /**
+   * Parse media item from Instagram API response
+   * Handles: media_type 1 (image), 2 (video), 8 (carousel)
+   */
+  function parseMediaItem(item, parentItem = null, carouselIndex = null) {
+    const results = [];
+    
+    const user = item.user || parentItem?.user;
+    const username = user?.username;
+    const userFullName = user?.full_name;
+    const userIsVerified = user?.is_verified;
+    const userFollowersCount = user?.follower_count;
+    const caption = item.caption?.text || parentItem?.caption?.text;
+    const likeCount = item.like_count || parentItem?.like_count;
+    const commentCount = item.comment_count || parentItem?.comment_count;
+    const takenAt = item.taken_at || parentItem?.taken_at;
+    const isCarousel = parentItem?.media_type === 8 || false;
+    const shortcode = item.code || parentItem?.code;
+    const postUrl = shortcode ? `https://www.instagram.com/p/${shortcode}/` : null;
+    const scrapedAt = new Date().toISOString();
+    
+    // Format taken_at as ISO string
+    let takenAtStr = '';
+    let filename = '';
+    if (username && takenAt) {
+      const date = new Date(takenAt * 1000);
+      takenAtStr = date.toISOString();
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
+      filename = `${username}_${dateStr}`;
+    }
+
+    // Handle VIDEO (media_type === 2)
+    if (item.media_type === 2 && Array.isArray(item.video_versions) && item.video_versions.length > 0) {
+      const videoUrl = item.video_versions[0].url;
+      
+      if (!state.seenVideoUrls.has(videoUrl)) {
+        let thumbnail = '';
+        if (item.image_versions2?.candidates?.length > 0) {
+          thumbnail = item.image_versions2.candidates[0].url;
+        }
+        
+        results.push({
+          type: 'video',
+          url: videoUrl,
+          postId: shortcode,
+          thumbnail: thumbnail,
+          filename: filename,
+          username: username,
+          postUrl: postUrl,
+          caption: caption,
+          likeCount: likeCount,
+          commentCount: commentCount,
+          takenAt: takenAtStr,
+          mediaType: 'video',
+          isCarousel: isCarousel,
+          carouselIndex: carouselIndex,
+          userFullName: userFullName,
+          userIsVerified: userIsVerified,
+          userFollowersCount: userFollowersCount,
+          scrapedAt: scrapedAt
+        });
+        
+        state.seenVideoUrls.add(videoUrl);
+        console.log('[IG Exporter] Captured video:', videoUrl.substring(0, 80) + '...');
+      }
+    }
+    
+    // Handle IMAGE (media_type === 1)
+    if (item.media_type === 1 && item.image_versions2?.candidates?.length > 0) {
+      const imageUrl = item.image_versions2.candidates[0].url;
+      
+      if (!state.seenImageUrls.has(imageUrl)) {
+        results.push({
+          type: 'image',
+          url: imageUrl,
+          postId: shortcode,
+          filename: filename,
+          username: username,
+          postUrl: postUrl,
+          caption: caption,
+          likeCount: likeCount,
+          commentCount: commentCount,
+          takenAt: takenAtStr,
+          mediaType: 'image',
+          isCarousel: isCarousel,
+          carouselIndex: carouselIndex,
+          userFullName: userFullName,
+          userIsVerified: userIsVerified,
+          userFollowersCount: userFollowersCount,
+          scrapedAt: scrapedAt
+        });
+        
+        state.seenImageUrls.add(imageUrl);
+        console.log('[IG Exporter] Captured image:', imageUrl.substring(0, 80) + '...');
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Parse a full media object (handles carousels)
+   */
+  function parseMediaObject(media) {
+    const results = [];
+    
+    // Handle CAROUSEL (media_type === 8)
+    if (media.media_type === 8 && media.carousel_media && media.carousel_media.length > 0) {
+      console.log('[IG Exporter] Processing carousel with', media.carousel_media.length, 'items');
+      for (let i = 0; i < media.carousel_media.length; i++) {
+        results.push(...parseMediaItem(media.carousel_media[i], media, i + 1));
+      }
+    } else {
+      // Single image or video
+      results.push(...parseMediaItem(media));
+    }
+    
+    return results;
+  }
+
+  /**
+   * Process API response data looking for media
+   */
+  function processApiResponse(data) {
+    if (!data || typeof data !== 'object') return;
+    
+    let mediaItems = [];
+    
+    // Different API response structures
+    // 1. Saved posts: data.items[]
+    if (data.items && Array.isArray(data.items)) {
+      data.items.forEach(item => {
+        if (item.media) {
+          mediaItems.push(item.media);
+        } else if (item.media_type) {
+          mediaItems.push(item);
+        }
+      });
+    }
+    
+    // 2. Single post: data.graphql.shortcode_media or data.items[0]
+    if (data.graphql?.shortcode_media) {
+      mediaItems.push(data.graphql.shortcode_media);
+    }
+    
+    // 3. User feed / timeline
+    if (data.feed_items) {
+      data.feed_items.forEach(item => {
+        if (item.media_or_ad) mediaItems.push(item.media_or_ad);
+      });
+    }
+    
+    // 4. Reels tray
+    if (data.reels_media) {
+      data.reels_media.forEach(reel => {
+        if (reel.items) {
+          reel.items.forEach(item => mediaItems.push(item));
+        }
+      });
+    }
+    
+    // 5. XDT (newer format)
+    if (data.xdt_api__v1__feed__saved__GET_connection?.edges) {
+      data.xdt_api__v1__feed__saved__GET_connection.edges.forEach(edge => {
+        if (edge.node?.media) mediaItems.push(edge.node.media);
+      });
+    }
+    
+    // 6. Direct media array at root
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        if (item.media_type) mediaItems.push(item);
+      });
+    }
+    
+    // Process all found media
+    let newCount = 0;
+    mediaItems.forEach(media => {
+      const parsed = parseMediaObject(media);
+      parsed.forEach(item => {
+        if (item.type === 'video') {
+          state.videos.push(item);
+          newCount++;
+        } else if (item.type === 'image') {
+          state.images.push(item);
+          newCount++;
+        }
+      });
+    });
+    
+    if (newCount > 0) {
+      console.log(`[IG Exporter] Captured ${newCount} new items. Total: ${state.images.length} images, ${state.videos.length} videos`);
+      updatePanel();
+      saveToStorage();
+    }
+  }
+
+  /**
+   * Intercept fetch requests
+   */
+  const originalFetch = window.fetch;
+  window.fetch = async function(...args) {
+    const response = await originalFetch.apply(this, args);
+    
+    // Clone response to read it
+    const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+    
+    // Check if this is an Instagram API request we care about
+    if (url.includes('/api/v1/') || url.includes('graphql') || url.includes('/web/')) {
+      try {
+        const clonedResponse = response.clone();
+        clonedResponse.json().then(data => {
+          processApiResponse(data);
+        }).catch(() => {});
+      } catch (e) {}
+    }
+    
+    return response;
+  };
+
+  /**
+   * Intercept XHR requests
+   */
+  const originalXHROpen = XMLHttpRequest.prototype.open;
+  const originalXHRSend = XMLHttpRequest.prototype.send;
+  
+  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    this._igExporterUrl = url;
+    return originalXHROpen.apply(this, [method, url, ...rest]);
+  };
+  
+  XMLHttpRequest.prototype.send = function(...args) {
+    this.addEventListener('load', function() {
+      const url = this._igExporterUrl || '';
+      if (url.includes('/api/v1/') || url.includes('graphql') || url.includes('/web/')) {
+        try {
+          const data = JSON.parse(this.responseText);
+          processApiResponse(data);
+        } catch (e) {}
+      }
+    });
+    return originalXHRSend.apply(this, args);
+  };
+
+  console.log('[IG Exporter] API interception active');
 
   // ============================================
   // POST DETECTION LOGIC
@@ -165,32 +418,42 @@
     // Categorize
     if (type === 'video' || shortcodeInfo.type === 'reel') {
       const videoData = {
+        type: 'video',
+        postId: shortcodeInfo.code,
         shortcode: shortcodeInfo.code,
-        thumbnailUrl: thumbnailUrl,
-        videoUrl: null, // Will be fetched
-        postUrl: `https://www.instagram.com/${shortcodeInfo.type}/${shortcodeInfo.code}/`
+        thumbnail: thumbnailUrl,
+        url: null, // Will be fetched or captured via API interception
+        postUrl: `https://www.instagram.com/${shortcodeInfo.type}/${shortcodeInfo.code}/`,
+        scrapedAt: new Date().toISOString()
       };
       state.videos.push(videoData);
       
-      // Fetch actual video URL
+      // Fetch actual video URL as fallback (API interception is preferred)
       fetchVideoUrl(shortcodeInfo.code, shortcodeInfo.type);
       
     } else if (type === 'carousel') {
       state.carousels.push({
+        type: 'carousel',
+        postId: shortcodeInfo.code,
         shortcode: shortcodeInfo.code,
-        thumbnailUrl: thumbnailUrl,
-        postUrl: `https://www.instagram.com/p/${shortcodeInfo.code}/`
+        thumbnail: thumbnailUrl,
+        postUrl: `https://www.instagram.com/p/${shortcodeInfo.code}/`,
+        scrapedAt: new Date().toISOString()
       });
       // For carousels, also try to fetch all media
       fetchCarouselMedia(shortcodeInfo.code);
       
     } else {
-      if (thumbnailUrl) {
+      if (thumbnailUrl && !state.seenImageUrls.has(thumbnailUrl)) {
         state.images.push({
+          type: 'image',
+          postId: shortcodeInfo.code,
           shortcode: shortcodeInfo.code,
-          imageUrl: thumbnailUrl,
-          postUrl: `https://www.instagram.com/p/${shortcodeInfo.code}/`
+          url: thumbnailUrl,
+          postUrl: `https://www.instagram.com/p/${shortcodeInfo.code}/`,
+          scrapedAt: new Date().toISOString()
         });
+        state.seenImageUrls.add(thumbnailUrl);
       }
     }
     
@@ -322,9 +585,11 @@
 
   function updateVideoInState(shortcode, videoUrl) {
     // Update the video in state
-    const video = state.videos.find(v => v.shortcode === shortcode);
-    if (video) {
-      video.videoUrl = videoUrl;
+    const video = state.videos.find(v => v.shortcode === shortcode || v.postId === shortcode);
+    if (video && !video.url) {
+      video.url = videoUrl;
+      state.seenVideoUrls.add(videoUrl);
+      console.log('[IG Exporter] Updated video URL for:', shortcode);
     }
     
     // Save to storage
@@ -546,18 +811,36 @@
   }
 
   function exportCSV() {
-    let csv = 'Type,Shortcode,URL,Thumbnail\n';
+    const headers = [
+      'Type', 'Post ID', 'Post URL', 'Media URL', 'Thumbnail', 'Username', 
+      'User Full Name', 'Caption', 'Like Count', 'Comment Count', 
+      'Taken At', 'Is Carousel', 'Carousel Index', 'Scraped At'
+    ];
+    let csv = headers.join(',') + '\n';
+    
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return '';
+      const str = String(val).replace(/"/g, '""').replace(/\n/g, ' ');
+      return str.includes(',') || str.includes('"') ? `"${str}"` : str;
+    };
     
     state.images.forEach(item => {
-      csv += `image,${item.shortcode},${item.postUrl},${item.imageUrl}\n`;
+      csv += [
+        'image', escapeCSV(item.postId), escapeCSV(item.postUrl), escapeCSV(item.url), '',
+        escapeCSV(item.username), escapeCSV(item.userFullName), escapeCSV(item.caption),
+        item.likeCount || '', item.commentCount || '', escapeCSV(item.takenAt),
+        item.isCarousel || false, item.carouselIndex || '', escapeCSV(item.scrapedAt)
+      ].join(',') + '\n';
     });
     
     state.videos.forEach(item => {
-      csv += `video,${item.shortcode},${item.postUrl},${item.thumbnailUrl}\n`;
-    });
-    
-    state.carousels.forEach(item => {
-      csv += `carousel,${item.shortcode},${item.postUrl},${item.thumbnailUrl}\n`;
+      csv += [
+        'video', escapeCSV(item.postId), escapeCSV(item.postUrl), escapeCSV(item.url), 
+        escapeCSV(item.thumbnail), escapeCSV(item.username), escapeCSV(item.userFullName),
+        escapeCSV(item.caption), item.likeCount || '', item.commentCount || '', 
+        escapeCSV(item.takenAt), item.isCarousel || false, item.carouselIndex || '', 
+        escapeCSV(item.scrapedAt)
+      ].join(',') + '\n';
     });
     
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -591,14 +874,17 @@
       carousels: state.carousels
     };
     
-    // Collect actual video URLs (or post URLs as fallback)
-    const videoUrlList = state.videos.map(v => v.videoUrl || v.postUrl).filter(Boolean);
+    // Collect actual video URLs (direct CDN URLs, not post URLs)
+    const videoUrlList = state.videos.map(v => v.url).filter(Boolean);
+    
+    // Collect actual image URLs
+    const imageUrlList = state.images.map(i => i.url).filter(Boolean);
     
     // Save full data for export
     // Also save URL arrays for gallery compatibility
     chrome.storage.local.set({
       igExporterData: data,
-      imageUrls: state.images.map(i => i.imageUrl).filter(Boolean),
+      imageUrls: imageUrlList,
       videoUrls: videoUrlList
     });
     
@@ -612,13 +898,23 @@
         state.videos = result.igExporterData.videos || [];
         state.carousels = result.igExporterData.carousels || [];
         
-        // Rebuild posts map
-        [...state.images, ...state.videos, ...state.carousels].forEach(item => {
-          state.posts.set(item.shortcode, item);
+        // Rebuild seen URLs for deduplication
+        state.images.forEach(item => {
+          if (item.url) state.seenImageUrls.add(item.url);
+          if (item.shortcode) state.posts.set(item.shortcode, item);
+          if (item.postId) state.posts.set(item.postId, item);
+        });
+        state.videos.forEach(item => {
+          if (item.url) state.seenVideoUrls.add(item.url);
+          if (item.shortcode) state.posts.set(item.shortcode, item);
+          if (item.postId) state.posts.set(item.postId, item);
+        });
+        state.carousels.forEach(item => {
+          if (item.shortcode) state.posts.set(item.shortcode, item);
         });
         
         updatePanel();
-        console.log('[IG Exporter] Loaded from storage:', state.posts.size, 'posts');
+        console.log('[IG Exporter] Loaded from storage:', state.images.length, 'images,', state.videos.length, 'videos');
       }
     });
   }

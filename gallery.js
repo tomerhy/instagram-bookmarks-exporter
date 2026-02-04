@@ -36,8 +36,9 @@ var ITEMS_PER_PAGE = 100;
 
 var currentTab = "images";
 var currentPage = 1;
+// Now stores arrays of media objects: { url, thumbnail, postUrl, username, caption, ... }
 var allMedia = { images: [], videos: [] };
-var currentViewUrl = null;
+var currentViewItem = null;  // Current selected media object
 var currentViewType = null;
 var selectedCard = null;
 var slideshowInterval = null;
@@ -58,7 +59,29 @@ function logDebug(msg) {
   }
 }
 
+// Helper to get URL from item (handles both string URLs and objects)
+function getItemUrl(item) {
+  if (!item) return null;
+  if (typeof item === 'string') return item;
+  return item.url || item.imageUrl || item.videoUrl || null;
+}
+
+// Helper to get thumbnail from item
+function getItemThumbnail(item) {
+  if (!item) return null;
+  if (typeof item === 'string') return item;
+  return item.thumbnail || item.url || item.imageUrl || null;
+}
+
+// Helper to get post URL from item
+function getItemPostUrl(item) {
+  if (!item) return null;
+  if (typeof item === 'string') return null;
+  return item.postUrl || null;
+}
+
 function normalizeUrl(url) {
+  if (!url || typeof url !== 'string') return '';
   try {
     var parsed = new URL(url);
     return parsed.origin + parsed.pathname;
@@ -67,20 +90,25 @@ function normalizeUrl(url) {
   }
 }
 
-function deduplicateUrls(urls) {
+function deduplicateItems(items) {
   var seen = {};
   var result = [];
-  for (var i = 0; i < urls.length; i++) {
-    var key = normalizeUrl(urls[i]);
+  for (var i = 0; i < items.length; i++) {
+    var url = getItemUrl(items[i]);
+    if (!url) continue;
+    var key = normalizeUrl(url);
     if (!seen[key]) {
       seen[key] = true;
-      result.push(urls[i]);
+      result.push(items[i]);
     }
   }
   return result;
 }
 
-function showVideo(url) {
+function showVideo(item) {
+  var url = getItemUrl(item);
+  if (!url) return;
+  
   viewerPlaceholder.style.display = "none";
   imageViewer.style.display = "none";
   fullscreenBtn.style.display = "none";
@@ -94,8 +122,8 @@ function showVideo(url) {
   // Check if this is a playable video URL
   var isVideoFile = url.indexOf(".mp4") !== -1 || 
                     url.indexOf("/v/") !== -1 ||
-                    url.indexOf("video") !== -1 && 
-                    (url.indexOf("fbcdn") !== -1 || url.indexOf("cdninstagram") !== -1);
+                    (url.indexOf("video") !== -1 && 
+                    (url.indexOf("fbcdn") !== -1 || url.indexOf("cdninstagram") !== -1));
   
   if (isPostUrl && !isVideoFile) {
     // It's a post URL, show a message and link
@@ -117,11 +145,12 @@ function showVideo(url) {
     };
     
     player.onerror = function() {
-      logDebug("Video error - opening in new tab");
+      logDebug("Video error - showing fallback");
       setStatus("Video can't play here. Click to open.");
       player.style.display = "none";
       viewerPlaceholder.style.display = "flex";
-      viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Video failed to load</p><a href="' + url + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open in new tab →</a></div>';
+      var postUrl = getItemPostUrl(item) || url;
+      viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:40px;"><p style="margin-bottom:20px;">Video failed to load</p><a href="' + postUrl + '" target="_blank" style="color:#E1306C;text-decoration:underline;">Open in new tab →</a></div>';
     };
     
     player.onclick = function() {
@@ -129,30 +158,34 @@ function showVideo(url) {
     };
   }
   
-  currentViewUrl = url;
+  currentViewItem = item;
   currentViewType = "video";
 }
 
-function showImage(url) {
+function showImage(item) {
+  var url = getItemUrl(item);
+  if (!url) return;
+  
   viewerPlaceholder.style.display = "none";
   player.style.display = "none";
   player.pause();
   imageViewer.style.display = "block";
   fullscreenBtn.style.display = "flex";
   imageViewer.src = url;
-  currentViewUrl = url;
+  currentViewItem = item;
   currentViewType = "image";
 }
 
 function hideViewer() {
   viewerPlaceholder.style.display = "flex";
+  viewerPlaceholder.innerHTML = "Select an item to preview";
   player.style.display = "none";
   imageViewer.style.display = "none";
   fullscreenBtn.style.display = "none";
   player.pause();
   player.src = "";
   imageViewer.src = "";
-  currentViewUrl = null;
+  currentViewItem = null;
   currentViewType = null;
 }
 
@@ -164,7 +197,12 @@ function setProgress(value) {
   progressBar.style.width = Math.max(0, Math.min(100, value)) + "%";
 }
 
-function getFilename(url, type) {
+function getFilename(item, type) {
+  // Try to use filename from metadata
+  if (item && typeof item === 'object' && item.filename) {
+    var ext = type === "video" ? ".mp4" : ".jpg";
+    return item.filename + ext;
+  }
   var ext = type === "video" ? ".mp4" : ".jpg";
   var ts = Date.now();
   var r = Math.random().toString(36).substring(2, 8);
@@ -182,28 +220,29 @@ function downloadFile(url, filename) {
 }
 
 function updateCounts() {
-  var images = deduplicateUrls(allMedia.images);
-  var videos = deduplicateUrls(allMedia.videos);
+  var images = deduplicateItems(allMedia.images);
+  var videos = deduplicateItems(allMedia.videos);
   imageCountEl.textContent = images.length;
   videoCountEl.textContent = videos.length;
   
-  // Log first video URL for debugging
+  // Log first video for debugging
   if (videos.length > 0) {
-    logDebug("First video URL: " + videos[0].substring(0, 100));
+    var firstUrl = getItemUrl(videos[0]);
+    logDebug("First video URL: " + (firstUrl ? firstUrl.substring(0, 100) : 'none'));
   }
 }
 
-function getCurrentUrls() {
+function getCurrentItems() {
   if (currentTab === "images") {
-    return deduplicateUrls(allMedia.images);
+    return deduplicateItems(allMedia.images);
   } else {
-    return deduplicateUrls(allMedia.videos);
+    return deduplicateItems(allMedia.videos);
   }
 }
 
 function getTotalPages() {
-  var urls = getCurrentUrls();
-  return Math.ceil(urls.length / ITEMS_PER_PAGE);
+  var items = getCurrentItems();
+  return Math.ceil(items.length / ITEMS_PER_PAGE);
 }
 
 function scrollToTop() {
@@ -274,7 +313,7 @@ function renderGrid() {
   grid.innerHTML = "";
   stopSlideshow();
   
-  var allUrls = getCurrentUrls();
+  var allItems = getCurrentItems();
   var totalPages = getTotalPages();
   
   if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
@@ -286,7 +325,7 @@ function renderGrid() {
     slideshowControls.classList.remove("visible");
   }
 
-  if (allUrls.length === 0) {
+  if (allItems.length === 0) {
     var empty = document.createElement("div");
     empty.className = "empty-state";
     empty.innerHTML = "<h3>No " + currentTab + " captured yet</h3><p>Scroll through Instagram to capture media.</p>";
@@ -297,45 +336,58 @@ function renderGrid() {
   }
 
   var startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  var endIndex = Math.min(startIndex + ITEMS_PER_PAGE, allUrls.length);
-  var pageUrls = allUrls.slice(startIndex, endIndex);
+  var endIndex = Math.min(startIndex + ITEMS_PER_PAGE, allItems.length);
+  var pageItems = allItems.slice(startIndex, endIndex);
 
-  pageUrls.forEach(function(url, index) {
+  pageItems.forEach(function(item, index) {
     var globalIndex = startIndex + index;
     var card = document.createElement("div");
     card.className = "card";
     card.setAttribute("data-index", globalIndex);
+    
+    var url = getItemUrl(item);
+    var thumbnailUrl = getItemThumbnail(item);
 
     var thumb;
     if (currentTab === "videos") {
-      // Check if this is an Instagram post URL (not a video file)
-      var isPostUrl = url.indexOf("instagram.com/p/") !== -1 || 
-                      url.indexOf("instagram.com/reel/") !== -1;
-      var isVideoFile = url.indexOf(".mp4") !== -1 || 
-                        url.indexOf("/v/") !== -1 ||
-                        (url.indexOf("video") !== -1 && 
-                         (url.indexOf("fbcdn") !== -1 || url.indexOf("cdninstagram") !== -1));
-      
-      if (isPostUrl && !isVideoFile) {
-        // It's a post URL - show placeholder image
-        thumb = document.createElement("div");
-        thumb.className = "thumb video-placeholder";
-        thumb.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#1a1a2e;"><span style="font-size:40px;">▶</span><span style="font-size:10px;margin-top:8px;color:#888;">Click to open</span></div>';
-      } else {
-        // It's a video file - try to load thumbnail
-        thumb = document.createElement("video");
+      // For videos, prefer using the thumbnail image
+      if (thumbnailUrl && thumbnailUrl !== url) {
+        // Use thumbnail image for video
+        thumb = document.createElement("img");
         thumb.className = "thumb";
-        thumb.src = url;
-        thumb.muted = true;
-        thumb.preload = "metadata";
-        thumb.playsInline = true;
-        thumb.addEventListener("loadedmetadata", function() {
-          try { this.currentTime = 1; } catch(e) {}
-        });
+        thumb.src = thumbnailUrl;
+        thumb.loading = "lazy";
         thumb.onerror = function() {
-          // If video fails to load, show placeholder
+          // Fallback to video element
           this.outerHTML = '<div class="thumb video-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#1a1a2e;"><span style="font-size:40px;">▶</span><span style="font-size:10px;margin-top:8px;color:#888;">Video</span></div>';
         };
+      } else {
+        // Check if this is a playable video URL
+        var isVideoFile = url && (url.indexOf(".mp4") !== -1 || 
+                          url.indexOf("/v/") !== -1 ||
+                          (url.indexOf("video") !== -1 && 
+                           (url.indexOf("fbcdn") !== -1 || url.indexOf("cdninstagram") !== -1)));
+        
+        if (isVideoFile) {
+          // Try to load video thumbnail
+          thumb = document.createElement("video");
+          thumb.className = "thumb";
+          thumb.src = url;
+          thumb.muted = true;
+          thumb.preload = "metadata";
+          thumb.playsInline = true;
+          thumb.addEventListener("loadedmetadata", function() {
+            try { this.currentTime = 1; } catch(e) {}
+          });
+          thumb.onerror = function() {
+            this.outerHTML = '<div class="thumb video-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#1a1a2e;"><span style="font-size:40px;">▶</span><span style="font-size:10px;margin-top:8px;color:#888;">Video</span></div>';
+          };
+        } else {
+          // Show placeholder
+          thumb = document.createElement("div");
+          thumb.className = "thumb video-placeholder";
+          thumb.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#1a1a2e;"><span style="font-size:40px;">▶</span><span style="font-size:10px;margin-top:8px;color:#888;">Click to open</span></div>';
+        }
       }
       
       // Add video badge
@@ -344,9 +396,10 @@ function renderGrid() {
       badge.textContent = "▶ Video";
       card.appendChild(badge);
     } else {
+      // Image
       thumb = document.createElement("img");
       thumb.className = "thumb";
-      thumb.src = url;
+      thumb.src = url || thumbnailUrl;
       thumb.loading = "lazy";
       thumb.onerror = function() {
         this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23333' width='100' height='100'/%3E%3C/svg%3E";
@@ -361,8 +414,11 @@ function renderGrid() {
     dlBtn.innerHTML = "⬇";
     dlBtn.onclick = function(e) {
       e.stopPropagation();
-      downloadFile(url, getFilename(url, currentTab === "videos" ? "video" : "image"));
-      setStatus("Download started!");
+      var dlUrl = getItemUrl(item);
+      if (dlUrl) {
+        downloadFile(dlUrl, getFilename(item, currentTab === "videos" ? "video" : "image"));
+        setStatus("Download started!");
+      }
     };
     overlay.appendChild(dlBtn);
     card.appendChild(overlay);
@@ -375,15 +431,15 @@ function renderGrid() {
       fullscreenIndex = globalIndex;
 
       if (currentTab === "videos") {
-        showVideo(url);
+        showVideo(item);
       } else {
-        showImage(url);
+        showImage(item);
       }
     };
 
     grid.appendChild(card);
 
-    if (index === 0 && !currentViewUrl) {
+    if (index === 0 && !currentViewItem) {
       card.click();
     }
   });
@@ -393,16 +449,16 @@ function renderGrid() {
 
 // Fullscreen functionality
 function updateFsCounter() {
-  var urls = getCurrentUrls();
-  fullscreenCounter.textContent = (fullscreenIndex + 1) + " / " + urls.length;
+  var items = getCurrentItems();
+  fullscreenCounter.textContent = (fullscreenIndex + 1) + " / " + items.length;
 }
 
 function openFullscreen() {
-  if (currentViewType !== "image" || !currentViewUrl) return;
+  if (currentViewType !== "image" || !currentViewItem) return;
   
-  var urls = getCurrentUrls();
+  var items = getCurrentItems();
   fullscreenIndex = slideshowIndex;
-  fullscreenImage.src = urls[fullscreenIndex];
+  fullscreenImage.src = getItemUrl(items[fullscreenIndex]);
   fullscreenOverlay.classList.add("visible");
   document.body.style.overflow = "hidden";
   updateFsCounter();
@@ -415,18 +471,18 @@ function closeFullscreen() {
 }
 
 function fullscreenPrevFn() {
-  var urls = getCurrentUrls();
+  var items = getCurrentItems();
   fullscreenIndex--;
-  if (fullscreenIndex < 0) fullscreenIndex = urls.length - 1;
-  fullscreenImage.src = urls[fullscreenIndex];
+  if (fullscreenIndex < 0) fullscreenIndex = items.length - 1;
+  fullscreenImage.src = getItemUrl(items[fullscreenIndex]);
   updateFsCounter();
 }
 
 function fullscreenNextFn() {
-  var urls = getCurrentUrls();
+  var items = getCurrentItems();
   fullscreenIndex++;
-  if (fullscreenIndex >= urls.length) fullscreenIndex = 0;
-  fullscreenImage.src = urls[fullscreenIndex];
+  if (fullscreenIndex >= items.length) fullscreenIndex = 0;
+  fullscreenImage.src = getItemUrl(items[fullscreenIndex]);
   updateFsCounter();
 }
 
@@ -477,8 +533,8 @@ document.addEventListener("keydown", function(e) {
 function startSlideshow(interval) {
   stopSlideshow();
   
-  var urls = getCurrentUrls();
-  if (urls.length === 0) return;
+  var items = getCurrentItems();
+  if (items.length === 0) return;
   
   var btns = slideshowControls.querySelectorAll(".slideshow-btn");
   btns.forEach(function(btn) {
@@ -494,7 +550,7 @@ function startSlideshow(interval) {
   
   slideshowInterval = setInterval(function() {
     slideshowIndex++;
-    if (slideshowIndex >= urls.length) slideshowIndex = 0;
+    if (slideshowIndex >= items.length) slideshowIndex = 0;
     
     var targetPage = Math.floor(slideshowIndex / ITEMS_PER_PAGE) + 1;
     if (targetPage !== currentPage) {
@@ -502,7 +558,7 @@ function startSlideshow(interval) {
       renderGrid();
     }
     
-    showImage(urls[slideshowIndex]);
+    showImage(items[slideshowIndex]);
     
     var cards = grid.querySelectorAll(".card");
     cards.forEach(function(card) {
@@ -533,10 +589,57 @@ slideshowControls.querySelectorAll(".slideshow-btn[data-interval]").forEach(func
 });
 stopSlideshowBtn.onclick = function() { stopSlideshow(); setStatus("Stopped"); };
 
+// Convert legacy URL string to item object
+function urlToItem(url, type) {
+  return {
+    type: type,
+    url: url,
+    thumbnail: type === 'video' ? null : url
+  };
+}
+
 function loadUrls() {
-  chrome.storage.local.get({ imageUrls: [], videoUrls: [] }, function(data) {
-    allMedia.images = data.imageUrls || [];
-    allMedia.videos = data.videoUrls || [];
+  chrome.storage.local.get({ imageUrls: [], videoUrls: [], igExporterData: null }, function(data) {
+    logDebug('Loading data from storage...');
+    
+    // Prefer rich data format (igExporterData)
+    if (data.igExporterData) {
+      var richImages = data.igExporterData.images || [];
+      var richVideos = data.igExporterData.videos || [];
+      
+      logDebug('Rich data: ' + richImages.length + ' images, ' + richVideos.length + ' videos');
+      
+      // Use rich data if available
+      if (richImages.length > 0 || richVideos.length > 0) {
+        allMedia.images = richImages;
+        allMedia.videos = richVideos;
+        updateCounts();
+        renderGrid();
+        return;
+      }
+    }
+    
+    // Fallback to legacy URL arrays
+    var legacyImages = data.imageUrls || [];
+    var legacyVideos = data.videoUrls || [];
+    
+    logDebug('Legacy data: ' + legacyImages.length + ' images, ' + legacyVideos.length + ' videos');
+    
+    // Convert legacy URLs to item objects
+    allMedia.images = legacyImages.map(function(url) {
+      if (typeof url === 'string') {
+        return urlToItem(url, 'image');
+      }
+      return url;
+    });
+    
+    allMedia.videos = legacyVideos.map(function(url) {
+      if (typeof url === 'string') {
+        return urlToItem(url, 'video');
+      }
+      return url;
+    });
+    
     updateCounts();
     renderGrid();
   });
@@ -554,7 +657,7 @@ tabs.forEach(function(tab) {
     currentTab = tab.getAttribute("data-tab");
     currentPage = 1;
     selectedCard = null;
-    currentViewUrl = null;
+    currentViewItem = null;
     stopSlideshow();
     hideViewer();
     renderGrid();
@@ -563,32 +666,40 @@ tabs.forEach(function(tab) {
 });
 
 downloadCurrentBtn.onclick = function() {
-  if (!currentViewUrl) { setStatus("Select an item first."); return; }
-  downloadFile(currentViewUrl, getFilename(currentViewUrl, currentViewType));
-  setStatus("Download started!");
+  if (!currentViewItem) { setStatus("Select an item first."); return; }
+  var url = getItemUrl(currentViewItem);
+  if (url) {
+    downloadFile(url, getFilename(currentViewItem, currentViewType));
+    setStatus("Download started!");
+  }
 };
 
 downloadAllBtn.onclick = function() {
-  var urls = getCurrentUrls();
-  if (urls.length === 0) { setStatus("No media."); return; }
-  setStatus("Downloading " + urls.length + " files...");
+  var items = getCurrentItems();
+  if (items.length === 0) { setStatus("No media."); return; }
+  setStatus("Downloading " + items.length + " files...");
   var i = 0;
   var next = function() {
-    if (i >= urls.length) { setStatus("Complete!"); setProgress(100); return; }
-    downloadFile(urls[i], getFilename(urls[i], currentTab === "videos" ? "video" : "image"));
+    if (i >= items.length) { setStatus("Complete!"); setProgress(100); return; }
+    var url = getItemUrl(items[i]);
+    if (url) {
+      downloadFile(url, getFilename(items[i], currentTab === "videos" ? "video" : "image"));
+    }
     i++;
-    setProgress((i / urls.length) * 100);
+    setProgress((i / items.length) * 100);
     setTimeout(next, 500);
   };
   next();
 };
 
 copyBtn.onclick = function() {
-  navigator.clipboard.writeText(getCurrentUrls().join("\n")).then(function() { setStatus("Copied!"); });
+  var urls = getCurrentItems().map(getItemUrl).filter(Boolean);
+  navigator.clipboard.writeText(urls.join("\n")).then(function() { setStatus("Copied!"); });
 };
 
 exportBtn.onclick = function() {
-  var blob = new Blob([getCurrentUrls().join("\n")], { type: "text/plain" });
+  var urls = getCurrentItems().map(getItemUrl).filter(Boolean);
+  var blob = new Blob([urls.join("\n")], { type: "text/plain" });
   var link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = "instagram-" + currentTab + ".txt";
@@ -604,11 +715,15 @@ fileInput.onchange = function() {
   var reader = new FileReader();
   reader.onload = function() {
     var urls = String(reader.result).split(/\r?\n/).filter(function(l) { return l.trim(); });
+    var items = urls.map(function(url) {
+      return urlToItem(url, currentTab === 'images' ? 'image' : 'video');
+    });
+    
     if (currentTab === "images") {
-      allMedia.images = urls;
+      allMedia.images = items;
       chrome.storage.local.set({ imageUrls: urls });
     } else {
-      allMedia.videos = urls;
+      allMedia.videos = items;
       chrome.storage.local.set({ videoUrls: urls });
     }
     currentPage = 1;
@@ -637,8 +752,33 @@ clearBtn.onclick = function() {
 
 chrome.storage.onChanged.addListener(function(changes, area) {
   if (area !== "local") return;
-  if (changes.imageUrls) allMedia.images = changes.imageUrls.newValue || [];
-  if (changes.videoUrls) allMedia.videos = changes.videoUrls.newValue || [];
+  
+  // Handle rich data changes
+  if (changes.igExporterData) {
+    var newData = changes.igExporterData.newValue;
+    if (newData) {
+      allMedia.images = newData.images || [];
+      allMedia.videos = newData.videos || [];
+      updateCounts();
+      if (!slideshowInterval) renderGrid();
+      return;
+    }
+  }
+  
+  // Handle legacy URL changes
+  if (changes.imageUrls) {
+    var urls = changes.imageUrls.newValue || [];
+    allMedia.images = urls.map(function(url) {
+      return typeof url === 'string' ? urlToItem(url, 'image') : url;
+    });
+  }
+  if (changes.videoUrls) {
+    var urls = changes.videoUrls.newValue || [];
+    allMedia.videos = urls.map(function(url) {
+      return typeof url === 'string' ? urlToItem(url, 'video') : url;
+    });
+  }
+  
   updateCounts();
   if (!slideshowInterval) renderGrid();
 });
