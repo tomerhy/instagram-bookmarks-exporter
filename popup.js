@@ -1,5 +1,6 @@
 /**
  * Instagram Saved Media Exporter - Popup Script
+ * Simplified & Reliable
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -10,16 +11,74 @@ document.addEventListener('DOMContentLoaded', function() {
   const mainContent = document.getElementById('main-content');
   const notInstagram = document.getElementById('not-instagram');
   const versionEl = document.getElementById('version');
-  const autoplayToggle = document.getElementById('autoplay-toggle');
-  const mutedToggle = document.getElementById('muted-toggle');
   
   let isScrolling = false;
   
   // Set version
-  const manifest = chrome.runtime.getManifest();
-  versionEl.textContent = 'v' + manifest.version;
+  try {
+    versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
+  } catch (e) {}
   
-  // Check if we're on Instagram
+  function setStatus(msg) {
+    if (statusEl) statusEl.textContent = msg;
+  }
+  
+  function updateStats(stats) {
+    if (imagesCount) imagesCount.textContent = stats.images || 0;
+    if (videosCount) videosCount.textContent = stats.videos || 0;
+    if (carouselsCount) carouselsCount.textContent = stats.carousels || 0;
+  }
+  
+  // Load stats from content script or storage
+  function loadStats() {
+    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+      const tab = tabs[0];
+      if (!tab || !tab.id) return;
+      
+      // Try to get stats from content script
+      chrome.tabs.sendMessage(tab.id, { type: 'GET_STATS' }, function(response) {
+        if (chrome.runtime.lastError) {
+          console.log('Content script not responding, trying storage');
+          // Fallback: load from storage
+          chrome.storage.local.get(['igExporterData'], function(result) {
+            if (result.igExporterData) {
+              updateStats({
+                images: (result.igExporterData.images || []).length,
+                videos: (result.igExporterData.videos || []).length,
+                carousels: (result.igExporterData.carousels || []).length
+              });
+            }
+          });
+          return;
+        }
+        
+        if (response) {
+          updateStats(response);
+        }
+      });
+    });
+  }
+  
+  // Send message to content script
+  function sendToContent(msg, callback) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+      const tab = tabs[0];
+      if (!tab || !tab.id) {
+        setStatus('No active tab');
+        return;
+      }
+      
+      chrome.tabs.sendMessage(tab.id, msg, function(response) {
+        if (chrome.runtime.lastError) {
+          setStatus('Reload Instagram page first');
+          return;
+        }
+        if (callback) callback(response);
+      });
+    });
+  }
+  
+  // Check if on Instagram
   chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
     const tab = tabs[0];
     const isInstagram = tab && tab.url && tab.url.includes('instagram.com');
@@ -34,92 +93,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  function setStatus(msg) {
-    statusEl.textContent = msg;
-  }
-  
-  function updateStats(stats) {
-    imagesCount.textContent = stats.images || 0;
-    videosCount.textContent = stats.videos || 0;
-    carouselsCount.textContent = stats.carousels || 0;
-  }
-  
-  function loadStats() {
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-      const tab = tabs[0];
-      if (!tab) return;
-      
-      chrome.tabs.sendMessage(tab.id, { type: 'GET_STATS' }, function(response) {
-        if (chrome.runtime.lastError) {
-          // Content script not loaded, try loading from storage
-          chrome.storage.local.get(['igExporterData'], function(result) {
-            if (result.igExporterData) {
-              updateStats({
-                images: result.igExporterData.images?.length || 0,
-                videos: result.igExporterData.videos?.length || 0,
-                carousels: result.igExporterData.carousels?.length || 0
-              });
-            }
-          });
-          return;
-        }
-        
-        if (response) {
-          updateStats(response);
-        }
-      });
-    });
-  }
-  
-  function sendToContent(msg, callback) {
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-      const tab = tabs[0];
-      if (!tab) return;
-      
-      chrome.tabs.sendMessage(tab.id, msg, function(response) {
-        if (chrome.runtime.lastError) {
-          setStatus('Reload the Instagram page');
-          return;
-        }
-        if (callback) callback(response);
-      });
-    });
-  }
-  
   // Scan button
   document.getElementById('scan-btn').addEventListener('click', function() {
     setStatus('Scanning...');
     sendToContent({ type: 'SCAN' }, function(response) {
       if (response) {
         updateStats(response);
-        setStatus('Found ' + response.total + ' posts');
+        setStatus('Found ' + (response.total || 0) + ' items');
       }
     });
   });
   
   // Auto scroll button
-  document.getElementById('scroll-btn').addEventListener('click', function() {
-    const btn = this;
-    
+  const scrollBtn = document.getElementById('scroll-btn');
+  scrollBtn.addEventListener('click', function() {
     if (isScrolling) {
       sendToContent({ type: 'STOP_SCROLL' });
-      btn.textContent = '📜 Auto Scroll';
+      scrollBtn.textContent = '📜 Auto Scroll';
       isScrolling = false;
       setStatus('Stopped');
     } else {
       sendToContent({ type: 'START_SCROLL' });
-      btn.textContent = '⏹️ Stop';
+      scrollBtn.textContent = '⏹️ Stop';
       isScrolling = true;
       setStatus('Scrolling...');
-      
-      // Poll for updates
-      const pollInterval = setInterval(function() {
-        if (!isScrolling) {
-          clearInterval(pollInterval);
-          return;
-        }
-        loadStats();
-      }, 2000);
     }
   });
   
@@ -127,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('clear-btn').addEventListener('click', function() {
     sendToContent({ type: 'CLEAR' }, function() {
       updateStats({ images: 0, videos: 0, carousels: 0 });
-      setStatus('Cleared');
+      setStatus('Cleared!');
     });
   });
   
@@ -136,55 +133,29 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.tabs.create({ url: chrome.runtime.getURL('gallery.html') });
   });
   
-  // ============================================
-  // AUTO-PLAY SETTINGS
-  // ============================================
+  // Auto-play toggle (optional feature)
+  const autoplayToggle = document.getElementById('autoplay-toggle');
+  const mutedToggle = document.getElementById('muted-toggle');
   
-  // Load auto-play settings from storage
-  function loadAutoplaySettings() {
+  if (autoplayToggle) {
     chrome.storage.local.get(['igAutoplayEnabled', 'igAutoplayMuted'], function(result) {
-      // Default to enabled and muted
-      const enabled = result.igAutoplayEnabled !== undefined ? result.igAutoplayEnabled : true;
-      const muted = result.igAutoplayMuted !== undefined ? result.igAutoplayMuted : true;
-      
-      autoplayToggle.checked = enabled;
-      mutedToggle.checked = muted;
+      autoplayToggle.checked = result.igAutoplayEnabled !== false;
+      if (mutedToggle) mutedToggle.checked = result.igAutoplayMuted !== false;
+    });
+    
+    autoplayToggle.addEventListener('change', function() {
+      chrome.storage.local.set({ igAutoplayEnabled: this.checked });
+      setStatus(this.checked ? 'Auto-play enabled' : 'Auto-play disabled');
     });
   }
   
-  // Auto-play toggle
-  autoplayToggle.addEventListener('change', function() {
-    const enabled = this.checked;
-    
-    // Save to storage
-    chrome.storage.local.set({ igAutoplayEnabled: enabled });
-    
-    // Send to content script
-    sendToContent({ type: 'SET_AUTOPLAY_ENABLED', enabled: enabled }, function(response) {
-      if (response && response.ok) {
-        setStatus(enabled ? 'Auto-play enabled' : 'Auto-play disabled');
-      }
+  if (mutedToggle) {
+    mutedToggle.addEventListener('change', function() {
+      chrome.storage.local.set({ igAutoplayMuted: this.checked });
+      setStatus(this.checked ? 'Videos muted' : 'Videos unmuted');
     });
-  });
+  }
   
-  // Muted toggle
-  mutedToggle.addEventListener('change', function() {
-    const muted = this.checked;
-    
-    // Save to storage
-    chrome.storage.local.set({ igAutoplayMuted: muted });
-    
-    // Send to content script
-    sendToContent({ type: 'SET_AUTOPLAY_MUTED', muted: muted }, function(response) {
-      if (response && response.ok) {
-        setStatus(muted ? 'Videos muted' : 'Videos unmuted');
-      }
-    });
-  });
-  
-  // Load settings on popup open
-  loadAutoplaySettings();
-  
-  // Update stats every 3 seconds
-  setInterval(loadStats, 3000);
+  // Poll for stats updates
+  setInterval(loadStats, 2000);
 });

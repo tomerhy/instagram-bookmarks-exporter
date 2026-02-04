@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Instagram Saved Media Exporter",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "description": "Analyze and export images, videos, and carousels from your Instagram saved posts. Now with video auto-play!",
   "icons": {
     "16": "assets/icons/icon-16.png",
@@ -26,7 +26,7 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
-      "js": ["content.js", "autoplay.js"],
+      "js": ["content.js"],
       "css": ["content-styles.css"],
       "run_at": "document_idle"
     }
