@@ -1057,15 +1057,22 @@
   // ============================================
 
   function init() {
-    createPanel();
-    loadFromStorage();
+    // Clear storage on load - start fresh
+    chrome.storage.local.clear(() => {
+      console.log('[IG Exporter] Cleared storage on load');
+    });
     
-    // Initial scan after page loads
-    setTimeout(() => {
-      scanDom();
-      updatePanel();
-      saveToStorage();
-    }, 2000);
+    // Reset state
+    state.images = [];
+    state.videos = [];
+    state.carousels = [];
+    state.seenUrls.clear();
+    
+    createPanel();
+    updatePanel();
+    
+    console.log('[IG Exporter] Ready. Use buttons to capture media.');
+    // No auto-scan - user must click button
   }
 
   if (document.readyState === 'complete') {
