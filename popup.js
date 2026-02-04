@@ -5,6 +5,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   const imagesCount = document.getElementById('images-count');
   const videosCount = document.getElementById('videos-count');
+  const totalCount = document.getElementById('total-count');
   const statusEl = document.getElementById('status');
   const mainContent = document.getElementById('main-content');
   const notInstagram = document.getElementById('not-instagram');
@@ -25,6 +26,10 @@ document.addEventListener('DOMContentLoaded', function() {
   function updateStats(stats) {
     if (imagesCount) imagesCount.textContent = stats.images || 0;
     if (videosCount) videosCount.textContent = stats.videos || 0;
+    if (totalCount) {
+      // Show total saved only after scrolling, otherwise show "-"
+      totalCount.textContent = stats.totalSaved ? stats.totalSaved : '-';
+    }
   }
   
   // Load stats from content script or storage
@@ -108,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Auto scroll button
+  // Auto scroll button (just scrolls, doesn't capture)
   const scrollBtn = document.getElementById('scroll-btn');
   scrollBtn.addEventListener('click', function() {
     if (isScrolling) {
@@ -120,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
       sendToContent({ type: 'START_SCROLL' });
       scrollBtn.textContent = '⏹️ Stop';
       isScrolling = true;
-      setStatus('Scrolling...');
+      setStatus('Scrolling to load posts...');
     }
   });
   
