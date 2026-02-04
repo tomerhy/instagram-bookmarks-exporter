@@ -173,8 +173,13 @@
     // Navigate through carousel slides to trigger loading of all items
     const nextBtnSelectors = [
       'button[aria-label="Next"]',
+      'div[aria-label="Next"]',
       '[aria-label="Next"]',
-      'button[aria-label="Go to next slide"]'
+      'button[aria-label="Go to next slide"]',
+      'button[aria-label="Go forward"]',
+      // SVG-based next buttons
+      'button svg[aria-label="Right chevron icon"]',
+      'div[role="button"] svg[aria-label="Right chevron icon"]'
     ];
     
     let slideCount = 0;
@@ -183,13 +188,27 @@
     while (slideCount < maxSlides) {
       let foundNext = false;
       for (const selector of nextBtnSelectors) {
-        const nextBtn = document.querySelector(selector);
-        if (nextBtn && !nextBtn.disabled) {
-          nextBtn.click();
-          await sleep(randomDelay(400, 800));
-          slideCount++;
-          foundNext = true;
-          break;
+        const el = document.querySelector(selector);
+        if (el) {
+          // Find the clickable element
+          const clickable = el.closest('button') || el.closest('[role="button"]') || el.closest('div[tabindex]') || el;
+          
+          if (clickable && typeof clickable.click === 'function') {
+            try {
+              clickable.click();
+              await sleep(randomDelay(500, 900));
+              slideCount++;
+              foundNext = true;
+              
+              // Capture the current slide's image
+              captureModalImages(shortcode);
+              
+              console.log('[IG Exporter] Clicked next slide', slideCount);
+              break;
+            } catch (e) {
+              console.log('[IG Exporter] Click failed:', e.message);
+            }
+          }
         }
       }
       if (!foundNext) break;
@@ -199,6 +218,10 @@
     
     // Wait a bit more for any final API calls
     await sleep(randomDelay(500, 1000));
+    
+    // Capture images from the modal DOM (fallback if API doesn't provide carousel_media)
+    const modalImages = captureModalImages(shortcode);
+    console.log('[IG Exporter] Captured', modalImages, 'images from modal');
     
     // Close the modal
     await closeModal();
@@ -286,6 +309,73 @@
     autoClickRunning = false;
     setStatus('Stopped');
     console.log('[IG Exporter] Auto-click stopped');
+  }
+  
+  // Capture images from currently open modal
+  function captureModalImages(shortcode) {
+    let count = 0;
+    const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+    
+    // Find all images in the modal/dialog
+    const modal = document.querySelector('div[role="dialog"]') || document.body;
+    
+    // Look for carousel images
+    const images = modal.querySelectorAll('img[src*="cdninstagram"], img[src*="fbcdn"]');
+    
+    images.forEach(img => {
+      const src = img.src;
+      if (!src) return;
+      
+      // Skip profile pics, small thumbnails
+      if (src.includes('profile') || src.includes('44x44') || src.includes('150x150') || src.includes('240x240')) {
+        return;
+      }
+      
+      // Get best quality from srcset
+      let bestUrl = src;
+      if (img.srcset) {
+        const parts = img.srcset.split(',');
+        let maxWidth = 0;
+        parts.forEach(part => {
+          const match = part.trim().match(/^(\S+)\s+(\d+)w$/);
+          if (match && parseInt(match[2]) > maxWidth) {
+            maxWidth = parseInt(match[2]);
+            bestUrl = match[1];
+          }
+        });
+      }
+      
+      // Check if this is a main content image (not UI element)
+      const isMainImage = img.closest('article') || 
+                          img.closest('[role="dialog"]') ||
+                          (img.width > 200 && img.height > 200);
+      
+      if (isMainImage && addImage(bestUrl, postUrl, bestUrl)) {
+        console.log('[IG Exporter] Captured modal image:', bestUrl.substring(0, 60));
+        count++;
+      }
+    });
+    
+    // Also look for video posters
+    const videos = modal.querySelectorAll('video');
+    videos.forEach(video => {
+      const poster = video.poster;
+      const src = video.src;
+      
+      if (src || poster) {
+        if (addVideo(src, postUrl, poster)) {
+          console.log('[IG Exporter] Captured modal video');
+          count++;
+        }
+      }
+    });
+    
+    if (count > 0) {
+      updatePanel();
+      saveToStorage();
+    }
+    
+    return count;
   }
 
   // ============================================
