@@ -769,9 +769,8 @@
           <div><span id="ig-exp-images">0</span> Images</div>
           <div><span id="ig-exp-videos">0</span> Videos</div>
         </div>
-        <button id="ig-exp-scan" class="ig-exp-btn-primary">🔍 Scan Page</button>
         <button id="ig-exp-scroll" class="ig-exp-btn">📜 Auto Scroll</button>
-        <button id="ig-exp-carousels" class="ig-exp-btn">🎠 Capture Carousels</button>
+        <button id="ig-exp-carousels" class="ig-exp-btn-primary">🎠 Capture Carousels</button>
         <button id="ig-exp-gallery" class="ig-exp-btn">🖼️ Gallery</button>
         <button id="ig-exp-clear" class="ig-exp-btn-danger">🗑️ Clear</button>
         <div id="ig-exp-status" class="ig-exp-status"></div>
@@ -858,16 +857,6 @@
       panel.querySelector('.ig-exp-body').classList.toggle('hidden');
     };
     
-    panel.querySelector('#ig-exp-scan').onclick = () => {
-      setStatus('Scanning...');
-      const count = scanDom();
-      if (count > 0) {
-        updatePanel();
-        saveToStorage();
-      }
-      setStatus(`Found ${state.images.length + state.videos.length} items`);
-    };
-    
     panel.querySelector('#ig-exp-scroll').onclick = toggleAutoScroll;
     
     const carouselBtn = panel.querySelector('#ig-exp-carousels');
@@ -897,15 +886,13 @@
   }
 
   function updatePanel() {
-    const imgEl = document.getElementById('ig-exp-images');
-    const vidEl = document.getElementById('ig-exp-videos');
-    if (imgEl) imgEl.textContent = state.images.length;
-    if (vidEl) vidEl.textContent = state.videos.length;
+    // No floating panel - stats are in popup
+    console.log('[IG Exporter] Stats:', state.images.length, 'images,', state.videos.length, 'videos');
   }
 
   function setStatus(msg) {
-    const el = document.getElementById('ig-exp-status');
-    if (el) el.textContent = msg;
+    // No floating panel - log to console
+    console.log('[IG Exporter]', msg);
   }
 
   // ============================================
@@ -1039,6 +1026,19 @@
         sendResponse({ ok: true });
         break;
         
+      case 'START_CAROUSELS':
+        startAutoClickCapture();
+        sendResponse({
+          images: state.images.length,
+          videos: state.videos.length
+        });
+        break;
+        
+      case 'STOP_CAROUSELS':
+        stopAutoClickCapture();
+        sendResponse({ ok: true });
+        break;
+        
       case 'CLEAR':
         state.images = [];
         state.videos = [];
@@ -1070,13 +1070,8 @@
   // ============================================
 
   function init() {
-    createPanel();
-    
-    // Load existing data (don't clear automatically - user can use Clear button)
-    loadFromStorage();
-    
-    console.log('[IG Exporter] Ready. Use buttons to capture media.');
-    // No auto-scan - user must click button
+    // No floating panel - use popup from extension icon
+    console.log('[IG Exporter] Ready. Click extension icon to use.');
   }
 
   if (document.readyState === 'complete') {
