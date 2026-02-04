@@ -113,7 +113,179 @@
   function markCarouselForCapture(shortcode) {
     if (fetchedCarousels.has(shortcode)) return;
     fetchedCarousels.add(shortcode);
-    console.log('[IG Exporter] Carousel detected:', shortcode, '- Click on it to capture all images');
+    console.log('[IG Exporter] Carousel detected:', shortcode);
+  }
+
+  // ============================================
+  // AUTO-CLICK CAROUSEL CAPTURE
+  // ============================================
+
+  let autoClickRunning = false;
+  let autoClickQueue = [];
+  
+  function randomDelay(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+  
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  async function closeModal() {
+    // Try different close button selectors
+    const closeSelectors = [
+      'svg[aria-label="Close"]',
+      '[aria-label="Close"]',
+      'button[type="button"] svg[aria-label="Close"]',
+      'div[role="dialog"] svg[aria-label="Close"]'
+    ];
+    
+    for (const selector of closeSelectors) {
+      const closeBtn = document.querySelector(selector);
+      if (closeBtn) {
+        const button = closeBtn.closest('button') || closeBtn.closest('[role="button"]') || closeBtn;
+        button.click();
+        console.log('[IG Exporter] Closed modal');
+        await sleep(randomDelay(300, 600));
+        return true;
+      }
+    }
+    
+    // Try pressing Escape
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+    await sleep(randomDelay(300, 500));
+    return true;
+  }
+  
+  async function clickCarouselPost(link, shortcode) {
+    console.log('[IG Exporter] Auto-clicking carousel:', shortcode);
+    
+    // Scroll element into view naturally
+    link.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await sleep(randomDelay(400, 800));
+    
+    // Click the post
+    link.click();
+    
+    // Wait for modal to load and API to respond
+    await sleep(randomDelay(1500, 2500));
+    
+    // Navigate through carousel slides to trigger loading of all items
+    const nextBtnSelectors = [
+      'button[aria-label="Next"]',
+      '[aria-label="Next"]',
+      'button[aria-label="Go to next slide"]'
+    ];
+    
+    let slideCount = 0;
+    const maxSlides = 10;
+    
+    while (slideCount < maxSlides) {
+      let foundNext = false;
+      for (const selector of nextBtnSelectors) {
+        const nextBtn = document.querySelector(selector);
+        if (nextBtn && !nextBtn.disabled) {
+          nextBtn.click();
+          await sleep(randomDelay(400, 800));
+          slideCount++;
+          foundNext = true;
+          break;
+        }
+      }
+      if (!foundNext) break;
+    }
+    
+    console.log('[IG Exporter] Navigated through', slideCount, 'slides');
+    
+    // Wait a bit more for any final API calls
+    await sleep(randomDelay(500, 1000));
+    
+    // Close the modal
+    await closeModal();
+    
+    // Random delay before next action (human-like)
+    await sleep(randomDelay(800, 1500));
+  }
+  
+  async function startAutoClickCapture() {
+    if (autoClickRunning) {
+      console.log('[IG Exporter] Auto-click already running');
+      return;
+    }
+    
+    autoClickRunning = true;
+    setStatus('Auto-capturing carousels...');
+    console.log('[IG Exporter] Starting auto-click capture');
+    
+    // Find all carousel posts
+    const carouselLinks = [];
+    document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(link => {
+      const href = link.href;
+      if (!href) return;
+      
+      const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
+      if (!match) return;
+      const shortcode = match[2];
+      
+      // Check for carousel indicator
+      const hasCarouselIcon = link.querySelector('svg[aria-label*="Carousel"]') ||
+                              link.parentElement?.querySelector('svg[aria-label*="Carousel"]');
+      
+      // Check SVG path pattern for carousel icon
+      let isCarousel = !!hasCarouselIcon;
+      const svgs = link.querySelectorAll('svg');
+      svgs.forEach(svg => {
+        const path = svg.querySelector('path');
+        if (path) {
+          const d = path.getAttribute('d') || '';
+          if (d.includes('M19') && d.includes('M3') && d.length > 100) {
+            isCarousel = true;
+          }
+        }
+      });
+      
+      if (isCarousel) {
+        carouselLinks.push({ link, shortcode });
+      }
+    });
+    
+    console.log('[IG Exporter] Found', carouselLinks.length, 'carousel posts to capture');
+    setStatus(`Found ${carouselLinks.length} carousels`);
+    
+    // Process each carousel with random delays
+    for (let i = 0; i < carouselLinks.length; i++) {
+      if (!autoClickRunning) {
+        console.log('[IG Exporter] Auto-click stopped by user');
+        break;
+      }
+      
+      const { link, shortcode } = carouselLinks[i];
+      setStatus(`Capturing ${i + 1}/${carouselLinks.length}...`);
+      
+      try {
+        await clickCarouselPost(link, shortcode);
+      } catch (error) {
+        console.log('[IG Exporter] Error clicking carousel:', error.message);
+      }
+      
+      // Random delay between posts (2-5 seconds to be safe)
+      if (i < carouselLinks.length - 1) {
+        const delay = randomDelay(2000, 5000);
+        console.log('[IG Exporter] Waiting', delay, 'ms before next...');
+        await sleep(delay);
+      }
+    }
+    
+    autoClickRunning = false;
+    setStatus(`Done! Captured ${carouselLinks.length} carousels`);
+    console.log('[IG Exporter] Auto-click capture complete');
+    saveToStorage();
+  }
+  
+  function stopAutoClickCapture() {
+    autoClickRunning = false;
+    setStatus('Stopped');
+    console.log('[IG Exporter] Auto-click stopped');
   }
 
   // ============================================
@@ -496,6 +668,7 @@
         </div>
         <button id="ig-exp-scan" class="ig-exp-btn-primary">🔍 Scan Page</button>
         <button id="ig-exp-scroll" class="ig-exp-btn">📜 Auto Scroll</button>
+        <button id="ig-exp-carousels" class="ig-exp-btn">🎠 Capture Carousels</button>
         <button id="ig-exp-gallery" class="ig-exp-btn">🖼️ Gallery</button>
         <button id="ig-exp-clear" class="ig-exp-btn-danger">🗑️ Clear</button>
         <div id="ig-exp-status" class="ig-exp-status"></div>
@@ -593,6 +766,17 @@
     };
     
     panel.querySelector('#ig-exp-scroll').onclick = toggleAutoScroll;
+    
+    const carouselBtn = panel.querySelector('#ig-exp-carousels');
+    carouselBtn.onclick = () => {
+      if (autoClickRunning) {
+        stopAutoClickCapture();
+        carouselBtn.textContent = '🎠 Capture Carousels';
+      } else {
+        startAutoClickCapture();
+        carouselBtn.textContent = '⏹️ Stop Capture';
+      }
+    };
     
     panel.querySelector('#ig-exp-gallery').onclick = () => {
       chrome.runtime.sendMessage({ type: 'OPEN_GALLERY' });
@@ -764,6 +948,15 @@
           videoUrls: []
         });
         sendResponse({ ok: true });
+        break;
+        
+      case 'CAPTURE_CAROUSELS':
+        if (autoClickRunning) {
+          stopAutoClickCapture();
+        } else {
+          startAutoClickCapture();
+        }
+        sendResponse({ ok: true, running: autoClickRunning });
         break;
     }
     return true;
