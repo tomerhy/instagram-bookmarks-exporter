@@ -76,56 +76,117 @@
     
     console.log('[IG Exporter] Fetching carousel details for:', shortcode);
     
+    // Method 1: Try the __a=1 endpoint
     try {
-      // Try the GraphQL endpoint
       const response = await fetch(`https://www.instagram.com/p/${shortcode}/?__a=1&__d=dis`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
       
+      console.log('[IG Exporter] Carousel fetch status:', response.status);
+      
       if (response.ok) {
-        const data = await response.json();
-        console.log('[IG Exporter] Carousel fetch response:', Object.keys(data));
+        const text = await response.text();
+        console.log('[IG Exporter] Response preview:', text.substring(0, 200));
         
-        // Parse the response
-        if (data.items?.[0]) {
-          const item = data.items[0];
-          if (item.carousel_media?.length > 0) {
-            console.log('[IG Exporter] Found', item.carousel_media.length, 'carousel items');
-            item.carousel_media.forEach((carouselItem, idx) => {
-              const imageUrl = carouselItem.image_versions2?.candidates?.[0]?.url;
-              const videoUrl = carouselItem.video_versions?.[0]?.url;
-              const postUrl = `https://www.instagram.com/p/${shortcode}/`;
-              
-              if (carouselItem.media_type === 2 && videoUrl) {
-                addVideo(videoUrl, postUrl, imageUrl);
-              } else if (imageUrl) {
-                addImage(imageUrl, postUrl, imageUrl);
-              }
-            });
+        try {
+          const data = JSON.parse(text);
+          const count = parseCarouselResponse(data, shortcode);
+          if (count > 0) {
+            console.log('[IG Exporter] Added', count, 'items from carousel');
             updatePanel();
             saveToStorage();
+            return;
           }
-        } else if (data.graphql?.shortcode_media) {
-          const media = data.graphql.shortcode_media;
-          if (media.edge_sidecar_to_children?.edges) {
-            console.log('[IG Exporter] Found', media.edge_sidecar_to_children.edges.length, 'sidecar items');
-            const postUrl = `https://www.instagram.com/p/${shortcode}/`;
-            media.edge_sidecar_to_children.edges.forEach((edge, idx) => {
-              const node = edge.node;
-              if (node.is_video && node.video_url) {
-                addVideo(node.video_url, postUrl, node.display_url);
-              } else if (node.display_url) {
-                addImage(node.display_url, postUrl, node.display_url);
-              }
-            });
-            updatePanel();
-            saveToStorage();
-          }
+        } catch (e) {
+          console.log('[IG Exporter] JSON parse failed, trying HTML parse');
         }
       }
     } catch (error) {
       console.log('[IG Exporter] Carousel fetch error:', error.message);
     }
+    
+    // Method 2: Try embed endpoint
+    try {
+      const embedResponse = await fetch(`https://www.instagram.com/p/${shortcode}/embed/`, {
+        credentials: 'include'
+      });
+      
+      if (embedResponse.ok) {
+        const html = await embedResponse.text();
+        // Look for media URLs in the embed HTML
+        const imgMatches = html.match(/https:\/\/[^"]+cdninstagram[^"]+\.jpg[^"]*/g) || [];
+        const uniqueUrls = [...new Set(imgMatches)].filter(url => 
+          !url.includes('150x150') && !url.includes('profile')
+        );
+        
+        console.log('[IG Exporter] Found', uniqueUrls.length, 'images in embed');
+        
+        const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+        uniqueUrls.forEach(url => {
+          addImage(url, postUrl, url);
+        });
+        
+        if (uniqueUrls.length > 0) {
+          updatePanel();
+          saveToStorage();
+        }
+      }
+    } catch (error) {
+      console.log('[IG Exporter] Embed fetch error:', error.message);
+    }
+  }
+  
+  function parseCarouselResponse(data, shortcode) {
+    let count = 0;
+    const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+    
+    // Structure 1: data.items[0].carousel_media
+    if (data.items?.[0]?.carousel_media) {
+      const items = data.items[0].carousel_media;
+      console.log('[IG Exporter] Parsing carousel_media:', items.length, 'items');
+      
+      items.forEach((item, idx) => {
+        const imageUrl = item.image_versions2?.candidates?.[0]?.url;
+        const videoUrl = item.video_versions?.[0]?.url;
+        
+        if (item.media_type === 2 && videoUrl) {
+          if (addVideo(videoUrl, postUrl, imageUrl)) count++;
+        } else if (imageUrl) {
+          if (addImage(imageUrl, postUrl, imageUrl)) count++;
+        }
+      });
+    }
+    
+    // Structure 2: data.graphql.shortcode_media.edge_sidecar_to_children
+    if (data.graphql?.shortcode_media?.edge_sidecar_to_children?.edges) {
+      const edges = data.graphql.shortcode_media.edge_sidecar_to_children.edges;
+      console.log('[IG Exporter] Parsing edge_sidecar:', edges.length, 'items');
+      
+      edges.forEach((edge, idx) => {
+        const node = edge.node;
+        if (node.is_video && node.video_url) {
+          if (addVideo(node.video_url, postUrl, node.display_url)) count++;
+        } else if (node.display_url) {
+          if (addImage(node.display_url, postUrl, node.display_url)) count++;
+        }
+      });
+    }
+    
+    // Structure 3: Direct items array with carousel_media
+    if (Array.isArray(data) && data[0]?.carousel_media) {
+      const items = data[0].carousel_media;
+      items.forEach((item, idx) => {
+        const imageUrl = item.image_versions2?.candidates?.[0]?.url;
+        if (imageUrl) {
+          if (addImage(imageUrl, postUrl, imageUrl)) count++;
+        }
+      });
+    }
+    
+    return count;
   }
 
   // ============================================
@@ -299,12 +360,18 @@
       const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
       
       // Check if this is an Instagram API request
-      if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved') || url.includes('/feed/')) {
-        console.log('[IG Exporter] Intercepted fetch:', url.substring(0, 100));
+      if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved') || url.includes('/feed/') || url.includes('/media/')) {
+        console.log('[IG Exporter] Intercepted fetch:', url.substring(0, 120));
         
         const cloned = response.clone();
         cloned.json().then(data => {
-          console.log('[IG Exporter] API response keys:', Object.keys(data || {}).slice(0, 5));
+          console.log('[IG Exporter] API response keys:', Object.keys(data || {}).slice(0, 8));
+          
+          // Check for carousel data in various locations
+          if (data.items?.[0]?.carousel_media) {
+            console.log('[IG Exporter] CAROUSEL DATA FOUND in API response!', data.items[0].carousel_media.length, 'items');
+          }
+          
           const count = parseApiResponse(data);
           console.log('[IG Exporter] Parsed', count, 'new items from API');
           if (count > 0) {
