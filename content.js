@@ -23,8 +23,6 @@
     seenUrls: new Set()
   };
   
-  let lastTotalSaved = 0; // Total saved posts found during scroll
-
   // ============================================
   // HELPER FUNCTIONS
   // ============================================
@@ -898,92 +896,6 @@
   }
 
   // ============================================
-  // AUTO SCROLL
-  // ============================================
-
-  let isScrolling = false;
-
-  // Simulate natural scroll with wheel events
-  function simulateScroll() {
-    // Method 1: Wheel event
-    const wheelEvent = new WheelEvent('wheel', {
-      deltaY: 1000,
-      bubbles: true,
-      cancelable: true
-    });
-    document.dispatchEvent(wheelEvent);
-    
-    // Method 2: Scroll event
-    window.scrollBy({ top: 1000, behavior: 'smooth' });
-    
-    // Method 3: Direct scroll
-    window.scrollTo(0, document.body.scrollHeight);
-  }
-
-  async function startAutoScroll() {
-    if (isScrolling) return;
-    isScrolling = true;
-    
-    console.log('[IG Exporter] Starting count... scroll will happen automatically');
-    setStatus('Scrolling to count posts...');
-    
-    let lastCount = 0;
-    let sameCountStreak = 0;
-    const maxSameCount = 5;
-    
-    while (isScrolling && sameCountStreak < maxSameCount) {
-      // Simulate natural scrolling
-      for (let i = 0; i < 3; i++) {
-        simulateScroll();
-        await sleep(300);
-      }
-      
-      // Wait for Instagram to load more
-      await sleep(2500);
-      
-      // Count unique posts
-      const posts = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
-      const uniqueShortcodes = new Set();
-      posts.forEach(p => {
-        const match = p.href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
-        if (match) uniqueShortcodes.add(match[2]);
-      });
-      const currentCount = uniqueShortcodes.size;
-      
-      console.log('[IG Exporter] Current count:', currentCount, '(streak:', sameCountStreak, ')');
-      setStatus(`Loading... ${currentCount} posts`);
-      
-      if (currentCount === lastCount) {
-        sameCountStreak++;
-      } else {
-        sameCountStreak = 0;
-        lastCount = currentCount;
-      }
-    }
-    
-    if (isScrolling) {
-      lastTotalSaved = lastCount;
-      console.log('[IG Exporter] ✅ TOTAL SAVED POSTS:', lastCount);
-      setStatus(`Found ${lastCount} saved posts!`);
-    }
-    
-    isScrolling = false;
-  }
-  
-  function stopAutoScroll() {
-    isScrolling = false;
-    setStatus('Stopped');
-  }
-
-  function toggleAutoScroll() {
-    if (isScrolling) {
-      stopAutoScroll();
-    } else {
-      startAutoScroll();
-    }
-  }
-
-  // ============================================
   // STORAGE
   // ============================================
 
@@ -1034,13 +946,11 @@
         break;
         
       case 'GET_STATS':
-        // Only show total saved after scrolling (lastTotalSaved > 0)
         sendResponse({
           images: state.images.length,
           videos: state.videos.length,
           carousels: state.carousels.length,
-          total: state.images.length + state.videos.length + state.carousels.length,
-          totalSaved: lastTotalSaved > 0 ? lastTotalSaved : null
+          total: state.images.length + state.videos.length + state.carousels.length
         });
         break;
         
@@ -1056,16 +966,6 @@
           carousels: state.carousels.length,
           total: state.images.length + state.videos.length + state.carousels.length
         });
-        break;
-        
-      case 'START_SCROLL':
-        if (!isScrolling) toggleAutoScroll();
-        sendResponse({ ok: true });
-        break;
-        
-      case 'STOP_SCROLL':
-        if (isScrolling) toggleAutoScroll();
-        sendResponse({ ok: true });
         break;
         
       case 'START_CAROUSELS':
