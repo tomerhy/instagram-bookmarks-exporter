@@ -311,17 +311,23 @@ function renderPagination(totalPages) {
 
 // Load data from storage
 function loadData() {
-  logDebug("Loading data from storage...");
+  logDebug("Loading fresh data from storage...");
   
-  chrome.storage.local.get(['igExporterData', 'imageUrls', 'videoUrls'], function(result) {
-    logDebug("Storage result: " + JSON.stringify(Object.keys(result)));
+  // Force fresh read from storage
+  chrome.storage.local.get(null, function(result) {
+    logDebug("Storage keys: " + Object.keys(result).join(", "));
     
     // Try rich data first
     if (result.igExporterData) {
       allMedia.images = result.igExporterData.images || [];
       allMedia.videos = result.igExporterData.videos || [];
-      logDebug("Loaded rich data: " + allMedia.images.length + " images, " + allMedia.videos.length + " videos");
-    } else {
+      logDebug("Loaded: " + allMedia.images.length + " images, " + allMedia.videos.length + " videos");
+      
+      // Show newest items first
+      if (allMedia.images.length > 0) {
+        logDebug("Newest image: " + (allMedia.images[allMedia.images.length - 1]?.url || "none").substring(0, 60));
+      }
+    } else if (result.imageUrls || result.videoUrls) {
       // Fallback to legacy
       allMedia.images = (result.imageUrls || []).map(function(url) {
         return { type: 'image', url: url, thumbnail: url };
@@ -329,7 +335,11 @@ function loadData() {
       allMedia.videos = (result.videoUrls || []).map(function(url) {
         return { type: 'video', url: url };
       });
-      logDebug("Loaded legacy data: " + allMedia.images.length + " images, " + allMedia.videos.length + " videos");
+      logDebug("Loaded legacy: " + allMedia.images.length + " images, " + allMedia.videos.length + " videos");
+    } else {
+      logDebug("No data found in storage");
+      allMedia.images = [];
+      allMedia.videos = [];
     }
     
     updateCounts();
@@ -491,6 +501,16 @@ document.getElementById("donate")?.addEventListener("click", function() {
   window.open("https://www.patreon.com/join/THYProduction", "_blank");
 });
 
+document.getElementById("refresh")?.addEventListener("click", function() {
+  setStatus("Refreshing...");
+  loadData();
+  setStatus("Refreshed!");
+  
+  if (window.Analytics) {
+    Analytics.trackButtonClick('refresh', 'gallery');
+  }
+});
+
 // Listen for storage changes
 chrome.storage.onChanged.addListener(function(changes, area) {
   if (area !== "local") return;
@@ -514,6 +534,20 @@ if (versionEl) {
 
 // Initialize
 loadData();
+
+// Reload data when tab becomes visible (user switches back to gallery)
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    logDebug("Tab visible - reloading data...");
+    loadData();
+  }
+});
+
+// Also reload when window gains focus
+window.addEventListener('focus', function() {
+  logDebug("Window focused - reloading data...");
+  loadData();
+});
 
 // Track page view
 if (window.Analytics) {
