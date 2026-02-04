@@ -347,6 +347,11 @@ document.querySelectorAll(".tab").forEach(function(tab) {
     currentItem = null;
     selectedCard = null;
     renderGrid();
+    
+    // Track tab switch
+    if (window.Analytics) {
+      Analytics.trackButtonClick('tab_' + currentTab, 'gallery');
+    }
   };
 });
 
@@ -360,12 +365,22 @@ document.getElementById("download-current")?.addEventListener("click", function(
     a.download = "instagram_" + Date.now() + (currentTab === "videos" ? ".mp4" : ".jpg");
     a.click();
     setStatus("Download started");
+    
+    // Track download
+    if (window.Analytics) {
+      Analytics.trackDownload('single', currentTab === 'videos' ? 'video' : 'image', 1);
+    }
   }
 });
 
 document.getElementById("download-all")?.addEventListener("click", function() {
   var items = getCurrentItems();
   if (items.length === 0) { setStatus("No items"); return; }
+  
+  // Track download all
+  if (window.Analytics) {
+    Analytics.trackDownload('all', currentTab === 'videos' ? 'video' : 'image', items.length);
+  }
   
   setStatus("Downloading " + items.length + " files...");
   var i = 0;
@@ -390,6 +405,12 @@ document.getElementById("copy")?.addEventListener("click", function() {
   var urls = getCurrentItems().map(getUrl).filter(Boolean);
   navigator.clipboard.writeText(urls.join("\n")).then(function() {
     setStatus("Copied " + urls.length + " URLs");
+    
+    // Track copy
+    if (window.Analytics) {
+      Analytics.trackButtonClick('copy_urls', 'gallery');
+      Analytics.trackFeature('copy_urls', { count: urls.length, type: currentTab });
+    }
   });
 });
 
@@ -401,9 +422,24 @@ document.getElementById("export")?.addEventListener("click", function() {
   a.download = "instagram-" + currentTab + ".txt";
   a.click();
   setStatus("Exported " + urls.length + " URLs");
+  
+  // Track export
+  if (window.Analytics) {
+    Analytics.trackButtonClick('export_urls', 'gallery');
+    Analytics.trackFeature('export_urls', { count: urls.length, type: currentTab });
+  }
 });
 
 document.getElementById("clear")?.addEventListener("click", function() {
+  // Track before clearing
+  if (window.Analytics) {
+    Analytics.trackButtonClick('clear_all', 'gallery');
+    Analytics.trackFeature('clear_data', { 
+      images_cleared: allMedia.images.length, 
+      videos_cleared: allMedia.videos.length 
+    });
+  }
+  
   allMedia.images = [];
   allMedia.videos = [];
   
@@ -478,3 +514,8 @@ if (versionEl) {
 
 // Initialize
 loadData();
+
+// Track page view
+if (window.Analytics) {
+  Analytics.trackPageView('gallery', 'Instagram Media Gallery');
+}

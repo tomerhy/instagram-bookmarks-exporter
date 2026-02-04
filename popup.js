@@ -93,13 +93,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
+  // Track popup open
+  if (window.Analytics) {
+    Analytics.trackPageView('popup', 'Extension Popup');
+  }
+  
   // Scan button
   document.getElementById('scan-btn').addEventListener('click', function() {
     setStatus('Scanning...');
+    
+    // Track scan click
+    if (window.Analytics) {
+      Analytics.trackButtonClick('scan', 'popup');
+    }
+    
     sendToContent({ type: 'SCAN' }, function(response) {
       if (response) {
         updateStats(response);
         setStatus('Found ' + (response.total || 0) + ' items');
+        
+        // Track capture stats
+        if (window.Analytics) {
+          Analytics.trackCaptureStats(response.images || 0, response.videos || 0);
+        }
       }
     });
   });
@@ -112,16 +128,29 @@ document.addEventListener('DOMContentLoaded', function() {
       scrollBtn.textContent = '📜 Auto Scroll';
       isScrolling = false;
       setStatus('Stopped');
+      
+      if (window.Analytics) {
+        Analytics.trackButtonClick('stop_scroll', 'popup');
+      }
     } else {
       sendToContent({ type: 'START_SCROLL' });
       scrollBtn.textContent = '⏹️ Stop';
       isScrolling = true;
       setStatus('Scrolling...');
+      
+      if (window.Analytics) {
+        Analytics.trackButtonClick('start_scroll', 'popup');
+        Analytics.trackFeature('auto_scroll');
+      }
     }
   });
   
   // Clear button
   document.getElementById('clear-btn').addEventListener('click', function() {
+    if (window.Analytics) {
+      Analytics.trackButtonClick('clear', 'popup');
+    }
+    
     sendToContent({ type: 'CLEAR' }, function() {
       updateStats({ images: 0, videos: 0, carousels: 0 });
       setStatus('Cleared!');
@@ -130,6 +159,10 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Gallery button
   document.getElementById('gallery-btn').addEventListener('click', function() {
+    if (window.Analytics) {
+      Analytics.trackButtonClick('open_gallery', 'popup');
+    }
+    
     chrome.tabs.create({ url: chrome.runtime.getURL('gallery.html') });
   });
   
@@ -146,6 +179,10 @@ document.addEventListener('DOMContentLoaded', function() {
     autoplayToggle.addEventListener('change', function() {
       chrome.storage.local.set({ igAutoplayEnabled: this.checked });
       setStatus(this.checked ? 'Auto-play enabled' : 'Auto-play disabled');
+      
+      if (window.Analytics) {
+        Analytics.trackFeature('autoplay_toggle', { enabled: this.checked });
+      }
     });
   }
   
@@ -153,6 +190,10 @@ document.addEventListener('DOMContentLoaded', function() {
     mutedToggle.addEventListener('change', function() {
       chrome.storage.local.set({ igAutoplayMuted: this.checked });
       setStatus(this.checked ? 'Videos muted' : 'Videos unmuted');
+      
+      if (window.Analytics) {
+        Analytics.trackFeature('muted_toggle', { muted: this.checked });
+      }
     });
   }
   
