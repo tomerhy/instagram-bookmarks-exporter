@@ -46,14 +46,21 @@
     const key = videoUrl || postUrl;
     if (!key || state.seenUrls.has(key)) return false;
     state.seenUrls.add(key);
-    state.videos.push({
+    
+    const video = {
       type: 'video',
       url: videoUrl,
       thumbnail: thumbnail || null,
       postUrl: postUrl || null,
       scrapedAt: new Date().toISOString()
+    };
+    state.videos.push(video);
+    
+    console.log('[IG Exporter] Added video:', {
+      hasDirectUrl: !!videoUrl,
+      urlPreview: (videoUrl || postUrl || '').substring(0, 80),
+      hasThumbnail: !!thumbnail
     });
-    console.log('[IG Exporter] Added video:', (videoUrl || postUrl).substring(0, 60));
     return true;
   }
 
@@ -67,33 +74,57 @@
     let count = 0;
     
     // Helper to parse a single media item
-    function parseMedia(item) {
+    function parseMedia(item, parentCode = null) {
       if (!item) return;
       
-      const shortcode = item.code || item.shortcode;
+      const shortcode = item.code || item.shortcode || parentCode;
       const postUrl = shortcode ? `https://www.instagram.com/p/${shortcode}/` : null;
       
-      // Get thumbnail
+      // Get thumbnail from various possible locations
       let thumbnail = null;
       if (item.image_versions2?.candidates?.length > 0) {
         thumbnail = item.image_versions2.candidates[0].url;
+      } else if (item.display_url) {
+        thumbnail = item.display_url;
+      } else if (item.thumbnail_src) {
+        thumbnail = item.thumbnail_src;
       }
       
-      // VIDEO (media_type === 2)
-      if (item.media_type === 2) {
+      // VIDEO (media_type === 2 or is_video === true)
+      if (item.media_type === 2 || item.is_video) {
         let videoUrl = null;
+        
+        // Try multiple video URL sources
         if (item.video_versions?.length > 0) {
           videoUrl = item.video_versions[0].url;
+        } else if (item.video_url) {
+          videoUrl = item.video_url;
+        } else if (item.video_resources?.length > 0) {
+          videoUrl = item.video_resources[0].src;
         }
+        
+        console.log('[IG Exporter] Found video:', { 
+          hasVideoVersions: !!item.video_versions,
+          hasVideoUrl: !!item.video_url,
+          extractedUrl: videoUrl ? 'yes' : 'no',
+          shortcode 
+        });
+        
         if (addVideo(videoUrl, postUrl, thumbnail)) count++;
       }
-      // IMAGE (media_type === 1)
-      else if (item.media_type === 1) {
+      // IMAGE (media_type === 1 or no media_type but has image)
+      else if (item.media_type === 1 || (!item.media_type && thumbnail)) {
         if (thumbnail && addImage(thumbnail, postUrl, thumbnail)) count++;
       }
       // CAROUSEL (media_type === 8)
       else if (item.media_type === 8 && item.carousel_media) {
-        item.carousel_media.forEach(carouselItem => parseMedia(carouselItem));
+        item.carousel_media.forEach(carouselItem => parseMedia(carouselItem, shortcode));
+      }
+      // Edge sidecar (GraphQL carousel format)
+      else if (item.edge_sidecar_to_children?.edges) {
+        item.edge_sidecar_to_children.edges.forEach(edge => {
+          if (edge.node) parseMedia(edge.node, shortcode);
+        });
       }
     }
     
@@ -169,17 +200,25 @@
       const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
       
       // Check if this is an Instagram API request
-      if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved')) {
+      if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved') || url.includes('/feed/')) {
+        console.log('[IG Exporter] Intercepted fetch:', url.substring(0, 100));
+        
         const cloned = response.clone();
         cloned.json().then(data => {
+          console.log('[IG Exporter] API response keys:', Object.keys(data || {}).slice(0, 5));
           const count = parseApiResponse(data);
+          console.log('[IG Exporter] Parsed', count, 'new items from API');
           if (count > 0) {
             updatePanel();
             saveToStorage();
           }
-        }).catch(() => {});
+        }).catch((e) => {
+          console.log('[IG Exporter] JSON parse failed:', e.message);
+        });
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log('[IG Exporter] Fetch intercept error:', e.message);
+    }
     
     return response;
   };
@@ -196,9 +235,12 @@
     this.addEventListener('load', function() {
       try {
         const url = this._url || '';
-        if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved')) {
+        if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved') || url.includes('/feed/')) {
+          console.log('[IG Exporter] Intercepted XHR:', url.substring(0, 100));
           const data = JSON.parse(this.responseText);
+          console.log('[IG Exporter] XHR response keys:', Object.keys(data || {}).slice(0, 5));
           const count = parseApiResponse(data);
+          console.log('[IG Exporter] Parsed', count, 'new items from XHR');
           if (count > 0) {
             updatePanel();
             saveToStorage();

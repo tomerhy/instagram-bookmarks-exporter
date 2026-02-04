@@ -29,10 +29,18 @@ function logDebug(msg) {
   console.log('[Gallery]', msg);
   if (debugSection) {
     debugSection.innerHTML = msg + "<br>" + debugSection.innerHTML;
-    if (debugSection.innerHTML.length > 3000) {
-      debugSection.innerHTML = debugSection.innerHTML.substring(0, 3000);
+    if (debugSection.innerHTML.length > 5000) {
+      debugSection.innerHTML = debugSection.innerHTML.substring(0, 5000);
     }
   }
+}
+
+// Check if URL is a playable video URL (CDN URL, not Instagram post URL)
+function isPlayableVideoUrl(url) {
+  if (!url) return false;
+  // Must be CDN URL with video indicators
+  return (url.includes('cdninstagram') || url.includes('fbcdn')) && 
+         (url.includes('.mp4') || url.includes('/v/') || url.includes('video'));
 }
 
 if (toggleDebug) {
@@ -91,7 +99,19 @@ function updateCounts() {
   var videos = allMedia.videos.length;
   if (imageCountEl) imageCountEl.textContent = images;
   if (videoCountEl) videoCountEl.textContent = videos;
-  logDebug("Counts: " + images + " images, " + videos + " videos");
+  
+  // Count how many videos have playable URLs
+  var playableVideos = allMedia.videos.filter(function(v) {
+    return isPlayableVideoUrl(getUrl(v));
+  }).length;
+  
+  logDebug("Counts: " + images + " images, " + videos + " videos (" + playableVideos + " playable)");
+  
+  // Show first video details for debugging
+  if (allMedia.videos.length > 0) {
+    var v = allMedia.videos[0];
+    logDebug("First video: url=" + (v.url ? v.url.substring(0, 50) : "null") + ", postUrl=" + (v.postUrl || "null"));
+  }
 }
 
 // Show image in viewer
@@ -112,17 +132,18 @@ function showImage(item) {
 function showVideo(item) {
   var url = getUrl(item);
   var postUrl = getPostUrl(item);
+  var thumb = getThumbnail(item);
+  
+  logDebug("Video item: url=" + (url ? url.substring(0, 60) + "..." : "null") + ", postUrl=" + (postUrl || "null"));
   
   if (imageViewer) imageViewer.style.display = "none";
+  if (player) { player.pause(); player.src = ""; }
   
-  // Check if we have a playable video URL
-  var isPlayable = url && (
-    url.indexOf(".mp4") !== -1 || 
-    url.indexOf("/v/") !== -1 ||
-    url.indexOf("video") !== -1
-  );
+  // Check if we have a playable CDN video URL
+  var playable = isPlayableVideoUrl(url);
   
-  if (isPlayable) {
+  if (playable) {
+    logDebug("Attempting to play video...");
     if (viewerPlaceholder) viewerPlaceholder.style.display = "none";
     if (player) {
       player.style.display = "block";
@@ -130,21 +151,32 @@ function showVideo(item) {
       player.load();
       player.play().catch(function(e) {
         logDebug("Play error: " + e.message);
+        // Show fallback on error
+        showVideoFallback(postUrl || url, thumb);
       });
     }
   } else {
-    // Show link to Instagram
-    if (player) player.style.display = "none";
-    if (viewerPlaceholder) {
-      viewerPlaceholder.style.display = "flex";
-      var linkUrl = postUrl || url || "#";
-      viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:30px;">' +
-        '<p style="margin-bottom:15px;">Video not captured directly</p>' +
-        '<a href="' + linkUrl + '" target="_blank" style="color:#E1306C;">Open on Instagram →</a></div>';
-    }
+    // No direct video URL - show thumbnail with link
+    showVideoFallback(postUrl || url, thumb);
   }
   
   currentItem = item;
+}
+
+function showVideoFallback(linkUrl, thumbnailUrl) {
+  if (player) player.style.display = "none";
+  if (viewerPlaceholder) {
+    viewerPlaceholder.style.display = "flex";
+    var thumbHtml = thumbnailUrl ? 
+      '<img src="' + thumbnailUrl + '" style="max-width:200px;max-height:200px;border-radius:8px;margin-bottom:15px;">' : 
+      '<div style="font-size:60px;margin-bottom:15px;">🎬</div>';
+    
+    viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:20px;">' +
+      thumbHtml +
+      '<p style="margin-bottom:15px;color:#aaa;">Direct video URL not available</p>' +
+      (linkUrl ? '<a href="' + linkUrl + '" target="_blank" class="btn-link">▶ Open on Instagram</a>' : '') +
+      '</div>';
+  }
 }
 
 // Render grid
