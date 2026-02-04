@@ -16,12 +16,8 @@
   "host_permissions": [
     "https://www.instagram.com/*",
     "https://instagram.com/*",
-    "https://www.googletagmanager.com/*",
     "https://www.google-analytics.com/*"
   ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self' https://www.googletagmanager.com; object-src 'self'"
-  },
   "background": {
     "service_worker": "background.js"
   },

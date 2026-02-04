@@ -1,93 +1,92 @@
 /**
- * Google Analytics 4 Helper for Chrome Extension
- * Replace GA_MEASUREMENT_ID with your actual GA4 Measurement ID (G-XXXXXXXXXX)
+ * Google Analytics 4 - Measurement Protocol
+ * Works with Chrome Extension Manifest V3 (no external scripts needed)
  */
 
 const GA_MEASUREMENT_ID = 'G-PX8PH6ZQE';
+const GA_API_SECRET = 'XsR9YFyZQY2_gJdKY939Lw';
 
-// Initialize GA4
-(function() {
-  // Load gtag.js
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-  document.head.appendChild(script);
+// Generate or retrieve client ID
+function getClientId() {
+  let clientId = localStorage.getItem('ga_client_id');
+  if (!clientId) {
+    clientId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    localStorage.setItem('ga_client_id', clientId);
+  }
+  return clientId;
+}
 
-  // Initialize dataLayer and gtag function
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function() { dataLayer.push(arguments); };
-  
-  gtag('js', new Date());
-  gtag('config', GA_MEASUREMENT_ID, {
-    // Disable automatic page view (we'll send manually with more context)
-    send_page_view: false,
-    // Respect user privacy
-    anonymize_ip: true
-  });
-})();
+// Send event to GA4 via Measurement Protocol
+async function sendEvent(eventName, params = {}) {
+  try {
+    const payload = {
+      client_id: getClientId(),
+      events: [{
+        name: eventName,
+        params: {
+          engagement_time_msec: 100,
+          session_id: sessionStorage.getItem('ga_session_id') || Date.now().toString(),
+          ...params
+        }
+      }]
+    };
+    
+    // Store session ID
+    if (!sessionStorage.getItem('ga_session_id')) {
+      sessionStorage.setItem('ga_session_id', Date.now().toString());
+    }
+
+    const response = await fetch(
+      `https://www.google-analytics.com/mp/collect?measurement_id=${GA_MEASUREMENT_ID}&api_secret=${GA_API_SECRET}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }
+    );
+    
+    console.log('[Analytics] Sent:', eventName, params);
+    return response.ok;
+  } catch (error) {
+    console.log('[Analytics] Error:', error.message);
+    return false;
+  }
+}
 
 /**
  * Track page view
- * @param {string} pageName - Name of the page (e.g., 'gallery', 'popup')
- * @param {string} pageTitle - Title of the page
  */
 function trackPageView(pageName, pageTitle) {
-  if (typeof gtag === 'undefined') return;
-  
-  gtag('event', 'page_view', {
+  sendEvent('page_view', {
     page_title: pageTitle || pageName,
-    page_location: pageName,
-    page_path: '/' + pageName
+    page_location: pageName
   });
-  
-  console.log('[Analytics] Page view:', pageName);
 }
 
 /**
  * Track button click
- * @param {string} buttonName - Name/ID of the button
- * @param {string} category - Category (e.g., 'gallery', 'popup', 'panel')
  */
 function trackButtonClick(buttonName, category) {
-  if (typeof gtag === 'undefined') return;
-  
-  gtag('event', 'button_click', {
-    event_category: category || 'general',
-    event_label: buttonName,
-    button_name: buttonName
+  sendEvent('button_click', {
+    button_name: buttonName,
+    category: category || 'general'
   });
-  
-  console.log('[Analytics] Button click:', buttonName, 'in', category);
 }
 
 /**
  * Track feature usage
- * @param {string} featureName - Name of the feature
- * @param {object} params - Additional parameters
  */
 function trackFeature(featureName, params = {}) {
-  if (typeof gtag === 'undefined') return;
-  
-  gtag('event', 'feature_usage', {
-    event_category: 'features',
-    event_label: featureName,
+  sendEvent('feature_usage', {
     feature_name: featureName,
     ...params
   });
-  
-  console.log('[Analytics] Feature:', featureName, params);
 }
 
 /**
  * Track media capture stats
- * @param {number} images - Number of images
- * @param {number} videos - Number of videos
  */
 function trackCaptureStats(images, videos) {
-  if (typeof gtag === 'undefined') return;
-  
-  gtag('event', 'capture_stats', {
-    event_category: 'capture',
+  sendEvent('capture_stats', {
     images_count: images,
     videos_count: videos,
     total_count: images + videos
@@ -96,33 +95,20 @@ function trackCaptureStats(images, videos) {
 
 /**
  * Track download action
- * @param {string} type - 'single' or 'all'
- * @param {string} mediaType - 'image' or 'video'
- * @param {number} count - Number of items
  */
 function trackDownload(type, mediaType, count) {
-  if (typeof gtag === 'undefined') return;
-  
-  gtag('event', 'download', {
-    event_category: 'downloads',
+  sendEvent('download', {
     download_type: type,
     media_type: mediaType,
     item_count: count
   });
-  
-  console.log('[Analytics] Download:', type, mediaType, count);
 }
 
 /**
  * Track error
- * @param {string} errorType - Type of error
- * @param {string} errorMessage - Error message
  */
 function trackError(errorType, errorMessage) {
-  if (typeof gtag === 'undefined') return;
-  
-  gtag('event', 'error', {
-    event_category: 'errors',
+  sendEvent('error', {
     error_type: errorType,
     error_message: errorMessage
   });
