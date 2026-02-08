@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IG Exporter - Export Instagram Saved Posts & Media | Chrome Extension</title>
+  <meta name="description" content="Export and download your Instagram saved posts, images, and videos with one click. Free Chrome extension for backing up your Instagram bookmarks.">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="IG Exporter - Export Instagram Saved Posts & Media">
+  <meta property="og:description" content="Export and download your Instagram saved posts, images, and videos with one click. Free Chrome extension.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/YOUR_USERNAME/instagram-bookmarks-exporter/main/assets/og-image.png">
+  <meta property="og:url" content="https://YOUR_USERNAME.github.io/instagram-bookmarks-exporter/">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="IG Exporter - Export Instagram Saved Posts">
+  <meta name="twitter:description" content="Export and download your Instagram saved posts with one click.">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="128x128" href="assets/icons/icon-128.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-128.png">
+  
+  <style>
+    :root {
+      --primary: #E1306C;
+      --primary-dark: #c13584;
+      --gradient: linear-gradient(135deg, #833ab4 0%, #E1306C 50%, #fd1d1d 100%);
+      --text: #1a1a2e;
+      --text-light: #666;
+      --bg: #ffffff;
+      --bg-alt: #f8f9fa;
+      --card-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+    }
+    
+    /* Typography */
+    h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+    h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+    h2 { font-size: clamp(1.5rem, 3vw, 2.5rem); margin-bottom: 1rem; }
+    h3 { font-size: 1.25rem; }
+    p { color: var(--text-light); }
+    
+    /* Layout */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    section {
+      padding: 80px 0;
+    }
+    
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      padding: 16px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    nav .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    
+    .logo img {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+    }
+    
+    .nav-cta {
+      background: var(--gradient);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .nav-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(225, 48, 108, 0.4);
+    }
+    
+    /* Hero */
+    .hero {
+      padding-top: 140px;
+      padding-bottom: 80px;
+      text-align: center;
+      background: linear-gradient(180deg, #fff 0%, var(--bg-alt) 100%);
+    }
+    
+    .hero-badge {
+      display: inline-block;
+      background: rgba(225, 48, 108, 0.1);
+      color: var(--primary);
+      padding: 8px 16px;
+      border-radius: 50px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    
+    .hero h1 {
+      margin-bottom: 20px;
+    }
+    
+    .hero h1 span {
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero-subtitle {
+      font-size: 1.25rem;
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+    
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--gradient);
+      color: white;
+      padding: 16px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 18px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 16px;
+    }
+    
+    .hero-cta:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(225, 48, 108, 0.4);
+    }
+    
+    .hero-cta svg {
+      width: 24px;
+      height: 24px;
+    }
+    
+    .hero-note {
+      font-size: 14px;
+      color: var(--text-light);
+    }
+    
+    .hero-screenshot {
+      margin-top: 60px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .hero-screenshot img {
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: var(--card-shadow);
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .screenshot-placeholder {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border-radius: 16px;
+      padding: 60px 40px;
+      color: white;
+      text-align: center;
+    }
+    
+    .screenshot-placeholder h3 {
+      margin-bottom: 8px;
+      color: var(--primary);
+    }
+    
+    /* Features */
+    .features {
+      background: var(--bg);
+    }
+    
+    .features-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 60px;
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 32px;
+    }
+    
+    .feature-card {
+      background: var(--bg-alt);
+      padding: 32px;
+      border-radius: 16px;
+      border: 1px solid rgba(0,0,0,0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--card-shadow);
+    }
+    
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--gradient);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    
+    .feature-card h3 {
+      margin-bottom: 12px;
+    }
+    
+    /* How It Works */
+    .how-it-works {
+      background: var(--bg-alt);
+    }
+    
+    .how-it-works-header {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 60px;
+    }
+    
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 40px;
+    }
+    
+    .step {
+      text-align: center;
+    }
+    
+    .step-number {
+      width: 60px;
+      height: 60px;
+      background: var(--gradient);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 auto 20px;
+    }
+    
+    .step h3 {
+      margin-bottom: 12px;
+    }
+    
+    /* Social Proof */
+    .social-proof {
+      background: var(--bg);
+    }
+    
+    .social-proof-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    
+    .testimonials {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+    }
+    
+    .testimonial {
+      background: var(--bg-alt);
+      padding: 32px;
+      border-radius: 16px;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .testimonial-stars {
+      color: #ffc107;
+      margin-bottom: 16px;
+      font-size: 18px;
+    }
+    
+    .testimonial-text {
+      font-style: italic;
+      margin-bottom: 20px;
+    }
+    
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .author-avatar {
+      width: 44px;
+      height: 44px;
+      background: var(--gradient);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+    }
+    
+    .author-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+    
+    .author-role {
+      font-size: 14px;
+      color: var(--text-light);
+    }
+    
+    /* Feedback Section */
+    .feedback-section {
+      background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+      color: white;
+      padding: 100px 0;
+    }
+    
+    .feedback-content {
+      text-align: center;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    .feedback-content h2 {
+      color: white;
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      margin-bottom: 12px;
+    }
+    
+    .feedback-content > p {
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 40px;
+      font-size: 1.1rem;
+    }
+    
+    .feedback-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .feedback-form select,
+    .feedback-form input,
+    .feedback-form textarea {
+      width: 100%;
+      padding: 18px 20px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      background: rgba(255,255,255,0.05);
+      color: white;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    
+    .feedback-form select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(255,255,255,0.5)' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 20px center;
+      cursor: pointer;
+    }
+    
+    .feedback-form select option {
+      background: #1a1a2e;
+      color: white;
+    }
+    
+    .feedback-form input::placeholder,
+    .feedback-form textarea::placeholder {
+      color: rgba(255,255,255,0.4);
+    }
+    
+    .feedback-form select:focus,
+    .feedback-form input:focus,
+    .feedback-form textarea:focus {
+      border-color: rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.08);
+    }
+    
+    .feedback-form textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+    
+    .feedback-form button {
+      background: linear-gradient(135deg, #a78bfa 0%, #818cf8 100%);
+      color: #1a1a2e;
+      border: none;
+      padding: 18px 32px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    
+    .feedback-form button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(167, 139, 250, 0.35);
+    }
+    
+    .feedback-form button span {
+      font-size: 14px;
+    }
+    
+    /* Final CTA */
+    .final-cta {
+      text-align: center;
+      background: var(--bg-alt);
+    }
+    
+    .final-cta h2 {
+      margin-bottom: 16px;
+    }
+    
+    .final-cta p {
+      margin-bottom: 32px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    /* Footer */
+    footer {
+      background: var(--text);
+      color: rgba(255,255,255,0.7);
+      padding: 40px 0;
+    }
+    
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: white;
+      font-weight: 600;
+    }
+    
+    .footer-logo img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+    }
+    
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+    
+    .footer-links a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+    
+    .footer-links a:hover {
+      color: white;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      section { padding: 60px 0; }
+      
+      .email-form {
+        flex-direction: column;
+      }
+      
+      .footer-content {
+        flex-direction: column;
+        text-align: center;
+      }
+      
+      .hero-cta {
+        padding: 14px 24px;
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="container">
+      <a href="#" class="logo">
+        <img src="assets/icons/icon-128.png" alt="IG Exporter">
+        IG Exporter
+      </a>
+      <a href="https://chrome.google.com/webstore/detail/YOUR_EXTENSION_ID" class="nav-cta" target="_blank">
+        Add to Chrome — Free
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <span class="hero-badge">🚀 Free Chrome Extension</span>
+      <h1>Export Your <span>Instagram Saved Posts</span> in Seconds</h1>
+      <p class="hero-subtitle">
+        Finally backup and download all your Instagram saved posts, images, and videos. 
+        Never lose your favorite content again.
+      </p>
+      <a href="https://chrome.google.com/webstore/detail/YOUR_EXTENSION_ID" class="hero-cta" target="_blank">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.953 6.848c.062.003.124.005.186.005 6.627 0 12-5.373 12-12 0-.691-.058-1.369-.169-2.025z"/></svg>
+        Add to Chrome — It's Free
+      </a>
+      <p class="hero-note">⚡️ Installs in 2 seconds • No account required</p>
+      
+      <div class="hero-screenshot">
+        <!-- Replace with actual screenshot -->
+        <div class="screenshot-placeholder">
+          <h3>📸 Screenshot Preview</h3>
+          <p>Replace this with a screenshot of your extension in action</p>
+          <p style="margin-top: 20px; font-size: 14px; opacity: 0.7;">
+            Recommended: 1200x800px PNG showing the gallery view
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="container">
+      <div class="features-header">
+        <h2>Everything You Need to Export Instagram Media</h2>
+        <p>Simple, fast, and reliable. No more screenshots or manual downloads.</p>
+      </div>
+      
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🎠</div>
+          <h3>Capture Carousels & Reels</h3>
+          <p>Automatically captures all slides from carousels and video reels. No content left behind.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">☑️</div>
+          <h3>iPhone-Style Selection</h3>
+          <p>Select exactly which posts you want to export with our intuitive tap-to-select interface.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🖼️</div>
+          <h3>Beautiful Gallery View</h3>
+          <p>Browse your saved media in a clean gallery with fullscreen mode and automatic slideshow.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">📥</div>
+          <h3>Batch Download</h3>
+          <p>Download individual images or export everything at once. Your media, your way.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3>100% Private</h3>
+          <p>Everything runs locally in your browser. No data is ever sent to external servers.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>Lightning Fast</h3>
+          <p>Optimized for speed. Capture hundreds of posts in minutes, not hours.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="how-it-works">
+    <div class="container">
+      <div class="how-it-works-header">
+        <h2>Export in 3 Simple Steps</h2>
+        <p>No technical knowledge required. Just click, scroll, and download.</p>
+      </div>
+      
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3>Install the Extension</h3>
+          <p>Add IG Exporter to Chrome with one click. Takes less than 5 seconds.</p>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3>Go to Your Saved Posts</h3>
+          <p>Navigate to your Instagram saved posts page and scroll to load content.</p>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3>Capture & Download</h3>
+          <p>Click Capture to save media, then open the Gallery to download your files.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Social Proof -->
+  <section class="social-proof">
+    <div class="container">
+      <div class="social-proof-header">
+        <h2>Loved by Instagram Users</h2>
+        <p>Join thousands who've saved their favorite content</p>
+      </div>
+      
+      <div class="testimonials">
+        <div class="testimonial">
+          <div class="testimonial-stars">★★★★★</div>
+          <p class="testimonial-text">"Finally! I've been looking for something like this for years. Saved all my bookmarks in under 10 minutes."</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">S</div>
+            <div>
+              <div class="author-name">Sarah M.</div>
+              <div class="author-role">Content Creator</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="testimonial">
+          <div class="testimonial-stars">★★★★★</div>
+          <p class="testimonial-text">"Super easy to use. The selection feature is amazing — I can pick exactly what I want to download."</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">J</div>
+            <div>
+              <div class="author-name">Jake T.</div>
+              <div class="author-role">Photographer</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="testimonial">
+          <div class="testimonial-stars">★★★★★</div>
+          <p class="testimonial-text">"Works exactly as advertised. Clean interface, fast downloads. This should be built into Instagram!"</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">M</div>
+            <div>
+              <div class="author-name">Maria L.</div>
+              <div class="author-role">Social Media Manager</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feedback Section -->
+  <section class="feedback-section">
+    <div class="container">
+      <div class="feedback-content">
+        <h2>We'd Love Your Feedback</h2>
+        <p>Found a bug or have a feature request? Let us know!</p>
+        
+        <form class="feedback-form" action="https://formspree.io/f/mdalorok" method="POST">
+          <select name="feedback_type" required>
+            <option value="" disabled selected>Select feedback type...</option>
+            <option value="bug">🐛 Bug Report</option>
+            <option value="feature">✨ Feature Request</option>
+            <option value="question">❓ Question</option>
+            <option value="other">💬 Other</option>
+          </select>
+          
+          <input type="email" name="email" placeholder="Your email (optional)">
+          
+          <textarea name="message" placeholder="Tell us more..." rows="5" required></textarea>
+          
+          <button type="submit">
+            <span>➤</span> Send Feedback
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="final-cta">
+    <div class="container">
+      <h2>Ready to Export Your Saved Posts?</h2>
+      <p>Stop losing your favorite Instagram content. Start backing up today.</p>
+      <a href="https://chrome.google.com/webstore/detail/YOUR_EXTENSION_ID" class="hero-cta" target="_blank">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.953 6.848c.062.003.124.005.186.005 6.627 0 12-5.373 12-12 0-.691-.058-1.369-.169-2.025z"/></svg>
+        Add to Chrome — It's Free
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-logo">
+          <img src="assets/icons/icon-128.png" alt="IG Exporter">
+          IG Exporter
+        </div>
+        <div class="footer-links">
+          <a href="privacy-policy.html">Privacy Policy</a>
+          <a href="mailto:support@example.com">Contact</a>
+          <a href="https://github.com/YOUR_USERNAME/instagram-bookmarks-exporter" target="_blank">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

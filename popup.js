@@ -87,12 +87,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Capture Carousels button
+  // Capture All button
   const captureBtn = document.getElementById('capture-btn');
   captureBtn.addEventListener('click', function() {
     if (isCapturing) {
       sendToContent({ type: 'STOP_CAROUSELS' });
-      captureBtn.textContent = '🎠 Capture Carousels';
+      captureBtn.textContent = '🎠 Capture All';
       isCapturing = false;
       setStatus('Stopped');
     } else {
@@ -101,10 +101,23 @@ document.addEventListener('DOMContentLoaded', function() {
           updateStats(response);
         }
       });
-      captureBtn.textContent = '⏹️ Stop Capture';
+      captureBtn.textContent = '⏹️ Stop';
       isCapturing = true;
-      setStatus('Capturing...');
+      setStatus('Capturing all posts...');
     }
+  });
+  
+  // Select button - enables iPhone-style selection on the page
+  const selectBtn = document.getElementById('select-btn');
+  selectBtn.addEventListener('click', function() {
+    sendToContent({ type: 'TOGGLE_SELECTION_MODE' }, function(response) {
+      if (response && response.selectionMode) {
+        setStatus('Selection mode ON - tap posts to select');
+        window.close(); // Close popup so user can interact with page
+      } else {
+        setStatus('Selection mode OFF');
+      }
+    });
   });
   
   // Clear button

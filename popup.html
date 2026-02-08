@@ -133,6 +133,15 @@
       background: rgba(255, 50, 50, 0.3);
     }
     
+    .btn-select {
+      background: linear-gradient(135deg, #40c463, #2ea043);
+      border: none;
+    }
+    
+    .btn-select:hover {
+      opacity: 0.9;
+    }
+    
     .status {
       margin-top: 12px;
       font-size: 10px;
@@ -178,9 +187,12 @@
     </div>
     
     <div class="actions">
-      <button id="capture-btn" class="btn-primary">🎠 Capture Carousels</button>
       <div class="btn-row">
-        <button id="gallery-btn" class="btn-gallery">🖼️ Open Gallery</button>
+        <button id="capture-btn" class="btn-primary">🎠 Capture All</button>
+        <button id="select-btn" class="btn-select">☑️ Select</button>
+      </div>
+      <div class="btn-row">
+        <button id="gallery-btn" class="btn-gallery">🖼️ Gallery</button>
         <button id="clear-btn" class="btn-danger">🗑️ Clear</button>
       </div>
     </div>

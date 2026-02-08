@@ -20,19 +20,322 @@
     images: [],
     videos: [],
     carousels: [],
-    seenUrls: new Set()
+    seenUrls: new Set(),
+    capturedShortcodes: new Set(),  // Track which posts we've already captured
+    selectedShortcodes: new Set(),  // Track selected posts for capture
+    selectionMode: false            // Whether selection mode is active
   };
+  
+  // ============================================
+  // SELECTION MODE (iPhone-style checkboxes)
+  // ============================================
+  
+  function injectSelectionStyles() {
+    if (document.getElementById('ig-exporter-selection-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'ig-exporter-selection-styles';
+    style.textContent = `
+      .ig-exporter-checkbox {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.5);
+        border: 2px solid white;
+        cursor: pointer;
+        z-index: 100;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+      }
+      .ig-exporter-checkbox:hover {
+        transform: scale(1.1);
+      }
+      .ig-exporter-checkbox.checked {
+        background: linear-gradient(135deg, #E1306C, #833ab4);
+        border-color: #E1306C;
+      }
+      .ig-exporter-checkbox.checked::after {
+        content: '✓';
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .ig-exporter-selection-active .ig-exporter-checkbox {
+        display: flex !important;
+      }
+      .ig-exporter-selection-bar {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        border: 1px solid #E1306C;
+        border-radius: 12px;
+        padding: 12px 20px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        z-index: 10000;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .ig-exporter-selection-bar button {
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.15s ease;
+      }
+      .ig-exporter-selection-bar .primary {
+        background: linear-gradient(135deg, #E1306C, #833ab4);
+        color: white;
+      }
+      .ig-exporter-selection-bar .primary:hover {
+        opacity: 0.9;
+      }
+      .ig-exporter-selection-bar .secondary {
+        background: #2a2a4a;
+        color: white;
+        border: 1px solid #444;
+      }
+      .ig-exporter-selection-bar .secondary:hover {
+        border-color: #E1306C;
+      }
+      .ig-exporter-selection-bar .count {
+        color: #E1306C;
+        font-size: 14px;
+        font-weight: 600;
+        min-width: 80px;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  function addCheckboxesToPosts() {
+    const links = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
+    const processed = new Set();
+    
+    links.forEach(link => {
+      const match = link.href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
+      if (!match) return;
+      
+      const shortcode = match[2];
+      if (processed.has(shortcode)) return;
+      processed.add(shortcode);
+      
+      // Find the container (usually the parent div with position relative)
+      let container = link;
+      while (container && container.tagName !== 'ARTICLE') {
+        const style = window.getComputedStyle(container);
+        if (style.position === 'relative' || style.position === 'absolute') {
+          break;
+        }
+        container = container.parentElement;
+      }
+      
+      if (!container) container = link;
+      
+      // Check if checkbox already exists
+      if (container.querySelector('.ig-exporter-checkbox')) return;
+      
+      // Make container relative if needed
+      const containerStyle = window.getComputedStyle(container);
+      if (containerStyle.position === 'static') {
+        container.style.position = 'relative';
+      }
+      
+      // Create checkbox
+      const checkbox = document.createElement('div');
+      checkbox.className = 'ig-exporter-checkbox';
+      checkbox.dataset.shortcode = shortcode;
+      
+      if (state.selectedShortcodes.has(shortcode)) {
+        checkbox.classList.add('checked');
+      }
+      
+      checkbox.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSelection(shortcode, checkbox);
+      });
+      
+      container.appendChild(checkbox);
+    });
+  }
+  
+  function toggleSelection(shortcode, checkbox) {
+    if (state.selectedShortcodes.has(shortcode)) {
+      state.selectedShortcodes.delete(shortcode);
+      checkbox.classList.remove('checked');
+    } else {
+      state.selectedShortcodes.add(shortcode);
+      checkbox.classList.add('checked');
+    }
+    updateSelectionBar();
+  }
+  
+  function selectAll() {
+    const checkboxes = document.querySelectorAll('.ig-exporter-checkbox');
+    checkboxes.forEach(cb => {
+      const shortcode = cb.dataset.shortcode;
+      if (shortcode) {
+        state.selectedShortcodes.add(shortcode);
+        cb.classList.add('checked');
+      }
+    });
+    updateSelectionBar();
+    console.log('[IG Exporter] Selected all:', state.selectedShortcodes.size, 'posts');
+  }
+  
+  function deselectAll() {
+    state.selectedShortcodes.clear();
+    const checkboxes = document.querySelectorAll('.ig-exporter-checkbox');
+    checkboxes.forEach(cb => {
+      cb.classList.remove('checked');
+    });
+    updateSelectionBar();
+    console.log('[IG Exporter] Deselected all');
+  }
+  
+  let selectionBar = null;
+  
+  function createSelectionBar() {
+    if (selectionBar) return;
+    
+    selectionBar = document.createElement('div');
+    selectionBar.className = 'ig-exporter-selection-bar';
+    selectionBar.innerHTML = `
+      <span class="count"><span id="ig-sel-count">0</span> selected</span>
+      <button class="secondary" id="ig-select-all">Select All</button>
+      <button class="secondary" id="ig-deselect-all">Deselect All</button>
+      <button class="primary" id="ig-capture-selected">Capture Selected</button>
+      <button class="secondary" id="ig-exit-selection">Exit</button>
+    `;
+    document.body.appendChild(selectionBar);
+    
+    document.getElementById('ig-select-all').onclick = selectAll;
+    document.getElementById('ig-deselect-all').onclick = deselectAll;
+    document.getElementById('ig-capture-selected').onclick = captureSelected;
+    document.getElementById('ig-exit-selection').onclick = exitSelectionMode;
+  }
+  
+  function updateSelectionBar() {
+    const countEl = document.getElementById('ig-sel-count');
+    if (countEl) {
+      countEl.textContent = state.selectedShortcodes.size;
+    }
+  }
+  
+  function enterSelectionMode() {
+    state.selectionMode = true;
+    injectSelectionStyles();
+    document.body.classList.add('ig-exporter-selection-active');
+    addCheckboxesToPosts();
+    createSelectionBar();
+    updateSelectionBar();
+    
+    // Watch for new posts being loaded (infinite scroll)
+    startSelectionObserver();
+    
+    console.log('[IG Exporter] Selection mode activated');
+  }
+  
+  function exitSelectionMode() {
+    state.selectionMode = false;
+    document.body.classList.remove('ig-exporter-selection-active');
+    
+    if (selectionBar) {
+      selectionBar.remove();
+      selectionBar = null;
+    }
+    
+    stopSelectionObserver();
+    console.log('[IG Exporter] Selection mode deactivated');
+  }
+  
+  let selectionObserver = null;
+  
+  function startSelectionObserver() {
+    if (selectionObserver) return;
+    
+    selectionObserver = new MutationObserver(() => {
+      if (state.selectionMode) {
+        addCheckboxesToPosts();
+      }
+    });
+    
+    selectionObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+  
+  function stopSelectionObserver() {
+    if (selectionObserver) {
+      selectionObserver.disconnect();
+      selectionObserver = null;
+    }
+  }
+  
+  async function captureSelected() {
+    console.log('[IG Exporter] captureSelected() called');
+    
+    if (state.selectedShortcodes.size === 0) {
+      alert('No posts selected. Tap on posts to select them.');
+      return;
+    }
+    
+    // IMPORTANT: Save selection to local variable BEFORE exiting selection mode
+    const selectedList = Array.from(state.selectedShortcodes);
+    console.log('[IG Exporter] === CAPTURE SELECTED MODE ===');
+    console.log('[IG Exporter] Selected count:', selectedList.length);
+    console.log('[IG Exporter] Selected shortcodes:', selectedList);
+    
+    exitSelectionMode();
+    
+    // Clear selection now (we have a copy)
+    state.selectedShortcodes.clear();
+    
+    // Start capture with ONLY selected shortcodes
+    console.log('[IG Exporter] Calling startAutoClickCapture with selection...');
+    await startAutoClickCapture(selectedList);
+  }
   
   // ============================================
   // HELPER FUNCTIONS
   // ============================================
 
+  // Normalize URL by removing query params (for deduplication)
+  function normalizeUrl(url) {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      // Return just the path without query params
+      return parsed.origin + parsed.pathname;
+    } catch (e) {
+      // If URL parsing fails, return as-is
+      return url;
+    }
+  }
+
   function addImage(url, postUrl, thumbnail) {
-    if (!url || state.seenUrls.has(url)) return false;
-    state.seenUrls.add(url);
+    if (!url) return false;
+    
+    // Use normalized URL for duplicate check
+    const normalizedUrl = normalizeUrl(url);
+    if (state.seenUrls.has(normalizedUrl)) return false;
+    state.seenUrls.add(normalizedUrl);
+    
     state.images.push({
       type: 'image',
-      url: url,
+      url: url,  // Store original URL with params
       thumbnail: thumbnail || url,
       postUrl: postUrl || null,
       scrapedAt: new Date().toISOString()
@@ -44,8 +347,12 @@
   function addVideo(url, postUrl, thumbnail) {
     const videoUrl = url || null;
     const key = videoUrl || postUrl;
-    if (!key || state.seenUrls.has(key)) return false;
-    state.seenUrls.add(key);
+    if (!key) return false;
+    
+    // Use normalized URL for duplicate check
+    const normalizedKey = normalizeUrl(key);
+    if (state.seenUrls.has(normalizedKey)) return false;
+    state.seenUrls.add(normalizedKey);
     
     const video = {
       type: 'video',
@@ -230,20 +537,34 @@
     await sleep(randomDelay(800, 1500));
   }
   
-  async function startAutoClickCapture() {
+  async function startAutoClickCapture(selectedOnly = null) {
     if (autoClickRunning) {
       console.log('[IG Exporter] Auto-click already running');
       return;
     }
     
     autoClickRunning = true;
-    setStatus('Auto-capturing carousels...');
-    console.log('[IG Exporter] Starting auto-click capture');
+    const isSelectionMode = selectedOnly && Array.isArray(selectedOnly) && selectedOnly.length > 0;
+    const modeLabel = isSelectionMode ? 'SELECTED ONLY' : 'ALL POSTS';
     
-    // Find all carousel posts
+    console.log('[IG Exporter] ========================================');
+    console.log('[IG Exporter] MODE:', modeLabel);
+    if (isSelectionMode) {
+      console.log('[IG Exporter] Selected shortcodes to capture:', selectedOnly);
+    }
+    console.log('[IG Exporter] ========================================');
+    
+    setStatus(`Capturing ${modeLabel.toLowerCase()}...`);
+    
+    // Find all unique posts (deduplicate by shortcode)
+    const seenShortcodes = new Set();
     const carouselLinks = [];
     const allLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
-    console.log('[IG Exporter] Total post links on page:', allLinks.length);
+    console.log('[IG Exporter] Total <a> elements found:', allLinks.length);
+    
+    // If we have a selection filter, create a Set for quick lookup
+    const selectionFilter = isSelectionMode ? new Set(selectedOnly) : null;
+    console.log('[IG Exporter] Selection filter:', selectionFilter ? `${selectionFilter.size} items: [${Array.from(selectionFilter).join(', ')}]` : 'NONE (capture all)');
     
     allLinks.forEach(link => {
       const href = link.href;
@@ -252,6 +573,15 @@
       const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
       if (!match) return;
       const shortcode = match[2];
+      
+      // If we have a selection filter, skip posts that aren't selected
+      if (selectionFilter && !selectionFilter.has(shortcode)) {
+        return; // Skip - not in selection
+      }
+      
+      // Skip if we already have this shortcode (in this scan - prevents clicking same post twice)
+      if (seenShortcodes.has(shortcode)) return;
+      seenShortcodes.add(shortcode);
       
       // Check for carousel indicator - multiple methods
       let isCarousel = false;
@@ -279,29 +609,81 @@
         });
       }
       
-      // For debugging: capture ALL posts, not just carousels
-      // This helps test if the clicking mechanism works
-      carouselLinks.push({ link, shortcode, isCarousel });
+      // Get visual position for sorting
+      const rect = link.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      
+      // Capture posts
+      carouselLinks.push({ 
+        link, 
+        shortcode, 
+        isCarousel,
+        top: rect.top + scrollTop,  // Absolute position on page
+        left: rect.left + scrollLeft
+      });
     });
     
-    console.log('[IG Exporter] Found', carouselLinks.length, 'posts,', 
-                carouselLinks.filter(c => c.isCarousel).length, 'are carousels');
-    setStatus(`Found ${carouselLinks.length} carousels`);
+    // Sort by visual position: top to bottom, then left to right
+    carouselLinks.sort((a, b) => {
+      // Group by rows (items within 50px of each other are on same row)
+      const rowDiff = Math.abs(a.top - b.top);
+      if (rowDiff < 50) {
+        return a.left - b.left;  // Same row: sort by left position
+      }
+      return a.top - b.top;  // Different rows: sort by top position
+    });
     
-    // Process each carousel with random delays
+    console.log('[IG Exporter] Posts to capture:', carouselLinks.length, 
+                '| Carousels:', carouselLinks.filter(c => c.isCarousel).length);
+    if (carouselLinks.length > 0) {
+      console.log('[IG Exporter] Posts list:', carouselLinks.map(c => c.shortcode).join(', '));
+    }
+    console.log('[IG Exporter] First post:', carouselLinks[0]?.shortcode, 'at top:', Math.round(carouselLinks[0]?.top));
+    setStatus(`Found ${carouselLinks.length} posts to capture`);
+    
+    // Safety check: if selection filter was provided but no posts matched, something's wrong
+    if (selectionFilter && carouselLinks.length === 0) {
+      console.log('[IG Exporter] WARNING: Selection filter has items but no posts matched. Filter contents:', Array.from(selectionFilter));
+    }
+    if (selectionFilter && carouselLinks.length > selectionFilter.size) {
+      console.log('[IG Exporter] WARNING: More posts than selection! This should not happen.');
+    }
+    
+    // Process each post - find element fresh each time to avoid stale references
     for (let i = 0; i < carouselLinks.length; i++) {
       if (!autoClickRunning) {
         console.log('[IG Exporter] Auto-click stopped by user');
         break;
       }
       
-      const { link, shortcode } = carouselLinks[i];
+      const { shortcode } = carouselLinks[i];
       setStatus(`Capturing ${i + 1}/${carouselLinks.length}...`);
       
-      try {
-        await clickCarouselPost(link, shortcode);
-      } catch (error) {
-        console.log('[IG Exporter] Error clicking carousel:', error.message);
+      // Find the element fresh each time (DOM may have changed)
+      const freshLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
+      
+      if (!freshLink) {
+        console.log('[IG Exporter] Element not found for:', shortcode, '- scrolling to find it');
+        // Try scrolling to where it should be
+        window.scrollTo({ top: carouselLinks[i].top - 200, behavior: 'instant' });
+        await sleep(500);
+        const retryLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
+        if (!retryLink) {
+          console.log('[IG Exporter] Still not found, skipping:', shortcode);
+          continue;
+        }
+        try {
+          await clickCarouselPost(retryLink, shortcode);
+        } catch (error) {
+          console.log('[IG Exporter] Error clicking carousel:', error.message);
+        }
+      } else {
+        try {
+          await clickCarouselPost(freshLink, shortcode);
+        } catch (error) {
+          console.log('[IG Exporter] Error clicking carousel:', error.message);
+        }
       }
       
       // Random delay between posts (2-5 seconds to be safe)
@@ -313,8 +695,9 @@
     }
     
     autoClickRunning = false;
-    setStatus(`Done! Captured ${carouselLinks.length} carousels`);
-    console.log('[IG Exporter] Auto-click capture complete');
+    const newCount = carouselLinks.length;
+    setStatus(`Done! Processed ${newCount} posts`);
+    console.log('[IG Exporter] Auto-click capture complete. Total captured shortcodes:', state.capturedShortcodes.size);
     saveToStorage();
   }
   
@@ -324,16 +707,37 @@
     console.log('[IG Exporter] Auto-click stopped');
   }
   
-  // Capture images from currently open modal
+  // Capture images from currently open modal - only the centered carousel image
   function captureModalImages(shortcode) {
     let count = 0;
     const postUrl = `https://www.instagram.com/p/${shortcode}/`;
     
-    // Find all images in the modal/dialog
-    const modal = document.querySelector('div[role="dialog"]') || document.body;
+    // Find the modal
+    const modal = document.querySelector('div[role="dialog"]');
+    if (!modal) {
+      console.log('[IG Exporter] Modal not found!');
+      return 0;
+    }
     
-    // Look for carousel images
-    const images = modal.querySelectorAll('img[src*="cdninstagram"], img[src*="fbcdn"]');
+    // Get modal center
+    const modalRect = modal.getBoundingClientRect();
+    const modalCenterX = modalRect.left + modalRect.width / 2;
+    const modalCenterY = modalRect.top + modalRect.height / 2;
+    console.log('[IG Exporter] Modal center:', Math.round(modalCenterX), Math.round(modalCenterY));
+    
+    // Look for images in the modal - try broader selector
+    let images = modal.querySelectorAll('img[src*="cdninstagram"], img[src*="fbcdn"]');
+    console.log('[IG Exporter] Images found with CDN selector:', images.length);
+    
+    // If no images found, try all images
+    if (images.length === 0) {
+      images = modal.querySelectorAll('img');
+      console.log('[IG Exporter] All images in modal:', images.length);
+    }
+    
+    // Find the image that is closest to the center of the modal AND large
+    let mainImage = null;
+    let minDistanceToCenter = Infinity;
     
     images.forEach(img => {
       const src = img.src;
@@ -344,10 +748,41 @@
         return;
       }
       
+      const rect = img.getBoundingClientRect();
+      console.log('[IG Exporter] Image:', rect.width, 'x', rect.height, 'src:', src.substring(0, 50));
+      
+      // Must be reasonably large (at least 100x100 - lowered threshold)
+      if (rect.width < 100 || rect.height < 100) {
+        console.log('[IG Exporter] Skipped - too small');
+        return;
+      }
+      
+      // Calculate distance from image center to modal center
+      const imgCenterX = rect.left + rect.width / 2;
+      const imgCenterY = rect.top + rect.height / 2;
+      const distance = Math.sqrt(
+        Math.pow(imgCenterX - modalCenterX, 2) + 
+        Math.pow(imgCenterY - modalCenterY, 2)
+      );
+      
+      console.log('[IG Exporter] Distance to center:', Math.round(distance));
+      
+      // Find the most centered large image
+      if (distance < minDistanceToCenter) {
+        minDistanceToCenter = distance;
+        mainImage = img;
+      }
+    });
+    
+    console.log('[IG Exporter] Main image found:', !!mainImage);
+    
+    // Capture the main centered image
+    if (mainImage) {
+      let bestUrl = mainImage.src;
+      
       // Get best quality from srcset
-      let bestUrl = src;
-      if (img.srcset) {
-        const parts = img.srcset.split(',');
+      if (mainImage.srcset) {
+        const parts = mainImage.srcset.split(',');
         let maxWidth = 0;
         parts.forEach(part => {
           const match = part.trim().match(/^(\S+)\s+(\d+)w$/);
@@ -358,22 +793,40 @@
         });
       }
       
-      // Check if this is a main content image (not UI element)
-      const isMainImage = img.closest('article') || 
-                          img.closest('[role="dialog"]') ||
-                          (img.width > 200 && img.height > 200);
-      
-      if (isMainImage && addImage(bestUrl, postUrl, bestUrl)) {
+      if (addImage(bestUrl, postUrl, bestUrl)) {
         console.log('[IG Exporter] Captured modal image:', bestUrl.substring(0, 60));
         count++;
       }
+    }
+    
+    // Also look for the main video (closest to modal center)
+    const videos = modal.querySelectorAll('video');
+    let mainVideo = null;
+    let minVideoDistance = Infinity;
+    
+    videos.forEach(video => {
+      const rect = video.getBoundingClientRect();
+      
+      // Must be reasonably large
+      if (rect.width < 200 || rect.height < 200) return;
+      
+      // Calculate distance from video center to modal center
+      const vidCenterX = rect.left + rect.width / 2;
+      const vidCenterY = rect.top + rect.height / 2;
+      const distance = Math.sqrt(
+        Math.pow(vidCenterX - modalCenterX, 2) + 
+        Math.pow(vidCenterY - modalCenterY, 2)
+      );
+      
+      if (distance < minVideoDistance) {
+        minVideoDistance = distance;
+        mainVideo = video;
+      }
     });
     
-    // Also look for video posters
-    const videos = modal.querySelectorAll('video');
-    videos.forEach(video => {
-      const poster = video.poster;
-      const src = video.src;
+    if (mainVideo) {
+      const poster = mainVideo.poster;
+      const src = mainVideo.src;
       
       if (src || poster) {
         if (addVideo(src, postUrl, poster)) {
@@ -381,7 +834,7 @@
           count++;
         }
       }
-    });
+    }
     
     if (count > 0) {
       updatePanel();
@@ -879,6 +1332,7 @@
       state.videos = [];
       state.carousels = [];
       state.seenUrls.clear();
+      state.capturedShortcodes.clear();
       updatePanel();
       saveToStorage();
       setStatus('Cleared!');
@@ -922,11 +1376,13 @@
         state.videos = result.igExporterData.videos || [];
         state.carousels = result.igExporterData.carousels || [];
         
-        // Rebuild seen URLs
-        state.images.forEach(i => { if (i.url) state.seenUrls.add(i.url); });
+        // Rebuild seenUrls from loaded data (using normalized URLs)
+        state.images.forEach(i => { 
+          if (i.url) state.seenUrls.add(normalizeUrl(i.url));
+        });
         state.videos.forEach(v => { 
-          if (v.url) state.seenUrls.add(v.url);
-          if (v.postUrl) state.seenUrls.add(v.postUrl);
+          if (v.url) state.seenUrls.add(normalizeUrl(v.url));
+          if (v.postUrl) state.seenUrls.add(normalizeUrl(v.postUrl));
         });
         
         updatePanel();
@@ -982,10 +1438,12 @@
         break;
         
       case 'CLEAR':
+        console.log('[IG Exporter] CLEAR command received - clearing ALL data');
         state.images = [];
         state.videos = [];
         state.carousels = [];
         state.seenUrls.clear();
+        state.capturedShortcodes.clear();
         updatePanel();
         chrome.storage.local.set({
           igExporterData: { images: [], videos: [], carousels: [] },
@@ -1003,6 +1461,19 @@
         }
         sendResponse({ ok: true, running: autoClickRunning });
         break;
+        
+      case 'TOGGLE_SELECTION_MODE':
+        if (state.selectionMode) {
+          exitSelectionMode();
+        } else {
+          enterSelectionMode();
+        }
+        sendResponse({ ok: true, selectionMode: state.selectionMode });
+        break;
+        
+      case 'GET_SELECTION_COUNT':
+        sendResponse({ count: state.selectedShortcodes.size, selectionMode: state.selectionMode });
+        break;
     }
     return true;
   });
@@ -1012,7 +1483,8 @@
   // ============================================
 
   function init() {
-    // No floating panel - use popup from extension icon
+    // Load existing data from storage
+    loadFromStorage();
     console.log('[IG Exporter] Ready. Click extension icon to use.');
   }
 
