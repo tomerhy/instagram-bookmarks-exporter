@@ -358,6 +358,12 @@ document.querySelectorAll(".tab").forEach(function(tab) {
     selectedCard = null;
     renderGrid();
     
+    // Hide slideshow controls for videos tab
+    var slideshowControls = document.getElementById("slideshow-controls");
+    if (slideshowControls) {
+      slideshowControls.style.display = currentTab === "videos" ? "none" : "flex";
+    }
+    
     // Track tab switch
     if (window.Analytics) {
       Analytics.trackButtonClick('tab_' + currentTab, 'gallery');
@@ -366,49 +372,36 @@ document.querySelectorAll(".tab").forEach(function(tab) {
 });
 
 // Button handlers
-document.getElementById("download-current")?.addEventListener("click", function() {
+document.getElementById("download-current")?.addEventListener("click", async function() {
   if (!currentItem) { setStatus("Select an item first"); return; }
   var url = getUrl(currentItem);
   if (url) {
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "instagram_" + Date.now() + (currentTab === "videos" ? ".mp4" : ".jpg");
-    a.click();
-    setStatus("Download started");
-    
-    // Track download
-    if (window.Analytics) {
-      Analytics.trackDownload('single', currentTab === 'videos' ? 'video' : 'image', 1);
-    }
-  }
-});
-
-document.getElementById("download-all")?.addEventListener("click", function() {
-  var items = getCurrentItems();
-  if (items.length === 0) { setStatus("No items"); return; }
-  
-  // Track download all
-  if (window.Analytics) {
-    Analytics.trackDownload('all', currentTab === 'videos' ? 'video' : 'image', items.length);
-  }
-  
-  setStatus("Downloading " + items.length + " files...");
-  var i = 0;
-  
-  function next() {
-    if (i >= items.length) { setStatus("Done!"); setProgress(100); return; }
-    var url = getUrl(items[i]);
-    if (url) {
+    setStatus("Downloading...");
+    try {
+      // Fetch the file as blob to bypass cross-origin restrictions
+      var response = await fetch(url);
+      var blob = await response.blob();
+      var blobUrl = URL.createObjectURL(blob);
+      
       var a = document.createElement("a");
-      a.href = url;
-      a.download = "instagram_" + Date.now() + "_" + i + (currentTab === "videos" ? ".mp4" : ".jpg");
+      a.href = blobUrl;
+      a.download = "instagram_" + Date.now() + (currentTab === "videos" ? ".mp4" : ".jpg");
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      
+      setStatus("Download complete!");
+      
+      // Track download
+      if (window.Analytics) {
+        Analytics.trackDownload('single', currentTab === 'videos' ? 'video' : 'image', 1);
+      }
+    } catch (err) {
+      console.error("Download failed:", err);
+      setStatus("Download failed - try right-click > Save As");
     }
-    i++;
-    setProgress((i / items.length) * 100);
-    setTimeout(next, 300);
   }
-  next();
 });
 
 document.getElementById("copy")?.addEventListener("click", function() {
@@ -591,12 +584,28 @@ function showFullscreenItem(index) {
   
   var item = items[index];
   var url = getUrl(item);
-  var isVideo = item && (item.type === 'video' || (item.url && item.url.includes('/v/')) || (item.videoUrl));
+  // Only check item.type for video detection - don't check URL patterns as they're unreliable
+  var isVideo = item && item.type === 'video';
   
   // Stop any playing video
   if (fullscreenVideo) {
     fullscreenVideo.pause();
     fullscreenVideo.src = '';
+  }
+  
+  // Show/hide slideshow buttons based on content type
+  var btn3 = document.getElementById("fs-slide-3");
+  var btn5 = document.getElementById("fs-slide-5");
+  var stopBtn = document.getElementById("fs-slide-stop");
+  if (isVideo) {
+    // Hide slideshow buttons for videos
+    if (btn3) btn3.style.display = 'none';
+    if (btn5) btn5.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = 'none';
+  } else {
+    // Show slideshow buttons for images
+    if (btn3) btn3.style.display = 'inline-block';
+    if (btn5) btn5.style.display = 'inline-block';
   }
   
   if (isVideo) {
@@ -714,6 +723,13 @@ if (fullscreenPrev) {
 
 if (fullscreenNext) {
   fullscreenNext.addEventListener("click", fullscreenNextItem);
+}
+
+// Auto-play next video when current one ends
+if (fullscreenVideo) {
+  fullscreenVideo.addEventListener("ended", function() {
+    fullscreenNextItem();
+  });
 }
 
 // Slideshow buttons in fullscreen
