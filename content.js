@@ -24,16 +24,28 @@
     console.log('[IG Exporter] Received', media.length, 'media from API interceptor');
     
     let added = 0;
+    let skipped = 0;
     media.forEach(item => {
       if (item.type === 'video' && item.url) {
-        if (addVideo(item.url, null, item.thumbnail)) added++;
+        if (addVideo(item.url, null, item.thumbnail)) {
+          added++;
+        } else {
+          skipped++;
+        }
       } else if (item.type === 'image' && item.url) {
-        if (addImage(item.url, null, item.url)) added++;
+        if (addImage(item.url, null, item.url)) {
+          added++;
+        } else {
+          skipped++;
+        }
       }
     });
     
+    // Log summary with running total
+    const totalItems = state.images.length + state.videos.length;
+    console.log(`[IG Exporter] API: +${added} new, ${skipped} dupes | Total: ${state.images.length} imgs + ${state.videos.length} vids = ${totalItems}`);
+    
     if (added > 0) {
-      console.log('[IG Exporter] Added', added, 'new items from API');
       updatePanel();
       saveToStorage();
     }
@@ -344,8 +356,11 @@
     if (!url) return null;
     try {
       const parsed = new URL(url);
-      // Return just the path without query params
-      return parsed.origin + parsed.pathname;
+      // Keep pathname + ig_cache_key (unique identifier for each media item)
+      const cacheKey = parsed.searchParams.get('ig_cache_key') || '';
+      const stp = parsed.searchParams.get('stp') || '';
+      // Create a unique key combining path and unique identifiers
+      return parsed.pathname + '|' + cacheKey + '|' + stp;
     } catch (e) {
       // If URL parsing fails, return as-is
       return url;
@@ -357,7 +372,10 @@
     
     // Use normalized URL for duplicate check
     const normalizedUrl = normalizeUrl(url);
-    if (state.seenUrls.has(normalizedUrl)) return false;
+    if (state.seenUrls.has(normalizedUrl)) {
+      // Correctly skip duplicates
+      return false;
+    }
     state.seenUrls.add(normalizedUrl);
     
     state.images.push({
@@ -378,7 +396,10 @@
     
     // Use normalized URL for duplicate check
     const normalizedKey = normalizeUrl(key);
-    if (state.seenUrls.has(normalizedKey)) return false;
+    if (state.seenUrls.has(normalizedKey)) {
+      // Correctly skip duplicates
+      return false;
+    }
     state.seenUrls.add(normalizedKey);
     
     const video = {
@@ -624,6 +645,14 @@
     let noNewContentCount = 0;
     const maxNoNewContent = 3; // Stop after 3 batches with no new content
     
+    // DEBUG COUNTERS
+    const debugCounters = {
+      postsClicked: 0,           // Each time we click a post
+      imagesAtStart: state.images.length,
+      videosAtStart: state.videos.length
+    };
+    console.log('[IG Exporter] DEBUG: Starting counts - Images:', debugCounters.imagesAtStart, 'Videos:', debugCounters.videosAtStart);
+    
     // Helper function to find posts currently in DOM (not yet captured)
     function findCurrentPosts() {
       const seenShortcodes = new Set();
@@ -733,6 +762,8 @@
         }
         
         try {
+          debugCounters.postsClicked++;
+          console.log('[IG Exporter] DEBUG: Clicked post #' + debugCounters.postsClicked + ' (' + shortcode + ')');
           await clickCarouselPost(freshLink, shortcode);
         } catch (error) {
           console.log('[IG Exporter] Error:', error.message);
@@ -757,6 +788,19 @@
     autoClickRunning = false;
     setStatus(`Done! Processed ${totalProcessed} posts`);
     console.log('[IG Exporter] Capture complete. Total:', totalProcessed);
+    
+    // Summary
+    const newImages = state.images.length - debugCounters.imagesAtStart;
+    const newVideos = state.videos.length - debugCounters.videosAtStart;
+    
+    console.log('[IG Exporter] ========================================');
+    console.log('[IG Exporter] CAPTURE COMPLETE:');
+    console.log('[IG Exporter]   Posts processed:', debugCounters.postsClicked);
+    console.log('[IG Exporter]   Images captured:', newImages);
+    console.log('[IG Exporter]   Videos captured:', newVideos);
+    console.log('[IG Exporter]   Total unique items:', newImages + newVideos);
+    console.log('[IG Exporter] ========================================');
+    
     saveToStorage();
   }
   
