@@ -594,6 +594,7 @@
     await sleep(randomDelay(300, 600));
   }
   
+  
   async function startAutoClickCapture(selectedOnly = null) {
     if (autoClickRunning) {
       console.log('[IG Exporter] Auto-click already running');
@@ -613,166 +614,149 @@
     
     setStatus(`Capturing ${modeLabel.toLowerCase()}...`);
     
-    // Find all unique posts (deduplicate by shortcode)
-    const seenShortcodes = new Set();
-    const carouselLinks = [];
-    const allLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
-    console.log('[IG Exporter] Total <a> elements found:', allLinks.length);
-    
     // If we have a selection filter, create a Set for quick lookup
     const selectionFilter = isSelectionMode ? new Set(selectedOnly) : null;
-    console.log('[IG Exporter] Selection filter:', selectionFilter ? `${selectionFilter.size} items: [${Array.from(selectionFilter).join(', ')}]` : 'NONE (capture all)');
+    console.log('[IG Exporter] Selection filter:', selectionFilter ? `${selectionFilter.size} items` : 'NONE (capture all)');
     
-    allLinks.forEach(link => {
-      const href = link.href;
-      if (!href) return;
+    // Track all captured shortcodes across multiple scroll batches
+    const capturedInSession = new Set();
+    let totalProcessed = 0;
+    let noNewContentCount = 0;
+    const maxNoNewContent = 3; // Stop after 3 batches with no new content
+    
+    // Helper function to find posts currently in DOM (not yet captured)
+    function findCurrentPosts() {
+      const seenShortcodes = new Set();
+      const posts = [];
+      const allLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
       
-      const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
-      if (!match) return;
-      const shortcode = match[2];
-      
-      // If we have a selection filter, skip posts that aren't selected
-      if (selectionFilter && !selectionFilter.has(shortcode)) {
-        return; // Skip - not in selection
-      }
-      
-      // Skip if we already have this shortcode (in this scan - prevents clicking same post twice)
-      if (seenShortcodes.has(shortcode)) return;
-      seenShortcodes.add(shortcode);
-      
-      // Check for carousel indicator - multiple methods
-      let isCarousel = false;
-      
-      // Method 1: SVG with Carousel aria-label
-      const hasCarouselLabel = link.querySelector('[aria-label*="Carousel"]') ||
-                               link.closest('div')?.querySelector('[aria-label*="Carousel"]');
-      if (hasCarouselLabel) isCarousel = true;
-      
-      // Method 2: Multiple images indicator (stacked squares icon)
-      const container = link.closest('div');
-      if (container) {
-        const svgs = container.querySelectorAll('svg');
-        svgs.forEach(svg => {
-          const paths = svg.querySelectorAll('path');
-          paths.forEach(path => {
-            const d = path.getAttribute('d') || '';
-            // Common carousel icon patterns
-            if ((d.includes('M19') && d.includes('M3')) ||
-                (d.includes('M22') && d.includes('rect')) ||
-                (d.length > 80 && d.split('M').length >= 2)) {
-              isCarousel = true;
-            }
-          });
+      allLinks.forEach(link => {
+        const href = link.href;
+        if (!href) return;
+        
+        const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
+        if (!match) return;
+        const shortcode = match[2];
+        
+        // Skip if in selection mode and not selected
+        if (selectionFilter && !selectionFilter.has(shortcode)) return;
+        
+        // Skip duplicates in this scan
+        if (seenShortcodes.has(shortcode)) return;
+        seenShortcodes.add(shortcode);
+        
+        // Skip if already captured in this session
+        if (capturedInSession.has(shortcode)) return;
+        
+        const rect = link.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        posts.push({ 
+          shortcode, 
+          top: rect.top + scrollTop,
+          left: rect.left
         });
-      }
-      
-      // Get visual position for sorting
-      const rect = link.getBoundingClientRect();
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-      
-      // Capture posts
-      carouselLinks.push({ 
-        link, 
-        shortcode, 
-        isCarousel,
-        top: rect.top + scrollTop,  // Absolute position on page
-        left: rect.left + scrollLeft
       });
-    });
-    
-    // Sort by visual position: top to bottom, then left to right
-    carouselLinks.sort((a, b) => {
-      // Group by rows (items within 50px of each other are on same row)
-      const rowDiff = Math.abs(a.top - b.top);
-      if (rowDiff < 50) {
-        return a.left - b.left;  // Same row: sort by left position
-      }
-      return a.top - b.top;  // Different rows: sort by top position
-    });
-    
-    console.log('[IG Exporter] Posts to capture:', carouselLinks.length, 
-                '| Carousels:', carouselLinks.filter(c => c.isCarousel).length);
-    if (carouselLinks.length > 0) {
-      console.log('[IG Exporter] Posts list:', carouselLinks.map(c => c.shortcode).join(', '));
-    }
-    console.log('[IG Exporter] First post:', carouselLinks[0]?.shortcode, 'at top:', Math.round(carouselLinks[0]?.top));
-    setStatus(`Found ${carouselLinks.length} posts to capture`);
-    
-    // Safety check: if selection filter was provided but no posts matched, something's wrong
-    if (selectionFilter && carouselLinks.length === 0) {
-      console.log('[IG Exporter] WARNING: Selection filter has items but no posts matched. Filter contents:', Array.from(selectionFilter));
-    }
-    if (selectionFilter && carouselLinks.length > selectionFilter.size) {
-      console.log('[IG Exporter] WARNING: More posts than selection! This should not happen.');
-    }
-    
-    // Process each post - find element fresh each time to avoid stale references
-    for (let i = 0; i < carouselLinks.length; i++) {
-      if (!autoClickRunning) {
-        console.log('[IG Exporter] Auto-click stopped by user');
-        break;
-      }
       
-      const { shortcode, top } = carouselLinks[i];
-      setStatus(`Capturing ${i + 1}/${carouselLinks.length}...`);
+      // Sort by position
+      posts.sort((a, b) => {
+        const rowDiff = Math.abs(a.top - b.top);
+        if (rowDiff < 50) return a.left - b.left;
+        return a.top - b.top;
+      });
       
-      // Wait for the saved posts page to be ready (if we navigated back)
-      let pageReady = false;
-      for (let attempt = 0; attempt < 10 && !pageReady; attempt++) {
-        // Check if we're on the saved posts page
-        if (window.location.pathname.includes('/saved/')) {
-          pageReady = true;
-        } else {
-          console.log('[IG Exporter] Waiting for saved posts page... attempt', attempt + 1);
-          await sleep(150);
+      return posts;
+    }
+    
+    // Main capture loop - processes batches and scrolls to load more
+    while (autoClickRunning) {
+      // Find posts not yet captured
+      const posts = findCurrentPosts();
+      console.log('[IG Exporter] Found', posts.length, 'new posts to capture');
+      
+      if (posts.length === 0) {
+        noNewContentCount++;
+        console.log('[IG Exporter] No new posts (attempt', noNewContentCount + '/' + maxNoNewContent + ')');
+        
+        if (noNewContentCount >= maxNoNewContent) {
+          console.log('[IG Exporter] No more content to capture');
+          break;
         }
-      }
-      
-      // Find the element fresh each time (DOM may have changed)
-      let freshLink = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        freshLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
-        if (freshLink) break;
         
-        console.log('[IG Exporter] Element not found for:', shortcode, '- attempt', attempt + 1);
-        
-        // Try scrolling to approximate position
-        window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
-        await sleep(250);
-        
-        // Also try scrolling up first if we're deep in the page
-        if (attempt >= 2) {
-          window.scrollTo({ top: 0, behavior: 'instant' });
-          await sleep(150);
-          window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
-          await sleep(250);
-        }
-      }
-      
-      if (!freshLink) {
-        console.log('[IG Exporter] Could not find element after 5 attempts, skipping:', shortcode);
+        // Scroll down to load more content
+        console.log('[IG Exporter] Scrolling to load more...');
+        window.scrollBy({ top: randomDelay(400, 600), behavior: 'smooth' });
+        await sleep(randomDelay(1500, 2500));
         continue;
       }
       
-      try {
-        await clickCarouselPost(freshLink, shortcode);
-      } catch (error) {
-        console.log('[IG Exporter] Error clicking carousel:', error.message);
+      // Reset no-content counter since we found posts
+      noNewContentCount = 0;
+      
+      // Process this batch of posts
+      for (let i = 0; i < posts.length; i++) {
+        if (!autoClickRunning) {
+          console.log('[IG Exporter] Stopped by user');
+          break;
+        }
+        
+        const { shortcode, top } = posts[i];
+        totalProcessed++;
+        setStatus(`Capturing ${totalProcessed}...`);
+        
+        // Mark as captured (before clicking to avoid re-processing)
+        capturedInSession.add(shortcode);
+        
+        // Wait for saved posts page (if navigated back)
+        let pageReady = false;
+        for (let attempt = 0; attempt < 10 && !pageReady; attempt++) {
+          if (window.location.pathname.includes('/saved/')) {
+            pageReady = true;
+          } else {
+            await sleep(150);
+          }
+        }
+        
+        // Find element fresh
+        let freshLink = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          freshLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
+          if (freshLink) break;
+          
+          window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
+          await sleep(250);
+        }
+        
+        if (!freshLink) {
+          console.log('[IG Exporter] Could not find:', shortcode);
+          continue;
+        }
+        
+        try {
+          await clickCarouselPost(freshLink, shortcode);
+        } catch (error) {
+          console.log('[IG Exporter] Error:', error.message);
+        }
+        
+        // Random delay between posts
+        const delay = randomDelay(300, 600);
+        await sleep(delay);
       }
       
-      // Random delay between posts (0.3-0.6 seconds - fast but variable)
-      if (i < carouselLinks.length - 1) {
-        const delay = randomDelay(300, 600);
-        console.log('[IG Exporter] Waiting', delay, 'ms before next...');
-        await sleep(delay);
+      // After processing batch, scroll down to load more (if not in selection mode)
+      if (autoClickRunning && !isSelectionMode) {
+        console.log('[IG Exporter] Scrolling to load next batch...');
+        window.scrollBy({ top: randomDelay(400, 600), behavior: 'smooth' });
+        await sleep(randomDelay(1500, 2500));
+      } else if (isSelectionMode) {
+        // In selection mode, don't scroll - just process what was selected
+        break;
       }
     }
     
     autoClickRunning = false;
-    const newCount = carouselLinks.length;
-    setStatus(`Done! Processed ${newCount} posts`);
-    console.log('[IG Exporter] Auto-click capture complete. Total captured shortcodes:', state.capturedShortcodes.size);
+    setStatus(`Done! Processed ${totalProcessed} posts`);
+    console.log('[IG Exporter] Capture complete. Total:', totalProcessed);
     saveToStorage();
   }
   
