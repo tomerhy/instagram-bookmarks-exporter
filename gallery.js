@@ -375,31 +375,44 @@ document.querySelectorAll(".tab").forEach(function(tab) {
 document.getElementById("download-current")?.addEventListener("click", async function() {
   if (!currentItem) { setStatus("Select an item first"); return; }
   var url = getUrl(currentItem);
+  var isVideo = currentTab === "videos";
+  
   if (url) {
-    setStatus("Downloading...");
-    try {
-      // Fetch the file as blob to bypass cross-origin restrictions
-      var response = await fetch(url);
-      var blob = await response.blob();
-      var blobUrl = URL.createObjectURL(blob);
-      
-      var a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = "instagram_" + Date.now() + (currentTab === "videos" ? ".mp4" : ".jpg");
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-      
-      setStatus("Download complete!");
+    if (isVideo) {
+      // Videos have CORS restrictions - open in new tab for manual save
+      setStatus("Opening video - right-click to save");
+      window.open(url, '_blank');
       
       // Track download
       if (window.Analytics) {
-        Analytics.trackDownload('single', currentTab === 'videos' ? 'video' : 'image', 1);
+        Analytics.trackDownload('single', 'video', 1);
       }
-    } catch (err) {
-      console.error("Download failed:", err);
-      setStatus("Download failed - try right-click > Save As");
+    } else {
+      // Images can be fetched as blob
+      setStatus("Downloading...");
+      try {
+        var response = await fetch(url);
+        var blob = await response.blob();
+        var blobUrl = URL.createObjectURL(blob);
+        
+        var a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = "instagram_" + Date.now() + ".jpg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        
+        setStatus("Download complete!");
+        
+        // Track download
+        if (window.Analytics) {
+          Analytics.trackDownload('single', 'image', 1);
+        }
+      } catch (err) {
+        console.error("Download failed:", err);
+        setStatus("Download failed - try right-click > Save As");
+      }
     }
   }
 });
