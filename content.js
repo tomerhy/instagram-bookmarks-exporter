@@ -481,7 +481,7 @@
         const button = closeBtn.closest('button') || closeBtn.closest('[role="button"]') || closeBtn;
         button.click();
         console.log('[IG Exporter] Closed modal via button');
-        await sleep(randomDelay(500, 800));
+        await sleep(randomDelay(200, 400));
         return true;
       }
     }
@@ -489,14 +489,14 @@
     // Try pressing Escape
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
     console.log('[IG Exporter] Sent Escape key');
-    await sleep(randomDelay(300, 500));
+    await sleep(randomDelay(150, 300));
     
     // Check if we're on a post page (not the saved posts page)
     // If so, go back
     if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
       console.log('[IG Exporter] On post page, going back to saved posts');
       window.history.back();
-      await sleep(randomDelay(1000, 1500));
+      await sleep(randomDelay(500, 800));
     }
     
     return true;
@@ -507,7 +507,7 @@
     
     // Scroll element into view naturally
     link.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await sleep(randomDelay(400, 800));
+    await sleep(randomDelay(150, 300));
     
     // Click the post - use a simulated click that should open modal
     const clickEvent = new MouseEvent('click', {
@@ -518,7 +518,7 @@
     link.dispatchEvent(clickEvent);
     
     // Wait for modal to open
-    await sleep(randomDelay(1500, 2500));
+    await sleep(randomDelay(600, 1000));
     
     // Wait for modal to appear - try multiple times
     let modal = null;
@@ -527,7 +527,7 @@
               document.querySelector('article[role="presentation"]') ||
               document.querySelector('div[class*="Modal"]');
       if (modal) break;
-      await sleep(300);
+      await sleep(150);
     }
     
     if (!modal) {
@@ -560,7 +560,7 @@
           if (clickable && typeof clickable.click === 'function') {
             try {
               clickable.click();
-              await sleep(randomDelay(500, 900));
+              await sleep(randomDelay(100, 200));
               slideCount++;
               foundNext = true;
               
@@ -581,7 +581,7 @@
     console.log('[IG Exporter] Navigated through', slideCount, 'slides');
     
     // Wait a bit more for any final API calls
-    await sleep(randomDelay(500, 1000));
+    await sleep(randomDelay(200, 400));
     
     // Capture images from the modal DOM (fallback if API doesn't provide carousel_media)
     const modalImages = captureModalImages(shortcode);
@@ -591,7 +591,7 @@
     await closeModal();
     
     // Random delay before next action (human-like)
-    await sleep(randomDelay(800, 1500));
+    await sleep(randomDelay(300, 600));
   }
   
   async function startAutoClickCapture(selectedOnly = null) {
@@ -725,7 +725,7 @@
           pageReady = true;
         } else {
           console.log('[IG Exporter] Waiting for saved posts page... attempt', attempt + 1);
-          await sleep(300);
+          await sleep(150);
         }
       }
       
@@ -739,14 +739,14 @@
         
         // Try scrolling to approximate position
         window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
-        await sleep(500);
+        await sleep(250);
         
         // Also try scrolling up first if we're deep in the page
         if (attempt >= 2) {
           window.scrollTo({ top: 0, behavior: 'instant' });
-          await sleep(300);
+          await sleep(150);
           window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
-          await sleep(500);
+          await sleep(250);
         }
       }
       
@@ -761,9 +761,9 @@
         console.log('[IG Exporter] Error clicking carousel:', error.message);
       }
       
-      // Random delay between posts (2-5 seconds to be safe)
+      // Random delay between posts (0.3-0.6 seconds - fast but variable)
       if (i < carouselLinks.length - 1) {
-        const delay = randomDelay(2000, 5000);
+        const delay = randomDelay(300, 600);
         console.log('[IG Exporter] Waiting', delay, 'ms before next...');
         await sleep(delay);
       }

@@ -170,10 +170,13 @@
     #fullscreen-overlay.visible {
       display: flex;
     }
-    #fullscreen-image {
-      max-width: 90%;
-      max-height: 80%;
+    #fullscreen-image, #fullscreen-video {
+      max-width: 90vw;
+      max-height: 80vh;
       object-fit: contain;
+    }
+    #fullscreen-video {
+      display: none;
     }
     #fullscreen-close {
       position: absolute;
@@ -513,6 +516,7 @@
   <!-- Fullscreen overlay -->
   <div id="fullscreen-overlay">
     <img id="fullscreen-image" alt="Fullscreen" />
+    <video id="fullscreen-video" controls autoplay></video>
     <button id="fullscreen-close">✕</button>
     <div id="fullscreen-controls">
       <button class="fullscreen-btn" id="fullscreen-prev">← Prev</button>

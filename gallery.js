@@ -560,6 +560,7 @@ if (window.Analytics) {
 
 var fullscreenOverlay = document.getElementById("fullscreen-overlay");
 var fullscreenImage = document.getElementById("fullscreen-image");
+var fullscreenVideo = document.getElementById("fullscreen-video");
 var fullscreenClose = document.getElementById("fullscreen-close");
 var fullscreenPrev = document.getElementById("fullscreen-prev");
 var fullscreenNext = document.getElementById("fullscreen-next");
@@ -590,9 +591,29 @@ function showFullscreenItem(index) {
   
   var item = items[index];
   var url = getUrl(item);
+  var isVideo = item && (item.type === 'video' || (item.url && item.url.includes('/v/')) || (item.videoUrl));
   
-  if (fullscreenImage && url) {
-    fullscreenImage.src = url;
+  // Stop any playing video
+  if (fullscreenVideo) {
+    fullscreenVideo.pause();
+    fullscreenVideo.src = '';
+  }
+  
+  if (isVideo) {
+    // Show video, hide image
+    if (fullscreenImage) fullscreenImage.style.display = 'none';
+    if (fullscreenVideo) {
+      fullscreenVideo.style.display = 'block';
+      fullscreenVideo.src = item.videoUrl || item.url || url;
+      fullscreenVideo.load();
+    }
+  } else {
+    // Show image, hide video
+    if (fullscreenVideo) fullscreenVideo.style.display = 'none';
+    if (fullscreenImage) {
+      fullscreenImage.style.display = 'block';
+      fullscreenImage.src = url;
+    }
   }
   updateFullscreenCounter();
 }
@@ -625,6 +646,11 @@ function openFullscreen() {
 function closeFullscreen() {
   if (fullscreenOverlay) {
     fullscreenOverlay.classList.remove("visible");
+  }
+  // Stop video playback
+  if (fullscreenVideo) {
+    fullscreenVideo.pause();
+    fullscreenVideo.src = '';
   }
   stopSlideshow();
 }
