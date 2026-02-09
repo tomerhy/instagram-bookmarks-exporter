@@ -27,6 +27,15 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
+      "js": ["injector.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.instagram.com/*",
+        "https://instagram.com/*"
+      ],
       "js": ["content.js"],
       "css": ["content-styles.css"],
       "run_at": "document_idle"

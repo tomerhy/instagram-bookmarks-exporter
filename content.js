@@ -13,6 +13,33 @@
   console.log('[IG Exporter] Content script loaded');
 
   // ============================================
+  // LISTEN FOR MEDIA FROM INJECTOR (runs in MAIN world)
+  // ============================================
+  
+  window.addEventListener('message', function(event) {
+    if (event.source !== window) return;
+    if (event.data?.type !== 'IG_EXPORTER_MEDIA') return;
+    
+    const media = event.data.media || [];
+    console.log('[IG Exporter] Received', media.length, 'media from API interceptor');
+    
+    let added = 0;
+    media.forEach(item => {
+      if (item.type === 'video' && item.url) {
+        if (addVideo(item.url, null, item.thumbnail)) added++;
+      } else if (item.type === 'image' && item.url) {
+        if (addImage(item.url, null, item.url)) added++;
+      }
+    });
+    
+    if (added > 0) {
+      console.log('[IG Exporter] Added', added, 'new items from API');
+      updatePanel();
+      saveToStorage();
+    }
+  });
+
+  // ============================================
   // STATE
   // ============================================
   
@@ -444,7 +471,8 @@
       'svg[aria-label="Close"]',
       '[aria-label="Close"]',
       'button[type="button"] svg[aria-label="Close"]',
-      'div[role="dialog"] svg[aria-label="Close"]'
+      'div[role="dialog"] svg[aria-label="Close"]',
+      '[aria-label="Close dialog"]'
     ];
     
     for (const selector of closeSelectors) {
@@ -452,15 +480,25 @@
       if (closeBtn) {
         const button = closeBtn.closest('button') || closeBtn.closest('[role="button"]') || closeBtn;
         button.click();
-        console.log('[IG Exporter] Closed modal');
-        await sleep(randomDelay(300, 600));
+        console.log('[IG Exporter] Closed modal via button');
+        await sleep(randomDelay(500, 800));
         return true;
       }
     }
     
     // Try pressing Escape
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+    console.log('[IG Exporter] Sent Escape key');
     await sleep(randomDelay(300, 500));
+    
+    // Check if we're on a post page (not the saved posts page)
+    // If so, go back
+    if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
+      console.log('[IG Exporter] On post page, going back to saved posts');
+      window.history.back();
+      await sleep(randomDelay(1000, 1500));
+    }
+    
     return true;
   }
   
@@ -471,11 +509,30 @@
     link.scrollIntoView({ behavior: 'smooth', block: 'center' });
     await sleep(randomDelay(400, 800));
     
-    // Click the post
-    link.click();
+    // Click the post - use a simulated click that should open modal
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    });
+    link.dispatchEvent(clickEvent);
     
-    // Wait for modal to load and API to respond
+    // Wait for modal to open
     await sleep(randomDelay(1500, 2500));
+    
+    // Wait for modal to appear - try multiple times
+    let modal = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      modal = document.querySelector('div[role="dialog"]') || 
+              document.querySelector('article[role="presentation"]') ||
+              document.querySelector('div[class*="Modal"]');
+      if (modal) break;
+      await sleep(300);
+    }
+    
+    if (!modal) {
+      console.log('[IG Exporter] Modal still not found after waiting, trying to continue anyway');
+    }
     
     // Navigate through carousel slides to trigger loading of all items
     const nextBtnSelectors = [
@@ -657,33 +714,51 @@
         break;
       }
       
-      const { shortcode } = carouselLinks[i];
+      const { shortcode, top } = carouselLinks[i];
       setStatus(`Capturing ${i + 1}/${carouselLinks.length}...`);
       
+      // Wait for the saved posts page to be ready (if we navigated back)
+      let pageReady = false;
+      for (let attempt = 0; attempt < 10 && !pageReady; attempt++) {
+        // Check if we're on the saved posts page
+        if (window.location.pathname.includes('/saved/')) {
+          pageReady = true;
+        } else {
+          console.log('[IG Exporter] Waiting for saved posts page... attempt', attempt + 1);
+          await sleep(300);
+        }
+      }
+      
       // Find the element fresh each time (DOM may have changed)
-      const freshLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
+      let freshLink = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        freshLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
+        if (freshLink) break;
+        
+        console.log('[IG Exporter] Element not found for:', shortcode, '- attempt', attempt + 1);
+        
+        // Try scrolling to approximate position
+        window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
+        await sleep(500);
+        
+        // Also try scrolling up first if we're deep in the page
+        if (attempt >= 2) {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          await sleep(300);
+          window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
+          await sleep(500);
+        }
+      }
       
       if (!freshLink) {
-        console.log('[IG Exporter] Element not found for:', shortcode, '- scrolling to find it');
-        // Try scrolling to where it should be
-        window.scrollTo({ top: carouselLinks[i].top - 200, behavior: 'instant' });
-        await sleep(500);
-        const retryLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
-        if (!retryLink) {
-          console.log('[IG Exporter] Still not found, skipping:', shortcode);
-          continue;
-        }
-        try {
-          await clickCarouselPost(retryLink, shortcode);
-        } catch (error) {
-          console.log('[IG Exporter] Error clicking carousel:', error.message);
-        }
-      } else {
-        try {
-          await clickCarouselPost(freshLink, shortcode);
-        } catch (error) {
-          console.log('[IG Exporter] Error clicking carousel:', error.message);
-        }
+        console.log('[IG Exporter] Could not find element after 5 attempts, skipping:', shortcode);
+        continue;
+      }
+      
+      try {
+        await clickCarouselPost(freshLink, shortcode);
+      } catch (error) {
+        console.log('[IG Exporter] Error clicking carousel:', error.message);
       }
       
       // Random delay between posts (2-5 seconds to be safe)
@@ -712,12 +787,22 @@
     let count = 0;
     const postUrl = `https://www.instagram.com/p/${shortcode}/`;
     
-    // Find the modal
-    const modal = document.querySelector('div[role="dialog"]');
+    // Find the modal or post article
+    let modal = document.querySelector('div[role="dialog"]');
+    
+    // If no modal, we might be on the post page directly - look for the article
     if (!modal) {
-      console.log('[IG Exporter] Modal not found!');
+      modal = document.querySelector('article[role="presentation"]') ||
+              document.querySelector('article') ||
+              document.querySelector('main');
+    }
+    
+    if (!modal) {
+      console.log('[IG Exporter] Modal/article not found!');
       return 0;
     }
+    
+    console.log('[IG Exporter] Found container:', modal.tagName, modal.getAttribute('role'));
     
     // Get modal center
     const modalRect = modal.getBoundingClientRect();
@@ -799,42 +884,31 @@
       }
     }
     
-    // Also look for the main video (closest to modal center)
+    // Also look for videos - capture ANY video with a valid src
     const videos = modal.querySelectorAll('video');
-    let mainVideo = null;
-    let minVideoDistance = Infinity;
+    console.log('[IG Exporter] Videos found in modal:', videos.length);
     
     videos.forEach(video => {
-      const rect = video.getBoundingClientRect();
+      const src = video.src;
+      const poster = video.poster;
       
-      // Must be reasonably large
-      if (rect.width < 200 || rect.height < 200) return;
-      
-      // Calculate distance from video center to modal center
-      const vidCenterX = rect.left + rect.width / 2;
-      const vidCenterY = rect.top + rect.height / 2;
-      const distance = Math.sqrt(
-        Math.pow(vidCenterX - modalCenterX, 2) + 
-        Math.pow(vidCenterY - modalCenterY, 2)
-      );
-      
-      if (distance < minVideoDistance) {
-        minVideoDistance = distance;
-        mainVideo = video;
+      // Skip blob URLs (they won't work in gallery)
+      if (src && src.startsWith('blob:')) {
+        console.log('[IG Exporter] Skipping blob video');
+        return;
       }
-    });
-    
-    if (mainVideo) {
-      const poster = mainVideo.poster;
-      const src = mainVideo.src;
       
-      if (src || poster) {
+      // Need either a direct CDN URL or a poster
+      if (src && (src.includes('cdninstagram') || src.includes('fbcdn'))) {
         if (addVideo(src, postUrl, poster)) {
-          console.log('[IG Exporter] Captured modal video');
+          console.log('[IG Exporter] Captured modal video:', src.substring(0, 60));
           count++;
         }
+      } else if (poster) {
+        // Video might not have loaded yet, but we have poster
+        console.log('[IG Exporter] Video without direct URL, checking poster');
       }
-    }
+    });
     
     if (count > 0) {
       updatePanel();
@@ -1021,6 +1095,9 @@
                             url.includes('/feed/') || 
                             url.includes('/media/') ||
                             url.includes('/info/') ||
+                            url.includes('/web_info') ||
+                            url.includes('/p/') ||
+                            url.includes('/reel/') ||
                             url.includes('query');
       
       if (isRelevantUrl) {
@@ -1080,7 +1157,9 @@
     this.addEventListener('load', function() {
       try {
         const url = this._url || '';
-        if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved') || url.includes('/feed/')) {
+        if (url.includes('/api/') || url.includes('graphql') || url.includes('/saved') || 
+            url.includes('/feed/') || url.includes('/media/') || url.includes('/p/') || 
+            url.includes('/reel/') || url.includes('/info')) {
           console.log('[IG Exporter] Intercepted XHR:', url.substring(0, 100));
           const data = JSON.parse(this.responseText);
           console.log('[IG Exporter] XHR response keys:', Object.keys(data || {}).slice(0, 5));
