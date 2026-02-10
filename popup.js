@@ -17,6 +17,11 @@ document.addEventListener('DOMContentLoaded', function() {
     versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
   } catch (e) {}
   
+  // Track popup page view
+  if (window.Analytics) {
+    Analytics.trackPageView('popup', 'Extension Popup');
+  }
+  
   function setStatus(msg) {
     if (statusEl) statusEl.textContent = msg;
   }
@@ -91,14 +96,23 @@ document.addEventListener('DOMContentLoaded', function() {
   const captureBtn = document.getElementById('capture-btn');
   captureBtn.addEventListener('click', function() {
     if (isCapturing) {
+      if (window.Analytics) Analytics.trackButtonClick('stop_capture', 'popup');
       sendToContent({ type: 'STOP_CAROUSELS' });
       captureBtn.textContent = '🎠 Capture All';
       isCapturing = false;
       setStatus('Stopped');
     } else {
+      if (window.Analytics) Analytics.trackButtonClick('start_capture', 'popup');
       sendToContent({ type: 'START_CAROUSELS' }, function(response) {
         if (response) {
           updateStats(response);
+          // Track capture feature usage with stats
+          if (window.Analytics) {
+            Analytics.trackFeature('capture_started', {
+              images_before: response.images || 0,
+              videos_before: response.videos || 0
+            });
+          }
         }
       });
       captureBtn.textContent = '⏹️ Stop';
@@ -109,14 +123,17 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Clear button
   document.getElementById('clear-btn').addEventListener('click', function() {
+    if (window.Analytics) Analytics.trackButtonClick('clear', 'popup');
     sendToContent({ type: 'CLEAR' }, function() {
       updateStats({ images: 0, videos: 0 });
       setStatus('Cleared!');
+      if (window.Analytics) Analytics.trackFeature('data_cleared', { source: 'popup' });
     });
   });
   
   // Gallery button
   document.getElementById('gallery-btn').addEventListener('click', function() {
+    if (window.Analytics) Analytics.trackButtonClick('open_gallery', 'popup');
     chrome.tabs.create({ url: chrome.runtime.getURL('gallery.html') });
   });
   

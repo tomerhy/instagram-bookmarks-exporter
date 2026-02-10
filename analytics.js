@@ -1,6 +1,6 @@
 /**
  * Google Analytics 4 - Measurement Protocol
- * Works with Chrome Extension Manifest V3 (no external scripts needed)
+ * Focused on: Page Views, Button Clicks, Feature Usage
  */
 
 const GA_MEASUREMENT_ID = 'G-PX8PH6ZQE';
@@ -53,7 +53,9 @@ async function sendEvent(eventName, params = {}) {
 }
 
 /**
- * Track page view
+ * PAGE VIEWS - Track when user opens popup or gallery
+ * @param {string} pageName - 'popup' or 'gallery'
+ * @param {string} pageTitle - Human readable title
  */
 function trackPageView(pageName, pageTitle) {
   sendEvent('page_view', {
@@ -63,17 +65,36 @@ function trackPageView(pageName, pageTitle) {
 }
 
 /**
- * Track button click
+ * BUTTON CLICKS - Track all user interactions
+ * @param {string} buttonName - Unique button identifier
+ * @param {string} location - 'popup' or 'gallery'
+ * 
+ * Button names:
+ * Popup: start_capture, stop_capture, clear, open_gallery
+ * Gallery: tab_images, tab_videos, download_single, copy_urls, export_urls, 
+ *          clear_all, refresh, import, fullscreen, slideshow
  */
-function trackButtonClick(buttonName, category) {
+function trackButtonClick(buttonName, location) {
   sendEvent('button_click', {
     button_name: buttonName,
-    category: category || 'general'
+    location: location || 'unknown'
   });
 }
 
 /**
- * Track feature usage
+ * FEATURE USAGE - Track when features are used with context
+ * @param {string} featureName - Feature identifier
+ * @param {object} params - Additional context data
+ * 
+ * Features:
+ * - capture_started: When user starts capture (with current counts)
+ * - capture_completed: When capture finishes (with final counts)
+ * - data_cleared: When user clears data
+ * - urls_copied: When user copies URLs (with count)
+ * - urls_exported: When user exports URLs (with count)
+ * - media_downloaded: When user downloads media (with type, count)
+ * - slideshow_used: When user uses slideshow feature
+ * - fullscreen_used: When user opens fullscreen view
  */
 function trackFeature(featureName, params = {}) {
   sendEvent('feature_usage', {
@@ -83,18 +104,10 @@ function trackFeature(featureName, params = {}) {
 }
 
 /**
- * Track media capture stats
- */
-function trackCaptureStats(images, videos) {
-  sendEvent('capture_stats', {
-    images_count: images,
-    videos_count: videos,
-    total_count: images + videos
-  });
-}
-
-/**
- * Track download action
+ * DOWNLOAD - Track media downloads
+ * @param {string} type - 'single' or 'batch'
+ * @param {string} mediaType - 'image' or 'video'
+ * @param {number} count - Number of items
  */
 function trackDownload(type, mediaType, count) {
   sendEvent('download', {
@@ -104,22 +117,10 @@ function trackDownload(type, mediaType, count) {
   });
 }
 
-/**
- * Track error
- */
-function trackError(errorType, errorMessage) {
-  sendEvent('error', {
-    error_type: errorType,
-    error_message: errorMessage
-  });
-}
-
 // Export for use in other scripts
 window.Analytics = {
   trackPageView,
   trackButtonClick,
   trackFeature,
-  trackCaptureStats,
-  trackDownload,
-  trackError
+  trackDownload
 };

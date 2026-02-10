@@ -472,6 +472,7 @@ document.getElementById("clear")?.addEventListener("click", function() {
 });
 
 document.getElementById("import")?.addEventListener("click", function() {
+  if (window.Analytics) Analytics.trackButtonClick('import', 'gallery');
   document.getElementById("file-input")?.click();
 });
 
@@ -499,11 +500,17 @@ document.getElementById("file-input")?.addEventListener("change", function() {
     updateCounts();
     renderGrid();
     setStatus("Imported " + urls.length + " items");
+    
+    // Track import feature usage
+    if (window.Analytics) {
+      Analytics.trackFeature('urls_imported', { count: urls.length, type: currentTab });
+    }
   };
   reader.readAsText(file);
 });
 
 document.getElementById("donate")?.addEventListener("click", function() {
+  if (window.Analytics) Analytics.trackButtonClick('donate', 'gallery');
   window.open("https://www.patreon.com/join/THYProduction", "_blank");
 });
 
@@ -662,6 +669,12 @@ function openFullscreen() {
   if (fullscreenOverlay) {
     fullscreenOverlay.classList.add("visible");
   }
+  
+  // Track fullscreen usage
+  if (window.Analytics) {
+    Analytics.trackButtonClick('fullscreen', 'gallery');
+    Analytics.trackFeature('fullscreen_opened', { type: currentTab });
+  }
 }
 
 // Close fullscreen
@@ -700,6 +713,12 @@ function startSlideshow(intervalMs) {
   if (stopBtn) stopBtn.style.display = "inline-block";
   if (btn3) btn3.style.display = "none";
   if (btn5) btn5.style.display = "none";
+  
+  // Track slideshow usage
+  if (window.Analytics) {
+    Analytics.trackButtonClick('slideshow_start', 'gallery');
+    Analytics.trackFeature('slideshow_started', { interval_seconds: intervalMs / 1000 });
+  }
 }
 
 function stopSlideshow() {
