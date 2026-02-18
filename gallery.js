@@ -13,8 +13,6 @@ var imageCountEl = document.getElementById("image-count");
 var videoCountEl = document.getElementById("video-count");
 var paginationEl = document.getElementById("pagination");
 var versionEl = document.getElementById("version");
-var debugSection = document.getElementById("debug-section");
-var toggleDebug = document.getElementById("toggle-debug");
 
 // State
 var ITEMS_PER_PAGE = 50;
@@ -27,12 +25,6 @@ var selectedCard = null;
 // Debug
 function logDebug(msg) {
   console.log('[Gallery]', msg);
-  if (debugSection) {
-    debugSection.innerHTML = msg + "<br>" + debugSection.innerHTML;
-    if (debugSection.innerHTML.length > 5000) {
-      debugSection.innerHTML = debugSection.innerHTML.substring(0, 5000);
-    }
-  }
 }
 
 // Check if URL is a playable video URL (CDN URL, not Instagram post URL)
@@ -43,12 +35,6 @@ function isPlayableVideoUrl(url) {
          (url.includes('.mp4') || url.includes('/v/') || url.includes('video'));
 }
 
-if (toggleDebug) {
-  toggleDebug.onclick = function() {
-    debugSection.classList.toggle("visible");
-    toggleDebug.textContent = debugSection.classList.contains("visible") ? "Hide Debug" : "Show Debug";
-  };
-}
 
 // Helper functions
 function getUrl(item) {
@@ -347,6 +333,15 @@ function loadData() {
   });
 }
 
+// Update button labels based on current tab
+function updateButtonLabels() {
+  var label = currentTab === "images" ? "Images" : "Videos";
+  var exportBtn = document.getElementById("export");
+  var copyBtn = document.getElementById("copy");
+  if (exportBtn) exportBtn.textContent = "Export " + label;
+  if (copyBtn) copyBtn.textContent = "Copy " + label;
+}
+
 // Tab switching
 document.querySelectorAll(".tab").forEach(function(tab) {
   tab.onclick = function() {
@@ -357,6 +352,7 @@ document.querySelectorAll(".tab").forEach(function(tab) {
     currentItem = null;
     selectedCard = null;
     renderGrid();
+    updateButtonLabels();
     
     // Hide slideshow controls for videos tab
     var slideshowControls = document.getElementById("slideshow-controls");
@@ -370,6 +366,9 @@ document.querySelectorAll(".tab").forEach(function(tab) {
     }
   };
 });
+
+// Set initial button labels
+updateButtonLabels();
 
 // Button handlers
 document.getElementById("download-current")?.addEventListener("click", async function() {
@@ -460,9 +459,7 @@ document.getElementById("clear")?.addEventListener("click", function() {
   allMedia.videos = [];
   
   chrome.storage.local.set({
-    igExporterData: { images: [], videos: [], carousels: [] },
-    imageUrls: [],
-    videoUrls: []
+    igExporterData: { images: [], videos: [], carousels: [] }
   }, function() {
     updateCounts();
     renderGrid();
@@ -514,15 +511,6 @@ document.getElementById("donate")?.addEventListener("click", function() {
   window.open("https://www.patreon.com/join/THYProduction", "_blank");
 });
 
-document.getElementById("refresh")?.addEventListener("click", function() {
-  setStatus("Refreshing...");
-  loadData();
-  setStatus("Refreshed!");
-  
-  if (window.Analytics) {
-    Analytics.trackButtonClick('refresh', 'gallery');
-  }
-});
 
 // Listen for storage changes
 chrome.storage.onChanged.addListener(function(changes, area) {
@@ -614,16 +602,19 @@ function showFullscreenItem(index) {
   }
   
   // Show/hide slideshow buttons based on content type
+  var btn2 = document.getElementById("fs-slide-2");
   var btn3 = document.getElementById("fs-slide-3");
   var btn5 = document.getElementById("fs-slide-5");
   var stopBtn = document.getElementById("fs-slide-stop");
   if (isVideo) {
     // Hide slideshow buttons for videos
+    if (btn2) btn2.style.display = 'none';
     if (btn3) btn3.style.display = 'none';
     if (btn5) btn5.style.display = 'none';
     if (stopBtn) stopBtn.style.display = 'none';
   } else {
     // Show slideshow buttons for images
+    if (btn2) btn2.style.display = 'inline-block';
     if (btn3) btn3.style.display = 'inline-block';
     if (btn5) btn5.style.display = 'inline-block';
   }
@@ -708,9 +699,11 @@ function startSlideshow(intervalMs) {
   
   // Show stop button, hide start buttons
   var stopBtn = document.getElementById("fs-slide-stop");
+  var btn2 = document.getElementById("fs-slide-2");
   var btn3 = document.getElementById("fs-slide-3");
   var btn5 = document.getElementById("fs-slide-5");
   if (stopBtn) stopBtn.style.display = "inline-block";
+  if (btn2) btn2.style.display = "none";
   if (btn3) btn3.style.display = "none";
   if (btn5) btn5.style.display = "none";
   
@@ -729,9 +722,11 @@ function stopSlideshow() {
   
   // Show start buttons, hide stop button
   var stopBtn = document.getElementById("fs-slide-stop");
+  var btn2 = document.getElementById("fs-slide-2");
   var btn3 = document.getElementById("fs-slide-3");
   var btn5 = document.getElementById("fs-slide-5");
   if (stopBtn) stopBtn.style.display = "none";
+  if (btn2) btn2.style.display = "inline-block";
   if (btn3) btn3.style.display = "inline-block";
   if (btn5) btn5.style.display = "inline-block";
 }
@@ -765,6 +760,10 @@ if (fullscreenVideo) {
 }
 
 // Slideshow buttons in fullscreen
+document.getElementById("fs-slide-2")?.addEventListener("click", function() {
+  startSlideshow(2000);
+});
+
 document.getElementById("fs-slide-3")?.addEventListener("click", function() {
   startSlideshow(3000);
 });

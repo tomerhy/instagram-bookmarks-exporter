@@ -618,42 +618,118 @@
   
   async function startAutoClickCapture(selectedOnly = null) {
     if (autoClickRunning) {
-      console.log('[IG Exporter] Auto-click already running');
+      console.log('[IG Exporter] Already running');
       return;
     }
     
     autoClickRunning = true;
-    const isSelectionMode = selectedOnly && Array.isArray(selectedOnly) && selectedOnly.length > 0;
-    const modeLabel = isSelectionMode ? 'SELECTED ONLY' : 'ALL POSTS';
     
+    // SCROLL-ONLY MODE: Just scroll to trigger Instagram's API loading
+    // The injector.js will capture media from API responses automatically
     console.log('[IG Exporter] ========================================');
-    console.log('[IG Exporter] MODE:', modeLabel);
-    if (isSelectionMode) {
-      console.log('[IG Exporter] Selected shortcodes to capture:', selectedOnly);
-    }
+    console.log('[IG Exporter] SCROLL-ONLY MODE');
+    console.log('[IG Exporter] Scrolling to load posts, API interception will capture media');
     console.log('[IG Exporter] ========================================');
     
-    setStatus(`Capturing ${modeLabel.toLowerCase()}...`);
+    setStatus('Auto-scrolling...', true);
     
-    // If we have a selection filter, create a Set for quick lookup
-    const selectionFilter = isSelectionMode ? new Set(selectedOnly) : null;
-    console.log('[IG Exporter] Selection filter:', selectionFilter ? `${selectionFilter.size} items` : 'NONE (capture all)');
-    
-    // Track all captured shortcodes across multiple scroll batches
-    const capturedInSession = new Set();
-    let totalProcessed = 0;
+    const startImages = state.images.length;
+    const startVideos = state.videos.length;
     let noNewContentCount = 0;
-    const maxNoNewContent = 3; // Stop after 3 batches with no new content
+    const maxNoNewContent = 5; // Stop after 5 scrolls with no new content
+    let scrollCount = 0;
     
-    // DEBUG COUNTERS
-    const debugCounters = {
-      postsClicked: 0,           // Each time we click a post
-      imagesAtStart: state.images.length,
-      videosAtStart: state.videos.length
-    };
-    console.log('[IG Exporter] DEBUG: Starting counts - Images:', debugCounters.imagesAtStart, 'Videos:', debugCounters.videosAtStart);
+    // SCROLL-ONLY LOOP: Just scroll to trigger Instagram's API loading
+    while (autoClickRunning) {
+      scrollCount++;
+      
+      // Track media count before scroll
+      const mediaBeforeScroll = state.images.length + state.videos.length;
+      
+      // Get document dimensions
+      const docHeight = document.documentElement.scrollHeight;
+      const viewportHeight = window.innerHeight;
+      const currentScroll = window.scrollY;
+      
+      // Check if we're near the bottom
+      const nearBottom = (currentScroll + viewportHeight) >= (docHeight - 200);
+      
+      if (nearBottom) {
+        // We're at the bottom, wait for more content to load
+        noNewContentCount++;
+        console.log('[IG Exporter] Near bottom, waiting for content... (attempt', noNewContentCount + '/' + maxNoNewContent + ')');
+        
+        if (noNewContentCount >= maxNoNewContent) {
+          console.log('[IG Exporter] No more content loading, stopping');
+          break;
+        }
+        
+        // Trigger scroll event to prompt loading
+        window.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await sleep(randomDelay(600, 1000));
+        
+        // Check if new media was captured
+        const mediaAfterWait = state.images.length + state.videos.length;
+        if (mediaAfterWait > mediaBeforeScroll) {
+          noNewContentCount = 0; // Reset counter if we got new content
+          console.log('[IG Exporter] New media captured:', mediaAfterWait - mediaBeforeScroll);
+        }
+        
+        continue;
+      }
+      
+      // Scroll down
+      const scrollAmount = viewportHeight * 0.8;
+      const targetScroll = currentScroll + scrollAmount;
+      
+      // Update live status
+      const totalMedia = state.images.length + state.videos.length;
+      setStatus(`Capturing... ${totalMedia} items`, true);
+      
+      console.log('[IG Exporter] Scroll #' + scrollCount + ' | Media so far:', state.images.length, 'imgs +', state.videos.length, 'vids');
+      
+      window.scrollTo({ top: targetScroll, behavior: 'auto' });
+      
+      // Dispatch scroll event to ensure Instagram detects it
+      window.dispatchEvent(new Event('scroll', { bubbles: true }));
+      
+      // Wait for Instagram to process and load content (faster)
+      await sleep(randomDelay(400, 600));
+      
+      // Check if new media was captured
+      const mediaAfterScroll = state.images.length + state.videos.length;
+      if (mediaAfterScroll > mediaBeforeScroll) {
+        noNewContentCount = 0; // Reset counter
+        updatePanel(); // Update stats in real-time
+        console.log('[IG Exporter] Captured', mediaAfterScroll - mediaBeforeScroll, 'new items');
+      }
+    }
     
-    // Helper function to find posts currently in DOM (not yet captured)
+    autoClickRunning = false;
+    
+    // Summary
+    const newImages = state.images.length - startImages;
+    const newVideos = state.videos.length - startVideos;
+    
+    console.log('[IG Exporter] ========================================');
+    console.log('[IG Exporter] SCROLL COMPLETE:');
+    console.log('[IG Exporter]   Scrolls:', scrollCount);
+    console.log('[IG Exporter]   Images captured:', newImages);
+    console.log('[IG Exporter]   Videos captured:', newVideos);
+    console.log('[IG Exporter]   Total:', state.images.length, 'imgs +', state.videos.length, 'vids');
+    console.log('[IG Exporter] ========================================');
+    
+    setStatus(`Done! ${newImages + newVideos} new items`);
+    saveToStorage();
+  }
+  
+  /* ============================================
+   * CLICK-BASED CAPTURE (DISABLED - kept for future use)
+   * This code clicks each post to capture carousel slides
+   * ============================================
+  
+  async function startClickCapture() {
+    // Helper function to find posts currently in DOM
     function findCurrentPosts() {
       const seenShortcodes = new Set();
       const posts = [];
@@ -667,142 +743,34 @@
         if (!match) return;
         const shortcode = match[2];
         
-        // Skip if in selection mode and not selected
-        if (selectionFilter && !selectionFilter.has(shortcode)) return;
-        
-        // Skip duplicates in this scan
         if (seenShortcodes.has(shortcode)) return;
         seenShortcodes.add(shortcode);
         
-        // Skip if already captured in this session
-        if (capturedInSession.has(shortcode)) return;
+        if (state.capturedShortcodes.has(shortcode)) return;
         
         const rect = link.getBoundingClientRect();
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        
-        posts.push({ 
-          shortcode, 
-          top: rect.top + scrollTop,
-          left: rect.left
-        });
+        posts.push({ shortcode, top: rect.top, left: rect.left });
       });
       
-      // Sort by position
-      posts.sort((a, b) => {
-        const rowDiff = Math.abs(a.top - b.top);
-        if (rowDiff < 50) return a.left - b.left;
-        return a.top - b.top;
-      });
-      
+      posts.sort((a, b) => a.top - b.top || a.left - b.left);
       return posts;
     }
     
-    // Main capture loop - processes batches and scrolls to load more
-    while (autoClickRunning) {
-      // Find posts not yet captured
-      const posts = findCurrentPosts();
-      console.log('[IG Exporter] Found', posts.length, 'new posts to capture');
+    // Process posts by clicking each one
+    const posts = findCurrentPosts();
+    for (const { shortcode } of posts) {
+      if (!autoClickRunning) break;
       
-      if (posts.length === 0) {
-        noNewContentCount++;
-        console.log('[IG Exporter] No new posts (attempt', noNewContentCount + '/' + maxNoNewContent + ')');
-        
-        if (noNewContentCount >= maxNoNewContent) {
-          console.log('[IG Exporter] No more content to capture');
-          break;
-        }
-        
-        // Scroll down to load more content
-        console.log('[IG Exporter] Scrolling to load more...');
-        window.scrollBy({ top: randomDelay(400, 600), behavior: 'smooth' });
-        await sleep(randomDelay(1500, 2500));
-        continue;
-      }
-      
-      // Reset no-content counter since we found posts
-      noNewContentCount = 0;
-      
-      // Process this batch of posts
-      for (let i = 0; i < posts.length; i++) {
-        if (!autoClickRunning) {
-          console.log('[IG Exporter] Stopped by user');
-          break;
-        }
-        
-        const { shortcode, top } = posts[i];
-        totalProcessed++;
-        setStatus(`Capturing ${totalProcessed}...`);
-        
-        // Mark as captured (before clicking to avoid re-processing)
-        capturedInSession.add(shortcode);
-        
-        // Wait for saved posts page (if navigated back)
-        let pageReady = false;
-        for (let attempt = 0; attempt < 10 && !pageReady; attempt++) {
-          if (window.location.pathname.includes('/saved/')) {
-            pageReady = true;
-          } else {
-            await sleep(150);
-          }
-        }
-        
-        // Find element fresh
-        let freshLink = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
-          freshLink = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
-          if (freshLink) break;
-          
-          window.scrollTo({ top: Math.max(0, top - 300), behavior: 'instant' });
-          await sleep(250);
-        }
-        
-        if (!freshLink) {
-          console.log('[IG Exporter] Could not find:', shortcode);
-          continue;
-        }
-        
-        try {
-          debugCounters.postsClicked++;
-          console.log('[IG Exporter] DEBUG: Clicked post #' + debugCounters.postsClicked + ' (' + shortcode + ')');
-          await clickCarouselPost(freshLink, shortcode);
-        } catch (error) {
-          console.log('[IG Exporter] Error:', error.message);
-        }
-        
-        // Random delay between posts
-        const delay = randomDelay(300, 600);
-        await sleep(delay);
-      }
-      
-      // After processing batch, scroll down to load more (if not in selection mode)
-      if (autoClickRunning && !isSelectionMode) {
-        console.log('[IG Exporter] Scrolling to load next batch...');
-        window.scrollBy({ top: randomDelay(400, 600), behavior: 'smooth' });
-        await sleep(randomDelay(1500, 2500));
-      } else if (isSelectionMode) {
-        // In selection mode, don't scroll - just process what was selected
-        break;
+      state.capturedShortcodes.add(shortcode);
+      const link = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
+      if (link) {
+        await clickCarouselPost(link, shortcode);
+        await sleep(randomDelay(300, 600));
       }
     }
-    
-    autoClickRunning = false;
-    setStatus(`Done! Processed ${totalProcessed} posts`);
-    console.log('[IG Exporter] Capture complete. Total:', totalProcessed);
-    
-    // Summary
-    const newImages = state.images.length - debugCounters.imagesAtStart;
-    const newVideos = state.videos.length - debugCounters.videosAtStart;
-    
-    console.log('[IG Exporter] ========================================');
-    console.log('[IG Exporter] CAPTURE COMPLETE:');
-    console.log('[IG Exporter]   Posts processed:', debugCounters.postsClicked);
-    console.log('[IG Exporter]   Images captured:', newImages);
-    console.log('[IG Exporter]   Videos captured:', newVideos);
-    console.log('[IG Exporter]   Total unique items:', newImages + newVideos);
-    console.log('[IG Exporter] ========================================');
-    
-    saveToStorage();
   }
+  
+  END OF CLICK-BASED CAPTURE */
   
   function stopAutoClickCapture() {
     autoClickRunning = false;
@@ -1329,11 +1297,13 @@
           <div><span id="ig-exp-images">0</span> Images</div>
           <div><span id="ig-exp-videos">0</span> Videos</div>
         </div>
-        <button id="ig-exp-scroll" class="ig-exp-btn">📜 Auto Scroll</button>
-        <button id="ig-exp-carousels" class="ig-exp-btn-primary">🎠 Capture Carousels</button>
+        <button id="ig-exp-carousels" class="ig-exp-btn-primary">📜 Start Capture</button>
         <button id="ig-exp-gallery" class="ig-exp-btn">🖼️ Gallery</button>
         <button id="ig-exp-clear" class="ig-exp-btn-danger">🗑️ Clear</button>
         <div id="ig-exp-status" class="ig-exp-status"></div>
+        <div id="ig-exp-loading-bar" class="ig-exp-loading-bar" style="display:none;">
+          <div class="ig-exp-loading-bar-inner"></div>
+        </div>
       </div>
     `;
     
@@ -1408,6 +1378,36 @@
         text-align: center;
         min-height: 16px;
       }
+      .ig-exp-status.loading {
+        color: #E1306C;
+        font-weight: 500;
+      }
+      .ig-exp-loading-bar {
+        height: 3px;
+        background: #333;
+        border-radius: 2px;
+        margin-top: 8px;
+        overflow: hidden;
+      }
+      .ig-exp-loading-bar-inner {
+        height: 100%;
+        width: 30%;
+        background: linear-gradient(90deg, #833ab4, #E1306C, #fd1d1d);
+        border-radius: 2px;
+        animation: ig-exp-loading 1s ease-in-out infinite;
+      }
+      @keyframes ig-exp-loading {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(200%); }
+        100% { transform: translateX(-100%); }
+      }
+      .ig-exp-pulse {
+        animation: ig-exp-pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes ig-exp-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
     `;
     document.head.appendChild(style);
     document.body.appendChild(panel);
@@ -1417,16 +1417,14 @@
       panel.querySelector('.ig-exp-body').classList.toggle('hidden');
     };
     
-    panel.querySelector('#ig-exp-scroll').onclick = toggleAutoScroll;
-    
     const carouselBtn = panel.querySelector('#ig-exp-carousels');
     carouselBtn.onclick = () => {
       if (autoClickRunning) {
         stopAutoClickCapture();
-        carouselBtn.textContent = '🎠 Capture Carousels';
+        carouselBtn.textContent = '📜 Start Capture';
       } else {
         startAutoClickCapture();
-        carouselBtn.textContent = '⏹️ Stop Capture';
+        carouselBtn.textContent = '⏹️ Stop';
       }
     };
     
@@ -1447,12 +1445,33 @@
   }
 
   function updatePanel() {
-    // No floating panel - stats are in popup
+    // Update floating panel stats
+    const imagesEl = document.getElementById('ig-exp-images');
+    const videosEl = document.getElementById('ig-exp-videos');
+    
+    if (imagesEl) imagesEl.textContent = state.images.length;
+    if (videosEl) videosEl.textContent = state.videos.length;
+    
     console.log('[IG Exporter] Stats:', state.images.length, 'images,', state.videos.length, 'videos');
   }
 
-  function setStatus(msg) {
-    // No floating panel - log to console
+  function setStatus(msg, isLoading = false) {
+    const statusEl = document.getElementById('ig-exp-status');
+    const loadingBar = document.getElementById('ig-exp-loading-bar');
+    
+    if (statusEl) {
+      statusEl.textContent = msg;
+      if (isLoading) {
+        statusEl.classList.add('loading', 'ig-exp-pulse');
+      } else {
+        statusEl.classList.remove('loading', 'ig-exp-pulse');
+      }
+    }
+    
+    if (loadingBar) {
+      loadingBar.style.display = isLoading ? 'block' : 'none';
+    }
+    
     console.log('[IG Exporter]', msg);
   }
 
@@ -1467,13 +1486,14 @@
       carousels: state.carousels
     };
     
-    chrome.storage.local.set({
-      igExporterData: data,
-      imageUrls: state.images.map(i => i.url).filter(Boolean),
-      videoUrls: state.videos.map(v => v.url || v.postUrl).filter(Boolean)
+    chrome.storage.local.set({ igExporterData: data }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[IG Exporter] Storage error:', chrome.runtime.lastError.message);
+        setStatus('Storage error - try clearing some data');
+      } else {
+        console.log('[IG Exporter] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
+      }
     });
-    
-    console.log('[IG Exporter] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
   }
 
   function loadFromStorage() {
@@ -1513,7 +1533,8 @@
           images: state.images.length,
           videos: state.videos.length,
           carousels: state.carousels.length,
-          total: state.images.length + state.videos.length + state.carousels.length
+          total: state.images.length + state.videos.length + state.carousels.length,
+          isCapturing: autoClickRunning
         });
         break;
         

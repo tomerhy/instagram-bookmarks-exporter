@@ -308,21 +308,6 @@
       transition: width 150ms ease;
     }
     
-    /* Debug section */
-    #debug-section {
-      margin-top: 12px;
-      padding: 10px;
-      background: #111;
-      border-radius: 8px;
-      font-size: 10px;
-      color: #666;
-      max-height: 100px;
-      overflow-y: auto;
-      display: none;
-    }
-    #debug-section.visible {
-      display: block;
-    }
 
     /* Grid container - 60% */
     #grid-container {
@@ -488,17 +473,17 @@
       
       <div class="slideshow-controls" id="slideshow-controls">
         <label>Slideshow:</label>
-        <button class="slideshow-btn" data-interval="3000">3 sec</button>
-        <button class="slideshow-btn" data-interval="5000">5 sec</button>
+        <button class="slideshow-btn" data-interval="2000">2s</button>
+        <button class="slideshow-btn" data-interval="3000">3s</button>
+        <button class="slideshow-btn" data-interval="5000">5s</button>
         <button class="slideshow-btn" id="stop-slideshow" style="display:none;">Stop</button>
       </div>
       
       <div class="actions">
         <button id="download-current">Download</button>
-        <button id="export">Export URLs</button>
+        <button id="export">Export Images</button>
         <button id="import">Import</button>
-        <button id="copy">Copy URLs</button>
-        <button id="refresh">🔄 Refresh</button>
+        <button id="copy">Copy Images</button>
         <button id="clear">Clear All</button>
         <button id="donate">Donate</button>
       </div>
@@ -506,9 +491,7 @@
       <div id="progress"><div id="progress-bar"></div></div>
       <input id="file-input" type="file" accept=".txt" />
       
-      <div id="debug-section"></div>
-      <button id="toggle-debug" style="margin-top:8px;font-size:10px;padding:4px 8px;">Show Debug</button>
-    </div>
+      </div>
     
     <div id="grid-container">
       <div id="grid"></div>
@@ -523,8 +506,9 @@
     <button id="fullscreen-close">✕</button>
     <div id="fullscreen-controls">
       <button class="fullscreen-btn" id="fullscreen-prev">← Prev</button>
-      <button class="fullscreen-btn" id="fs-slide-3" data-interval="3000">3s Slide</button>
-      <button class="fullscreen-btn" id="fs-slide-5" data-interval="5000">5s Slide</button>
+      <button class="fullscreen-btn" id="fs-slide-2" data-interval="2000">2s</button>
+      <button class="fullscreen-btn" id="fs-slide-3" data-interval="3000">3s</button>
+      <button class="fullscreen-btn" id="fs-slide-5" data-interval="5000">5s</button>
       <button class="fullscreen-btn" id="fs-slide-stop" style="display:none;">Stop</button>
       <span id="fullscreen-counter"></span>
       <button class="fullscreen-btn" id="fullscreen-next">Next →</button>

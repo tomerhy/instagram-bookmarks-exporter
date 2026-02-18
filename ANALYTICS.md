@@ -21,7 +21,6 @@ This document lists all Google Analytics 4 events tracked by the Instagram Saved
 | `copy_urls` | gallery | User copies URLs |
 | `export_urls` | gallery | User exports URLs |
 | `clear_all` | gallery | User clears data from gallery |
-| `refresh` | gallery | User refreshes data |
 | `import` | gallery | User clicks import |
 | `donate` | gallery | User clicks donate |
 | `fullscreen` | gallery | User opens fullscreen |

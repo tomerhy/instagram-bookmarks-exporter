@@ -6,11 +6,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const imagesCount = document.getElementById('images-count');
   const videosCount = document.getElementById('videos-count');
   const statusEl = document.getElementById('status');
+  const loadingBar = document.getElementById('loading-bar');
   const mainContent = document.getElementById('main-content');
   const notInstagram = document.getElementById('not-instagram');
   const versionEl = document.getElementById('version');
   
   let isCapturing = false;
+  const captureBtn = document.getElementById('capture-btn');
   
   // Set version
   try {
@@ -22,13 +24,32 @@ document.addEventListener('DOMContentLoaded', function() {
     Analytics.trackPageView('popup', 'Extension Popup');
   }
   
-  function setStatus(msg) {
-    if (statusEl) statusEl.textContent = msg;
+  function setStatus(msg, capturing = false) {
+    if (statusEl) {
+      statusEl.textContent = msg;
+      statusEl.classList.toggle('capturing', capturing);
+    }
+    if (loadingBar) {
+      loadingBar.classList.toggle('active', capturing);
+    }
   }
   
   function updateStats(stats) {
     if (imagesCount) imagesCount.textContent = stats.images || 0;
     if (videosCount) videosCount.textContent = stats.videos || 0;
+  }
+  
+  function updateCaptureState(capturing) {
+    isCapturing = capturing;
+    if (captureBtn) {
+      if (capturing) {
+        captureBtn.textContent = '⏹️ Stop';
+        setStatus('Capturing...', true);
+      } else {
+        captureBtn.textContent = '🎠 Capture All';
+        setStatus('', false);
+      }
+    }
   }
   
   // Load stats from content script or storage
@@ -53,6 +74,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (response) {
           updateStats(response);
+          // Update capture button state based on whether capture is running
+          if (response.isCapturing !== undefined) {
+            updateCaptureState(response.isCapturing);
+          }
         }
       });
     });
@@ -93,14 +118,13 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Capture All button
-  const captureBtn = document.getElementById('capture-btn');
   captureBtn.addEventListener('click', function() {
     if (isCapturing) {
       if (window.Analytics) Analytics.trackButtonClick('stop_capture', 'popup');
       sendToContent({ type: 'STOP_CAROUSELS' });
       captureBtn.textContent = '🎠 Capture All';
       isCapturing = false;
-      setStatus('Stopped');
+      setStatus('Stopped', false);
     } else {
       if (window.Analytics) Analytics.trackButtonClick('start_capture', 'popup');
       sendToContent({ type: 'START_CAROUSELS' }, function(response) {
@@ -117,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       captureBtn.textContent = '⏹️ Stop';
       isCapturing = true;
-      setStatus('Capturing all posts...');
+      setStatus('Capturing all posts...', true);
     }
   });
   

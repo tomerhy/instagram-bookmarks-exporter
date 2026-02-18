@@ -141,6 +141,38 @@
       min-height: 14px;
     }
     
+    .status.capturing {
+      color: #E1306C;
+      font-weight: 500;
+    }
+    
+    .loading-bar {
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+      display: none;
+    }
+    
+    .loading-bar.active {
+      display: block;
+    }
+    
+    .loading-bar-inner {
+      height: 100%;
+      width: 30%;
+      background: linear-gradient(90deg, #833ab4, #E1306C, #fd1d1d);
+      border-radius: 2px;
+      animation: loading-slide 1s ease-in-out infinite;
+    }
+    
+    @keyframes loading-slide {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(250%); }
+      100% { transform: translateX(-100%); }
+    }
+    
     .not-instagram {
       text-align: center;
       padding: 24px 16px;
@@ -188,6 +220,9 @@
     </div>
     
     <div class="status" id="status"></div>
+    <div class="loading-bar" id="loading-bar">
+      <div class="loading-bar-inner"></div>
+    </div>
   </div>
   
   <div id="not-instagram" style="display: none;">
