@@ -372,6 +372,7 @@ updateButtonLabels();
 
 // Button handlers
 document.getElementById("download-current")?.addEventListener("click", async function() {
+  if (window.Analytics) Analytics.trackButtonClick('download', 'gallery');
   if (!currentItem) { setStatus("Select an item first"); return; }
   var url = getUrl(currentItem);
   var isVideo = currentTab === "videos";
@@ -670,6 +671,7 @@ function openFullscreen() {
 
 // Close fullscreen
 function closeFullscreen() {
+  if (window.Analytics) Analytics.trackButtonClick('fullscreen_close', 'gallery');
   if (fullscreenOverlay) {
     fullscreenOverlay.classList.remove("visible");
   }
@@ -715,6 +717,7 @@ function startSlideshow(intervalMs) {
 }
 
 function stopSlideshow() {
+  if (window.Analytics) Analytics.trackButtonClick('slideshow_stop', 'gallery');
   if (slideshowInterval) {
     clearInterval(slideshowInterval);
     slideshowInterval = null;

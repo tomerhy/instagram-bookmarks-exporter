@@ -23,8 +23,11 @@ This document lists all Google Analytics 4 events tracked by the Instagram Saved
 | `clear_all` | gallery | User clears data from gallery |
 | `import` | gallery | User clicks import |
 | `donate` | gallery | User clicks donate |
+| `download` | gallery | User clicks download button |
 | `fullscreen` | gallery | User opens fullscreen |
+| `fullscreen_close` | gallery | User closes fullscreen |
 | `slideshow_start` | gallery | User starts slideshow |
+| `slideshow_stop` | gallery | User stops slideshow |
 
 ## Feature Usage
 

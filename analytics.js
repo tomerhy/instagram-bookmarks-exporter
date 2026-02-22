@@ -3,7 +3,7 @@
  * Focused on: Page Views, Button Clicks, Feature Usage
  */
 
-const GA_MEASUREMENT_ID = 'G-PX8PH6ZQE';
+const GA_MEASUREMENT_ID = 'G-PX8PH6ZQED';
 const GA_API_SECRET = 'XsR9YFyZQY2_gJdKY939Lw';
 
 // Generate or retrieve client ID
