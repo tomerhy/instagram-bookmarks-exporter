@@ -188,14 +188,82 @@
     .not-instagram p {
       font-size: 12px;
     }
+    
+    .support-banner {
+      background: rgba(255, 199, 0, 0.1);
+      border: 1px solid rgba(255, 199, 0, 0.3);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    
+    .support-banner.visible {
+      display: block;
+    }
+    
+    .support-banner-text {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 8px;
+    }
+    
+    .support-banner-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .support-banner-btn {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 10px;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .support-banner-btn.primary {
+      background: #ffdd00;
+      color: #000;
+      font-weight: 600;
+    }
+    
+    .support-banner-btn.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .footer {
+      margin-top: 12px;
+      text-align: center;
+    }
+    
+    .coffee-link {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    
+    .coffee-link:hover {
+      color: #ffdd00;
+    }
   </style>
 </head>
 <body>
   <div id="main-content">
+    <div class="support-banner" id="support-banner">
+      <div class="support-banner-text">Enjoying this extension? Consider buying me a coffee ☕</div>
+      <div class="support-banner-actions">
+        <button class="support-banner-btn primary" id="support-btn">☕ Support</button>
+        <button class="support-banner-btn secondary" id="dismiss-btn">Maybe later</button>
+      </div>
+    </div>
+    
     <div class="header">
       <img class="logo" src="assets/icons/icon-128.png" alt="Logo">
       <span class="title">IG Exporter</span>
-      <span class="version" id="version">v4.2.1</span>
+      <span class="version" id="version">v4.2.2</span>
     </div>
     
     <div class="stats">
@@ -222,6 +290,10 @@
     <div class="status" id="status"></div>
     <div class="loading-bar" id="loading-bar">
       <div class="loading-bar-inner"></div>
+    </div>
+    
+    <div class="footer">
+      <a href="#" class="coffee-link" id="coffee-link">☕ Buy me a coffee</a>
     </div>
   </div>
   

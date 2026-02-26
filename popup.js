@@ -13,6 +13,13 @@ document.addEventListener('DOMContentLoaded', function() {
   
   let isCapturing = false;
   const captureBtn = document.getElementById('capture-btn');
+  const supportBanner = document.getElementById('support-banner');
+  const supportBtn = document.getElementById('support-btn');
+  const dismissBtn = document.getElementById('dismiss-btn');
+  const coffeeLink = document.getElementById('coffee-link');
+  
+  const COFFEE_URL = 'https://buymeacoffee.com/thyproduction';
+  const USE_THRESHOLD = 15;
   
   // Set version
   try {
@@ -23,6 +30,61 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window.Analytics) {
     Analytics.trackPageView('popup', 'Extension Popup');
   }
+  
+  // Support banner logic
+  function checkSupportBanner() {
+    chrome.storage.local.get(['supportDismissed', 'useCount'], function(result) {
+      if (result.supportDismissed) return;
+      const useCount = result.useCount || 0;
+      if (useCount >= USE_THRESHOLD && supportBanner) {
+        supportBanner.classList.add('visible');
+      }
+    });
+  }
+  
+  function incrementUseCount() {
+    chrome.storage.local.get(['useCount'], function(result) {
+      const newCount = (result.useCount || 0) + 1;
+      chrome.storage.local.set({ useCount: newCount });
+    });
+  }
+  
+  function openCoffeeLink() {
+    chrome.tabs.create({ url: COFFEE_URL });
+    if (window.Analytics) {
+      Analytics.trackButtonClick('buy_coffee', 'popup');
+    }
+  }
+  
+  function dismissBanner() {
+    chrome.storage.local.set({ supportDismissed: true });
+    if (supportBanner) supportBanner.classList.remove('visible');
+    if (window.Analytics) {
+      Analytics.trackButtonClick('dismiss_support', 'popup');
+    }
+  }
+  
+  // Support button handlers
+  if (supportBtn) {
+    supportBtn.addEventListener('click', function() {
+      openCoffeeLink();
+      dismissBanner();
+    });
+  }
+  
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', dismissBanner);
+  }
+  
+  if (coffeeLink) {
+    coffeeLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      openCoffeeLink();
+    });
+  }
+  
+  // Check if banner should show
+  checkSupportBanner();
   
   function setStatus(msg, capturing = false) {
     if (statusEl) {
@@ -127,6 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
       setStatus('Stopped', false);
     } else {
       if (window.Analytics) Analytics.trackButtonClick('start_capture', 'popup');
+      incrementUseCount();
       sendToContent({ type: 'START_CAROUSELS' }, function(response) {
         if (response) {
           updateStats(response);

@@ -17,6 +17,8 @@ This document lists all Google Analytics 4 events tracked by the Instagram Saved
 | `stop_capture` | popup | User stops capture |
 | `clear` | popup | User clears data from popup |
 | `open_gallery` | popup | User opens gallery |
+| `buy_coffee` | popup | User clicks coffee link |
+| `dismiss_support` | popup | User dismisses support banner |
 | `tab_images` / `tab_videos` | gallery | User switches tabs |
 | `copy_urls` | gallery | User copies URLs |
 | `export_urls` | gallery | User exports URLs |
