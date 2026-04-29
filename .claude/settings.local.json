@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/tomer.haryoffi/Development/instagram-bookmarks-exporter/.claude)",
+      "Bash(mv /Users/tomer.haryoffi/Development/instagram-bookmarks-exporter/CLAUDE.md /Users/tomer.haryoffi/Development/instagram-bookmarks-exporter/.claude/CLAUDE.md)",
+      "Bash(grep -E \"\\\\.zip$|autoplay\")",
+      "Bash(node -e ' *)",
+      "Bash(node *)",
+      "Bash(npm test *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git check-ignore *)"
+    ]
+  }
+}
