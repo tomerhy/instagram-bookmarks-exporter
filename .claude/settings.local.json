@@ -10,7 +10,9 @@
       "Bash(git log *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(git push *)",
+      "Bash(./build.sh)"
     ]
   }
 }
