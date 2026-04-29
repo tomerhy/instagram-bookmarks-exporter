@@ -1,0 +1,12 @@
+{
+  "name": "instagram-saved-media-exporter",
+  "version": "4.3.0",
+  "private": true,
+  "description": "Chrome extension — see manifest.json. This package.json exists only so `npm test` works; the extension itself ships zero npm dependencies.",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
