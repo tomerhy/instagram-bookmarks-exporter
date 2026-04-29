@@ -382,6 +382,71 @@
       padding: 2px 6px;
       border-radius: 4px;
     }
+    .carousel-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      font-size: 10px;
+      padding: 3px 7px;
+      border-radius: 10px;
+      font-weight: 600;
+      pointer-events: none;
+    }
+    .meta-overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 18px 8px 6px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      color: #fff;
+      font-size: 10px;
+      pointer-events: none;
+    }
+    .meta-overlay .meta-owner {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Viewer metadata block (under the preview) */
+    #viewer-meta {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      font-size: 12px;
+      color: #ccc;
+      display: none;
+    }
+    #viewer-meta.visible {
+      display: block;
+    }
+    #viewer-meta .vm-head {
+      color: #aaa;
+      font-size: 11px;
+      margin-bottom: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    #viewer-meta .vm-owner {
+      color: var(--ig-pink);
+      font-weight: 600;
+    }
+    #viewer-meta .vm-album {
+      color: #fff;
+    }
+    #viewer-meta .vm-caption {
+      color: #ddd;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
 
     .btn-link {
       display: inline-block;
@@ -471,6 +536,8 @@
         <button id="fullscreen-btn" title="Fullscreen">⛶</button>
       </div>
       
+      <div id="viewer-meta"></div>
+
       <div class="slideshow-controls" id="slideshow-controls">
         <label>Slideshow:</label>
         <button class="slideshow-btn" data-interval="2000">2s</button>

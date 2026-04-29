@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   let isCapturing = false;
   const captureBtn = document.getElementById('capture-btn');
+  const autoplayToggle = document.getElementById('autoplay-toggle');
   const supportBanner = document.getElementById('support-banner');
   const supportBtn = document.getElementById('support-btn');
   const dismissBtn = document.getElementById('dismiss-btn');
@@ -85,6 +86,29 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Check if banner should show
   checkSupportBanner();
+
+  // Autoplay toggle: load current state, persist on change, push live to active tab.
+  if (autoplayToggle) {
+    chrome.storage.local.get(['igAutoplayEnabled'], function(result) {
+      const enabled = result.igAutoplayEnabled !== false;
+      autoplayToggle.checked = enabled;
+    });
+
+    autoplayToggle.addEventListener('change', function() {
+      const enabled = autoplayToggle.checked;
+      chrome.storage.local.set({ igAutoplayEnabled: enabled });
+      chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+        const tab = tabs[0];
+        if (!tab || !tab.id) return;
+        chrome.tabs.sendMessage(tab.id, { type: 'SET_AUTOPLAY_ENABLED', enabled: enabled }, function() {
+          void chrome.runtime.lastError;
+        });
+      });
+      if (window.Analytics) {
+        Analytics.trackButtonClick(enabled ? 'autoplay_on' : 'autoplay_off', 'popup');
+      }
+    });
+  }
   
   function setStatus(msg, capturing = false) {
     if (statusEl) {
@@ -208,10 +232,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
-  // Clear button
+  // Clear button — wipes all captured data from chrome.storage.local. Writes
+  // directly so it works even when no Instagram tab is open (the previous
+  // implementation messaged the content script and silently failed when none
+  // was reachable). The storage write fans out via chrome.storage.onChanged:
+  //   - content.js resets its in-memory state (images, videos, seenUrls...)
+  //   - background.js hides the toolbar badge
+  //   - gallery.js (if open) re-renders empty
+  //   - this popup's own listener updates the visible counter
   document.getElementById('clear-btn').addEventListener('click', function() {
     if (window.Analytics) Analytics.trackButtonClick('clear', 'popup');
-    sendToContent({ type: 'CLEAR' }, function() {
+    chrome.storage.local.set({
+      igExporterData: { images: [], videos: [] },
+      imageUrls: [],
+      videoUrls: []
+    }, function() {
       updateStats({ images: 0, videos: 0 });
       setStatus('Cleared!');
       if (window.Analytics) Analytics.trackFeature('data_cleared', { source: 'popup' });
@@ -224,6 +259,18 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.tabs.create({ url: chrome.runtime.getURL('gallery.html') });
   });
   
+  // React to storage changes from any source (gallery clear, content script
+  // capture, etc.) so the popup counter never lags the underlying data.
+  chrome.storage.onChanged.addListener(function(changes, area) {
+    if (area !== 'local') return;
+    if (!changes.igExporterData) return;
+    const next = changes.igExporterData.newValue;
+    updateStats({
+      images: (next && next.images && next.images.length) || 0,
+      videos: (next && next.videos && next.videos.length) || 0
+    });
+  });
+
   // Poll for stats updates
   setInterval(loadStats, 2000);
 });
