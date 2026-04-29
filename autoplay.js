@@ -62,134 +62,10 @@
   // STYLES
   // ============================================
   
-  function injectStyles() {
-    if (document.getElementById('ig-autoplay-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'ig-autoplay-styles';
-    style.textContent = `
-      /* Playing indicator */
-      .${CONFIG.classes.indicator} {
-        position: absolute;
-        top: 8px;
-        left: 8px;
-        background: rgba(0, 0, 0, 0.7);
-        color: #fff;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 500;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.2s ease;
-      }
-      
-      .${CONFIG.classes.playing} .${CONFIG.classes.indicator} {
-        opacity: 1;
-      }
-      
-      .${CONFIG.classes.indicator}::before {
-        content: '';
-        width: 8px;
-        height: 8px;
-        background: #4ade80;
-        border-radius: 50%;
-        animation: ig-autoplay-pulse 1.5s ease-in-out infinite;
-      }
-      
-      @keyframes ig-autoplay-pulse {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.5; transform: scale(0.8); }
-      }
-      
-      /* Mute button overlay */
-      .ig-autoplay-mute-btn {
-        position: absolute;
-        bottom: 12px;
-        right: 12px;
-        width: 36px;
-        height: 36px;
-        background: rgba(0, 0, 0, 0.7);
-        border: none;
-        border-radius: 50%;
-        color: #fff;
-        font-size: 16px;
-        cursor: pointer;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        transition: opacity 0.2s ease, background 0.2s ease;
-      }
-      
-      .${CONFIG.classes.playing} .ig-autoplay-mute-btn,
-      video:hover + .ig-autoplay-mute-btn,
-      .ig-autoplay-mute-btn:hover {
-        opacity: 1;
-      }
-      
-      .ig-autoplay-mute-btn:hover {
-        background: rgba(225, 48, 108, 0.9);
-      }
-      
-      /* Duration overlay */
-      .ig-autoplay-duration {
-        position: absolute;
-        bottom: 12px;
-        left: 12px;
-        background: rgba(0, 0, 0, 0.7);
-        color: #fff;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 500;
-        z-index: 100;
-        opacity: 0;
-        transition: opacity 0.2s ease;
-      }
-      
-      video:hover ~ .ig-autoplay-duration,
-      .${CONFIG.classes.playing} .ig-autoplay-duration {
-        opacity: 1;
-      }
-      
-      /* Video container styles */
-      .ig-autoplay-container {
-        position: relative;
-      }
-      
-      /* Progress bar */
-      .ig-autoplay-progress {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 3px;
-        background: rgba(255, 255, 255, 0.3);
-        z-index: 100;
-        opacity: 0;
-        transition: opacity 0.2s ease;
-      }
-      
-      .${CONFIG.classes.playing} .ig-autoplay-progress,
-      video:hover ~ .ig-autoplay-progress {
-        opacity: 1;
-      }
-      
-      .ig-autoplay-progress-bar {
-        height: 100%;
-        background: linear-gradient(90deg, #833ab4, #E1306C);
-        width: 0%;
-        transition: width 0.1s linear;
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  // No styles needed — autoplay is now a silent, no-UI feature.
+  // It plays the most-visible video as the user scrolls Instagram. Visual
+  // feedback comes from Instagram's own video player (mute icon, scrubber).
+  function injectStyles() { /* intentionally empty */ }
 
   // ============================================
   // UTILITY FUNCTIONS
@@ -219,135 +95,46 @@
   // ============================================
   
   function wrapVideoElement(video) {
-    // Skip if already wrapped
+    // Skip if already tracked
     if (video.dataset.igAutoplayWrapped) return;
     video.dataset.igAutoplayWrapped = 'true';
-    
-    // Find or create container
-    let container = video.closest('.ig-autoplay-container');
-    if (!container) {
-      // Check if parent can be used as container
-      const parent = video.parentElement;
-      if (parent && getComputedStyle(parent).position !== 'static') {
-        container = parent;
-        container.classList.add('ig-autoplay-container');
-      } else {
-        // Create wrapper
-        container = document.createElement('div');
-        container.className = 'ig-autoplay-container';
-        container.style.position = 'relative';
-        video.parentNode.insertBefore(container, video);
-        container.appendChild(video);
-      }
-    }
-    
-    // Add playing indicator
-    const indicator = document.createElement('div');
-    indicator.className = CONFIG.classes.indicator;
-    indicator.innerHTML = '<span>Playing</span>';
-    container.appendChild(indicator);
-    
-    // Add mute/unmute button
-    const muteBtn = document.createElement('button');
-    muteBtn.className = 'ig-autoplay-mute-btn';
-    muteBtn.innerHTML = state.muted ? '🔇' : '🔊';
-    muteBtn.title = state.muted ? 'Unmute' : 'Mute';
-    muteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      toggleMute(video);
-      muteBtn.innerHTML = video.muted ? '🔇' : '🔊';
-      muteBtn.title = video.muted ? 'Unmute' : 'Mute';
-    });
-    container.appendChild(muteBtn);
-    
-    // Add duration display
-    const duration = document.createElement('div');
-    duration.className = 'ig-autoplay-duration';
-    duration.textContent = '0:00';
-    container.appendChild(duration);
-    
-    // Add progress bar
-    const progress = document.createElement('div');
-    progress.className = 'ig-autoplay-progress';
-    progress.innerHTML = '<div class="ig-autoplay-progress-bar"></div>';
-    container.appendChild(progress);
-    
-    // Update duration when metadata loads
-    video.addEventListener('loadedmetadata', () => {
-      duration.textContent = formatDuration(video.duration);
-    });
-    
-    // Update progress bar
+
+    // Preload the next video as the current one approaches end.
     video.addEventListener('timeupdate', () => {
-      if (video.duration) {
-        const percent = (video.currentTime / video.duration) * 100;
-        const progressBar = progress.querySelector('.ig-autoplay-progress-bar');
-        if (progressBar) {
-          progressBar.style.width = `${percent}%`;
-        }
-        
-        // Preload next video when approaching end
-        if (percent >= CONFIG.preloadThreshold * 100) {
-          preloadNextVideo(video);
-        }
+      if (state.currentlyPlaying === video && video.duration &&
+          (video.currentTime / video.duration) >= CONFIG.preloadThreshold) {
+        preloadNextVideo(video);
       }
     });
-    
-    // Handle manual play/pause
-    video.addEventListener('play', () => {
-      container.classList.add(CONFIG.classes.playing);
-      container.classList.remove(CONFIG.classes.paused);
+
+    // Track manual play/pause so we don't fight the user.
+    video.addEventListener('click', () => {
+      if (!video.paused) state.manuallyPaused.add(video);
+      else state.manuallyPaused.delete(video);
     });
-    
-    video.addEventListener('pause', () => {
-      container.classList.remove(CONFIG.classes.playing);
-      container.classList.add(CONFIG.classes.paused);
-    });
-    
-    // Double-click to toggle mute
+
+    // Double-click toggles our muted preference (mirrored to all tracked videos).
     video.addEventListener('dblclick', (e) => {
       e.preventDefault();
       toggleMute(video);
-      const btn = container.querySelector('.ig-autoplay-mute-btn');
-      if (btn) {
-        btn.innerHTML = video.muted ? '🔇' : '🔊';
-        btn.title = video.muted ? 'Unmute' : 'Mute';
-      }
     });
-    
-    // Click to toggle play/pause (and track manual pause)
-    video.addEventListener('click', (e) => {
-      // Let default behavior happen, but track if user manually paused
-      if (!video.paused) {
-        // User is clicking to pause
-        state.manuallyPaused.add(video);
-      } else {
-        // User is clicking to play
-        state.manuallyPaused.delete(video);
-      }
-    });
-    
-    // Store video state
-    state.videos.set(video, {
-      container,
-      indicator,
-      muteBtn,
-      duration,
-      progress
-    });
-    
+
+    state.videos.set(video, {});
+
+    if (state.videos.size === 1) {
+      console.log('[IG Autoplay] First video tracked. Will auto-play on scroll.');
+    }
   }
 
   function toggleMute(video) {
     video.muted = !video.muted;
     state.muted = video.muted;
-    
+
     // Update all video mute states
     state.videos.forEach((_, v) => {
       v.muted = state.muted;
     });
-    
+
     // Save preference
     savePreferences();
   }
@@ -369,28 +156,29 @@
   // PLAYBACK CONTROL
   // ============================================
   
+  let _loggedDisabledHint = false;
   async function playVideo(video) {
-    if (!state.enabled) return;
+    if (!state.enabled) {
+      if (!_loggedDisabledHint) {
+        _loggedDisabledHint = true;
+        console.log('[IG Autoplay] Skipping play — autoplay is disabled. Toggle "🎬 Auto-play videos" in the extension popup to enable.');
+      }
+      return;
+    }
     if (state.manuallyPaused.has(video)) return;
     if (state.currentlyPlaying === video && !video.paused) return;
-    
+
     // Pause currently playing video
     if (state.currentlyPlaying && state.currentlyPlaying !== video) {
       pauseVideo(state.currentlyPlaying);
     }
-    
+
     // Set muted state (required for autoplay in most browsers)
     video.muted = state.muted;
-    
+
     try {
-      // Attempt to play
       await video.play();
       state.currentlyPlaying = video;
-      
-      const videoState = state.videos.get(video);
-      if (videoState?.container) {
-        videoState.container.classList.add(CONFIG.classes.playing);
-      }
     } catch (error) {
       if (error.name === 'NotAllowedError') {
         // Autoplay was blocked - try again with mute
@@ -413,14 +201,8 @@
   function pauseVideo(video) {
     if (video && !video.paused) {
       video.pause();
-      
       if (state.currentlyPlaying === video) {
         state.currentlyPlaying = null;
-      }
-      
-      const videoState = state.videos.get(video);
-      if (videoState?.container) {
-        videoState.container.classList.remove(CONFIG.classes.playing);
       }
     }
   }
@@ -485,12 +267,21 @@
     if (!state.observer) {
       createIntersectionObserver();
     }
-    
+
     // Wrap video element with controls
     wrapVideoElement(video);
-    
+
     // Start observing
     state.observer.observe(video);
+
+    // If autoplay is enabled and nothing is playing yet, immediately kick the
+    // most-visible video. This handles the race where a video gets added to
+    // the DOM after init() (e.g. SPA navigation, lazy-loaded reels feed) and
+    // the IntersectionObserver's auto-fire happens to coincide with state
+    // transitions in a way that drops the play.
+    if (state.enabled && (!state.currentlyPlaying || state.currentlyPlaying.paused)) {
+      playMostVisibleVideo();
+    }
   }
 
   function unobserveVideo(video) {
@@ -582,12 +373,37 @@
     }
   }
 
+  // Find the tracked video that's most visible in the viewport, if any meets
+  // the visibility threshold. Used when autoplay is toggled on so we don't
+  // wait for the next scroll event to start the show.
+  function playMostVisibleVideo() {
+    let best = null;
+    let bestRatio = 0;
+    state.videos.forEach((_, video) => {
+      const rect = video.getBoundingClientRect();
+      if (rect.height <= 0) return;
+      const visibleHeight = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+      const visibleRatio = visibleHeight / rect.height;
+      if (visibleRatio > bestRatio && visibleRatio >= CONFIG.visibilityThreshold) {
+        bestRatio = visibleRatio;
+        best = video;
+      }
+    });
+    if (best) playVideo(best);
+  }
+
   function setEnabled(enabled) {
+    const wasEnabled = state.enabled;
     state.enabled = enabled;
     savePreferences();
-    
+    _loggedDisabledHint = false;
+
     if (!enabled) {
       pauseAllVideos();
+    } else if (!wasEnabled) {
+      // Just turned on — kick off the currently most-visible video so it
+      // starts playing immediately, without waiting for the next scroll event.
+      playMostVisibleVideo();
     }
   }
 
@@ -597,32 +413,63 @@
   }
 
   async function init() {
-    // Check if we're on Instagram saved posts
+    // Run on any instagram.com page; the IntersectionObserver only fires when
+    // there's an actual <video> in the viewport.
     const url = window.location.href;
-    const isSavedPage = url.includes('/saved') || url.includes('instagram.com');
-    
-    if (!isSavedPage) {
-      return;
-    }
-    
-    // Inject styles
+    if (!url.includes('instagram.com')) return;
+
     injectStyles();
-    
-    // Load user preferences
     await loadPreferences();
-    
-    // Create observers
     createIntersectionObserver();
     createMutationObserver();
-    
-    // Scan existing videos
     scanExistingVideos();
+
+    console.log(
+      '[IG Autoplay] Active. enabled=' + state.enabled +
+      ' muted=' + state.muted +
+      ' videosFound=' + state.videos.size +
+      '. Run __igAutoplay.getState() in console for live status.'
+    );
+
+    // Safety interval: 500ms backstop. Catches races where a video appears in
+    // the DOM after the IntersectionObserver's last fire, or where a SPA route
+    // change leaves autoplay enabled but with nothing playing despite a
+    // visible video. Idempotent — playVideo() is a no-op if the video is
+    // already playing or manually paused.
+    if (!state.safetyInterval) {
+      state.safetyInterval = setInterval(() => {
+        // Cheap early-outs first so pages without videos pay almost nothing.
+        if (state.videos.size === 0) return;
+        if (!state.enabled) return;
+        if (state.currentlyPlaying && !state.currentlyPlaying.paused) return;
+        playMostVisibleVideo();
+      }, 500);
+    }
   }
 
   // ============================================
   // MESSAGE HANDLING (for popup communication)
   // ============================================
   
+  // React to preference changes from the popup (or any other context).
+  // This keeps every Instagram tab in sync, not just the one popup messaged.
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      if (changes.igAutoplayEnabled) {
+        const enabled = changes.igAutoplayEnabled.newValue !== false;
+        if (enabled !== state.enabled) setEnabled(enabled);
+      }
+      if (changes.igAutoplayMuted) {
+        const muted = !!changes.igAutoplayMuted.newValue;
+        if (muted !== state.muted) {
+          state.muted = muted;
+          state.videos.forEach((_, video) => { video.muted = muted; });
+        }
+      }
+    });
+  }
+
   if (typeof chrome !== 'undefined' && chrome.runtime) {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       switch (msg.type) {
@@ -672,6 +519,10 @@
       state.mutationObserver.disconnect();
       state.mutationObserver = null;
     }
+    if (state.safetyInterval) {
+      clearInterval(state.safetyInterval);
+      state.safetyInterval = null;
+    }
     pauseAllVideos();
     state.videos.clear();
     state.manuallyPaused.clear();
@@ -686,6 +537,7 @@
       pauseAllVideos();
     }
   });
+
 
   // ============================================
   // EXPOSE API
