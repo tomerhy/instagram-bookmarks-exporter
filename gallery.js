@@ -63,20 +63,106 @@ function setProgress(val) {
   if (progressBar) progressBar.style.width = Math.max(0, Math.min(100, val)) + "%";
 }
 
-// Get current items based on tab
+// Escape user-supplied strings before injecting into innerHTML.
+// Captions and usernames come from Instagram and may contain HTML special chars.
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Get items for the current tab, grouped by post.
+// Items sharing a postShortcode collapse into a single "cover" entry that
+// carries _carouselSlides (sorted by carouselIndex) and carouselSize. Items
+// without a shortcode (legacy data captured before v4.3) pass through as
+// individual entries. Capture order is preserved by remembering the first
+// occurrence of each group.
 function getCurrentItems() {
   var items = currentTab === "images" ? allMedia.images : allMedia.videos;
-  // Deduplicate
-  var seen = {};
-  var result = [];
+  // Items inside the same post dedupe by (shortcode, carouselIndex) so that a
+  // slide URL matching the cover URL doesn't drop the slide. Items without a
+  // shortcode (legacy data captured pre-v4.3) dedupe by URL.
+  var seenWithinPost = {};
+  var seenUrl = {};
+  var groupOrder = [];
+  var groupMap = {};
+
   for (var i = 0; i < items.length; i++) {
-    var url = getUrl(items[i]);
-    if (url && !seen[url]) {
-      seen[url] = true;
-      result.push(items[i]);
+    var item = items[i];
+    var url = getUrl(item);
+    if (!url) continue;
+
+    if (item && item.postShortcode) {
+      var idx = (item.carouselIndex == null) ? 'cover' : item.carouselIndex;
+      var slotKey = item.postShortcode + ':' + idx;
+      if (seenWithinPost[slotKey]) continue;
+      seenWithinPost[slotKey] = true;
+    } else {
+      if (seenUrl[url]) continue;
+      seenUrl[url] = true;
     }
+
+    var key = (item && item.postShortcode) ? ("post:" + item.postShortcode) : ("item:" + url);
+    if (!groupMap[key]) {
+      groupMap[key] = [];
+      groupOrder.push(key);
+    }
+    groupMap[key].push(item);
   }
-  return result;
+
+  return groupOrder.map(function(key) {
+    var slides = groupMap[key];
+    if (slides.length === 1) return slides[0];
+    var sorted = slides.slice().sort(function(a, b) {
+      var ai = (a.carouselIndex == null) ? 0 : a.carouselIndex;
+      var bi = (b.carouselIndex == null) ? 0 : b.carouselIndex;
+      return ai - bi;
+    });
+    return Object.assign({}, sorted[0], {
+      _carouselSlides: sorted,
+      carouselSize: sorted.length
+    });
+  });
+}
+
+// Render the metadata block under the viewer (caption, owner, date, album size).
+// No-op when the item has no metadata (legacy items pre-v4.3).
+function renderViewerMeta(item) {
+  var el = document.getElementById("viewer-meta");
+  if (!el) return;
+
+  var meta = item && item.metadata;
+  var hasAlbum = item && item.carouselSize && item.carouselSize > 1;
+
+  if (!meta && !hasAlbum) {
+    el.classList.remove("visible");
+    el.innerHTML = "";
+    return;
+  }
+
+  var headParts = [];
+  if (meta && meta.owner) headParts.push('<span class="vm-owner">@' + escapeHtml(meta.owner) + '</span>');
+  if (meta && meta.takenAt) {
+    var d = new Date(meta.takenAt);
+    if (!isNaN(d.getTime())) headParts.push('<span class="vm-date">' + d.toLocaleDateString() + '</span>');
+  }
+  if (hasAlbum) {
+    headParts.push('<span class="vm-album">📷 ' + item.carouselSize + ' slides</span>');
+  }
+
+  var headHtml = headParts.length ? '<div class="vm-head">' + headParts.join(' · ') + '</div>' : '';
+  var captionHtml = '';
+  if (meta && meta.caption) {
+    var c = meta.caption.length > 280 ? meta.caption.slice(0, 280) + '…' : meta.caption;
+    captionHtml = '<div class="vm-caption">' + escapeHtml(c) + '</div>';
+  }
+
+  el.innerHTML = headHtml + captionHtml;
+  el.classList.add("visible");
 }
 
 // Update counts
@@ -104,7 +190,7 @@ function updateCounts() {
 function showImage(item) {
   var url = getUrl(item);
   if (!url) return;
-  
+
   if (player) { player.pause(); player.style.display = "none"; }
   if (viewerPlaceholder) viewerPlaceholder.style.display = "none";
   if (imageViewer) {
@@ -112,6 +198,7 @@ function showImage(item) {
     imageViewer.src = url;
   }
   currentItem = item;
+  renderViewerMeta(item);
 }
 
 // Show video in viewer
@@ -145,8 +232,9 @@ function showVideo(item) {
     // No direct video URL - show thumbnail with link
     showVideoFallback(postUrl || url, thumb);
   }
-  
+
   currentItem = item;
+  renderViewerMeta(item);
 }
 
 function showVideoFallback(linkUrl, thumbnailUrl) {
@@ -232,7 +320,24 @@ function renderGrid() {
       };
       card.appendChild(img);
     }
-    
+
+    // Carousel size badge (only for grouped posts with >1 slide)
+    if (item.carouselSize && item.carouselSize > 1) {
+      var carBadge = document.createElement("div");
+      carBadge.className = "carousel-badge";
+      carBadge.textContent = "📷 " + item.carouselSize;
+      carBadge.title = "Album: " + item.carouselSize + " slides";
+      card.appendChild(carBadge);
+    }
+
+    // Owner overlay (only when metadata is present)
+    if (item.metadata && item.metadata.owner) {
+      var ovl = document.createElement("div");
+      ovl.className = "meta-overlay";
+      ovl.innerHTML = '<div class="meta-owner">@' + escapeHtml(item.metadata.owner) + '</div>';
+      card.appendChild(ovl);
+    }
+
     card.onclick = function() {
       if (selectedCard) selectedCard.classList.remove("selected");
       card.classList.add("selected");
@@ -460,7 +565,7 @@ document.getElementById("clear")?.addEventListener("click", function() {
   allMedia.videos = [];
   
   chrome.storage.local.set({
-    igExporterData: { images: [], videos: [], carousels: [] }
+    igExporterData: { images: [], videos: [] }
   }, function() {
     updateCounts();
     renderGrid();
@@ -492,7 +597,7 @@ document.getElementById("file-input")?.addEventListener("change", function() {
     }
     
     chrome.storage.local.set({
-      igExporterData: { images: allMedia.images, videos: allMedia.videos, carousels: [] }
+      igExporterData: { images: allMedia.images, videos: allMedia.videos }
     });
     
     updateCounts();
@@ -571,9 +676,26 @@ var fullscreenBtn = document.getElementById("fullscreen-btn");
 var slideshowInterval = null;
 var currentFullscreenIndex = 0;
 
-// Get current items for fullscreen navigation
+// Get items for fullscreen navigation — a flat list of every individual slide
+// across every post, in capture order. A carousel post contributes all its
+// slides; a single post contributes itself. After the last slide of post N,
+// Next advances into the first slide of post N+1 (instead of looping inside
+// the same carousel, which was the v4.3 behavior).
 function getFullscreenItems() {
-  return getCurrentItems();
+  var grouped = getCurrentItems();
+  var flat = [];
+  grouped.forEach(function(item) {
+    if (Array.isArray(item._carouselSlides)) {
+      // _carouselSlides[0] is the cover; the array already holds every slide
+      // in carouselIndex order.
+      for (var i = 0; i < item._carouselSlides.length; i++) {
+        flat.push(item._carouselSlides[i]);
+      }
+    } else {
+      flat.push(item);
+    }
+  });
+  return flat;
 }
 
 // Update fullscreen counter
@@ -692,24 +814,41 @@ function fullscreenPrevItem() {
   showFullscreenItem(currentFullscreenIndex - 1);
 }
 
-// Slideshow
+// Slideshow controls. Speed buttons (2s / 3s / 5s) stay visible at all times
+// (when an image is showing); the active one gets `.active` so the user can
+// see which speed is in effect and switch on the fly. The Stop button only
+// appears while a slideshow is running.
+var SLIDESHOW_SPEED_IDS = ["fs-slide-2", "fs-slide-3", "fs-slide-5"];
+
+function clearSlideshowActiveState() {
+  for (var i = 0; i < SLIDESHOW_SPEED_IDS.length; i++) {
+    var b = document.getElementById(SLIDESHOW_SPEED_IDS[i]);
+    if (b) b.classList.remove("active");
+  }
+}
+
+function setSlideshowActiveSpeed(intervalMs) {
+  clearSlideshowActiveState();
+  for (var i = 0; i < SLIDESHOW_SPEED_IDS.length; i++) {
+    var b = document.getElementById(SLIDESHOW_SPEED_IDS[i]);
+    if (!b) continue;
+    if (parseInt(b.getAttribute("data-interval"), 10) === intervalMs) {
+      b.classList.add("active");
+    }
+  }
+}
+
 function startSlideshow(intervalMs) {
   stopSlideshow();
   slideshowInterval = setInterval(function() {
     fullscreenNextItem();
   }, intervalMs);
-  
-  // Show stop button, hide start buttons
+
+  // Show stop button; mark the chosen speed as active.
   var stopBtn = document.getElementById("fs-slide-stop");
-  var btn2 = document.getElementById("fs-slide-2");
-  var btn3 = document.getElementById("fs-slide-3");
-  var btn5 = document.getElementById("fs-slide-5");
   if (stopBtn) stopBtn.style.display = "inline-block";
-  if (btn2) btn2.style.display = "none";
-  if (btn3) btn3.style.display = "none";
-  if (btn5) btn5.style.display = "none";
-  
-  // Track slideshow usage
+  setSlideshowActiveSpeed(intervalMs);
+
   if (window.Analytics) {
     Analytics.trackButtonClick('slideshow_start', 'gallery');
     Analytics.trackFeature('slideshow_started', { interval_seconds: intervalMs / 1000 });
@@ -722,16 +861,9 @@ function stopSlideshow() {
     clearInterval(slideshowInterval);
     slideshowInterval = null;
   }
-  
-  // Show start buttons, hide stop button
   var stopBtn = document.getElementById("fs-slide-stop");
-  var btn2 = document.getElementById("fs-slide-2");
-  var btn3 = document.getElementById("fs-slide-3");
-  var btn5 = document.getElementById("fs-slide-5");
   if (stopBtn) stopBtn.style.display = "none";
-  if (btn2) btn2.style.display = "inline-block";
-  if (btn3) btn3.style.display = "inline-block";
-  if (btn5) btn5.style.display = "inline-block";
+  clearSlideshowActiveState();
 }
 
 // Event listeners for fullscreen
