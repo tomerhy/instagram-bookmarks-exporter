@@ -19,21 +19,22 @@
   window.addEventListener('message', function(event) {
     if (event.source !== window) return;
     if (event.data?.type !== 'IG_EXPORTER_MEDIA') return;
-    
+
     const media = event.data.media || [];
     console.log('[IG Exporter] Received', media.length, 'media from API interceptor');
-    
+
     let added = 0;
     let skipped = 0;
     media.forEach(item => {
+      const opts = contextToOptions(item.context);
       if (item.type === 'video' && item.url) {
-        if (addVideo(item.url, null, item.thumbnail)) {
+        if (addVideo(item.url, null, item.thumbnail, opts)) {
           added++;
         } else {
           skipped++;
         }
       } else if (item.type === 'image' && item.url) {
-        if (addImage(item.url, null, item.url)) {
+        if (addImage(item.url, null, item.url, opts)) {
           added++;
         } else {
           skipped++;
@@ -58,7 +59,6 @@
   const state = {
     images: [],
     videos: [],
-    carousels: [],
     seenUrls: new Set(),
     capturedShortcodes: new Set(),  // Track which posts we've already captured
     selectedShortcodes: new Set(),  // Track selected posts for capture
@@ -351,6 +351,32 @@
   // HELPER FUNCTIONS
   // ============================================
 
+  // Pull #hashtags out of a caption. Unicode-aware so non-ASCII tags work.
+  function extractHashtags(caption) {
+    if (!caption || typeof caption !== 'string') return [];
+    const matches = caption.match(/#[\p{L}\p{N}_]+/gu) || [];
+    return matches.map(h => h.slice(1));
+  }
+
+  // Translate the wire-format context (from injector.js) into the options shape
+  // that addImage/addVideo expect. Keeping the wire and storage shapes separate
+  // means future fields can be added without breaking either side.
+  function contextToOptions(ctx) {
+    if (!ctx || typeof ctx !== 'object') return null;
+    return {
+      postShortcode: ctx.postShortcode || null,
+      carouselIndex: typeof ctx.carouselIndex === 'number' ? ctx.carouselIndex : null,
+      carouselSize: ctx.carouselSize || 1,
+      metadata: {
+        caption: ctx.caption || null,
+        owner: ctx.owner || null,
+        takenAt: ctx.takenAt || null,
+        likeCount: typeof ctx.likeCount === 'number' ? ctx.likeCount : null,
+        hashtags: extractHashtags(ctx.caption)
+      }
+    };
+  }
+
   // Normalize URL by removing query params (for deduplication)
   function normalizeUrl(url) {
     if (!url) return null;
@@ -367,9 +393,28 @@
     }
   }
 
-  function addImage(url, postUrl, thumbnail) {
+  // Build the persisted item shape. Keeps grouping + metadata fields together
+  // so addImage/addVideo stay symmetric.
+  function buildItem(type, url, postUrl, thumbnail, options) {
+    const opts = options || {};
+    const shortcode = opts.postShortcode || null;
+    const finalPostUrl = postUrl || (shortcode ? `https://www.instagram.com/p/${shortcode}/` : null);
+    return {
+      type: type,
+      url: url || null,
+      thumbnail: thumbnail || (type === 'image' ? url : null),
+      postUrl: finalPostUrl,
+      postShortcode: shortcode,
+      carouselIndex: typeof opts.carouselIndex === 'number' ? opts.carouselIndex : null,
+      carouselSize: opts.carouselSize || 1,
+      metadata: opts.metadata || null,
+      scrapedAt: new Date().toISOString()
+    };
+  }
+
+  function addImage(url, postUrl, thumbnail, options) {
     if (!url) return false;
-    
+
     // Use normalized URL for duplicate check
     const normalizedUrl = normalizeUrl(url);
     if (state.seenUrls.has(normalizedUrl)) {
@@ -377,23 +422,17 @@
       return false;
     }
     state.seenUrls.add(normalizedUrl);
-    
-    state.images.push({
-      type: 'image',
-      url: url,  // Store original URL with params
-      thumbnail: thumbnail || url,
-      postUrl: postUrl || null,
-      scrapedAt: new Date().toISOString()
-    });
+
+    state.images.push(buildItem('image', url, postUrl, thumbnail || url, options));
     console.log('[IG Exporter] Added image:', url.substring(0, 60));
     return true;
   }
 
-  function addVideo(url, postUrl, thumbnail) {
+  function addVideo(url, postUrl, thumbnail, options) {
     const videoUrl = url || null;
     const key = videoUrl || postUrl;
     if (!key) return false;
-    
+
     // Use normalized URL for duplicate check
     const normalizedKey = normalizeUrl(key);
     if (state.seenUrls.has(normalizedKey)) {
@@ -401,16 +440,10 @@
       return false;
     }
     state.seenUrls.add(normalizedKey);
-    
-    const video = {
-      type: 'video',
-      url: videoUrl,
-      thumbnail: thumbnail || null,
-      postUrl: postUrl || null,
-      scrapedAt: new Date().toISOString()
-    };
+
+    const video = buildItem('video', videoUrl, postUrl, thumbnail, options);
     state.videos.push(video);
-    
+
     console.log('[IG Exporter] Added video:', {
       hasDirectUrl: !!videoUrl,
       urlPreview: (videoUrl || postUrl || '').substring(0, 80),
@@ -782,6 +815,7 @@
   function captureModalImages(shortcode) {
     let count = 0;
     const postUrl = `https://www.instagram.com/p/${shortcode}/`;
+    const modalOpts = { postShortcode: shortcode };
     
     // Find the modal or post article
     let modal = document.querySelector('div[role="dialog"]');
@@ -874,29 +908,29 @@
         });
       }
       
-      if (addImage(bestUrl, postUrl, bestUrl)) {
+      if (addImage(bestUrl, postUrl, bestUrl, modalOpts)) {
         console.log('[IG Exporter] Captured modal image:', bestUrl.substring(0, 60));
         count++;
       }
     }
-    
+
     // Also look for videos - capture ANY video with a valid src
     const videos = modal.querySelectorAll('video');
     console.log('[IG Exporter] Videos found in modal:', videos.length);
-    
+
     videos.forEach(video => {
       const src = video.src;
       const poster = video.poster;
-      
+
       // Skip blob URLs (they won't work in gallery)
       if (src && src.startsWith('blob:')) {
         console.log('[IG Exporter] Skipping blob video');
         return;
       }
-      
+
       // Need either a direct CDN URL or a poster
       if (src && (src.includes('cdninstagram') || src.includes('fbcdn'))) {
-        if (addVideo(src, postUrl, poster)) {
+        if (addVideo(src, postUrl, poster, modalOpts)) {
           console.log('[IG Exporter] Captured modal video:', src.substring(0, 60));
           count++;
         }
@@ -1435,7 +1469,6 @@
     panel.querySelector('#ig-exp-clear').onclick = () => {
       state.images = [];
       state.videos = [];
-      state.carousels = [];
       state.seenUrls.clear();
       state.capturedShortcodes.clear();
       updatePanel();
@@ -1482,10 +1515,9 @@
   function saveToStorage() {
     const data = {
       images: state.images,
-      videos: state.videos,
-      carousels: state.carousels
+      videos: state.videos
     };
-    
+
     chrome.storage.local.set({ igExporterData: data }, () => {
       if (chrome.runtime.lastError) {
         console.error('[IG Exporter] Storage error:', chrome.runtime.lastError.message);
@@ -1501,8 +1533,7 @@
       if (result.igExporterData) {
         state.images = result.igExporterData.images || [];
         state.videos = result.igExporterData.videos || [];
-        state.carousels = result.igExporterData.carousels || [];
-        
+
         // Rebuild seenUrls from loaded data (using normalized URLs)
         state.images.forEach(i => { 
           if (i.url) state.seenUrls.add(normalizeUrl(i.url));
@@ -1519,6 +1550,34 @@
   }
 
   // ============================================
+  // EXTERNAL STORAGE CLEAR (e.g. gallery's "Clear All" button)
+  // ============================================
+  // Without this, the in-memory state outlives the storage clear and:
+  //   1. the popup keeps showing stale counts via GET_STATS
+  //   2. the next saveToStorage() call resurrects the cleared items
+  //   3. capturedShortcodes lingers and blocks re-capture of those posts
+  // Always reset on a cleared write — clearing already-empty state is a no-op
+  // (no feedback loop, since this branch doesn't write back to storage).
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (!changes.igExporterData) return;
+    const next = changes.igExporterData.newValue;
+    const isCleared = !next || (
+      Array.isArray(next.images) && next.images.length === 0 &&
+      Array.isArray(next.videos) && next.videos.length === 0
+    );
+    if (isCleared) {
+      state.images = [];
+      state.videos = [];
+      state.seenUrls.clear();
+      state.capturedShortcodes.clear();
+      updatePanel();
+      console.log('[IG Exporter] Storage cleared externally; in-memory state reset');
+    }
+  });
+
+  // ============================================
   // MESSAGE HANDLING
   // ============================================
 
@@ -1532,12 +1591,11 @@
         sendResponse({
           images: state.images.length,
           videos: state.videos.length,
-          carousels: state.carousels.length,
-          total: state.images.length + state.videos.length + state.carousels.length,
+          total: state.images.length + state.videos.length,
           isCapturing: autoClickRunning
         });
         break;
-        
+
       case 'SCAN':
         const count = scanDom();
         if (count > 0) {
@@ -1547,8 +1605,7 @@
         sendResponse({
           images: state.images.length,
           videos: state.videos.length,
-          carousels: state.carousels.length,
-          total: state.images.length + state.videos.length + state.carousels.length
+          total: state.images.length + state.videos.length
         });
         break;
         
@@ -1569,12 +1626,11 @@
         console.log('[IG Exporter] CLEAR command received - clearing ALL data');
         state.images = [];
         state.videos = [];
-        state.carousels = [];
         state.seenUrls.clear();
         state.capturedShortcodes.clear();
         updatePanel();
         chrome.storage.local.set({
-          igExporterData: { images: [], videos: [], carousels: [] },
+          igExporterData: { images: [], videos: [] },
           imageUrls: [],
           videoUrls: []
         });
@@ -1620,6 +1676,15 @@
     init();
   } else {
     window.addEventListener('load', init);
+  }
+
+  // Test seam: only fires when tests set __IG_EXPORTER_TEST_HOOKS__ before
+  // loading the source. Has no effect in the browser.
+  if (typeof globalThis !== 'undefined' && globalThis.__IG_EXPORTER_TEST_HOOKS__) {
+    globalThis.__IG_EXPORTER_TEST_HOOKS__.content = {
+      extractHashtags, contextToOptions, buildItem, normalizeUrl,
+      addImage, addVideo, state
+    };
   }
 
 })();
