@@ -55,6 +55,30 @@ function getPostUrl(item) {
   return item.postUrl || null;
 }
 
+// Send a GA4 'item_viewed' event when a user clicks a card.
+// `post_url` is the openable Instagram permalink (stable, ~36 chars) and is
+// the field to aggregate on. GA4 truncates custom param values at ~100 chars,
+// so the full signed CDN URL won't fit — we still send `media_path` (pathname
+// only) as a stable asset-level identifier for cases without a shortcode.
+function trackItemView(item) {
+  if (!item || !window.Analytics) return;
+  var url = getUrl(item);
+  if (!url) return;
+  var pathname = url;
+  try { pathname = new URL(url).pathname; } catch (e) { /* leave as-is */ }
+  var postUrl = item.postShortcode
+    ? 'https://www.instagram.com/p/' + item.postShortcode + '/'
+    : (item.postUrl || null);
+  Analytics.trackFeature('item_viewed', {
+    media_type: currentTab === 'videos' ? 'video' : 'image',
+    post_url: postUrl,
+    post_shortcode: item.postShortcode || null,
+    media_path: pathname,
+    carousel_index: typeof item.carouselIndex === 'number' ? item.carouselIndex : null,
+    carousel_size: item.carouselSize || 1
+  });
+}
+
 function setStatus(msg) {
   if (statusEl) statusEl.textContent = msg || "";
 }
@@ -342,18 +366,26 @@ function renderGrid() {
       if (selectedCard) selectedCard.classList.remove("selected");
       card.classList.add("selected");
       selectedCard = card;
-      
+
       if (currentTab === "videos") {
         showVideo(item);
       } else {
         showImage(item);
       }
+
+      // Skip the auto-select firing on first render — only count real clicks.
+      if (card.dataset.autoSelect === "true") {
+        delete card.dataset.autoSelect;
+        return;
+      }
+      trackItemView(item);
     };
-    
+
     grid.appendChild(card);
-    
-    // Auto-select first item
+
+    // Auto-select first item (flagged so the click handler doesn't track it)
     if (idx === 0 && !currentItem) {
+      card.dataset.autoSelect = "true";
       card.click();
     }
   });
