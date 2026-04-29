@@ -524,6 +524,11 @@
       state.safetyInterval = null;
     }
     pauseAllVideos();
+    // Clear the per-video sentinel so a later re-init can re-wrap the same
+    // DOM nodes (SPA route changes can reuse existing <video> elements).
+    state.videos.forEach((_, video) => {
+      try { delete video.dataset.igAutoplayWrapped; } catch (e) { /* node detached */ }
+    });
     state.videos.clear();
     state.manuallyPaused.clear();
   }
