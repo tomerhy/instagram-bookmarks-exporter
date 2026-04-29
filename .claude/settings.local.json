@@ -12,7 +12,10 @@
       "Bash(git commit -m ' *)",
       "Bash(git check-ignore *)",
       "Bash(git push *)",
-      "Bash(./build.sh)"
+      "Bash(./build.sh)",
+      "Bash(git tag *)",
+      "Bash(gh release create v4.3.0 instagram-saved-media-exporter.zip --title v4.3.0 --notes ' *)",
+      "Bash(gh release *)"
     ]
   }
 }
