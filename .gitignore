@@ -18,3 +18,9 @@ __pycache__/
 *.zip
 dist/
 venv/
+
+# Node
+node_modules/
+
+# Claude Code — local, machine-specific permissions
+.claude/settings.local.json
