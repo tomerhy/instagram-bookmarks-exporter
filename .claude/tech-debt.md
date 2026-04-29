@@ -1,6 +1,8 @@
 # Tech Debt
 
-Snapshot at v4.2.3. Items are concrete and verified against the code (file:line shown). Ranked by impact, not by effort. Use this as the input list when planning v4.3 and beyond — pick which items each release pays down, don't try to clear it all at once.
+Snapshot at v4.2.3, amended after v4.3 shipped. Items are concrete and verified against the code (file:line shown). Ranked by impact, not by effort. Use this as the input list when planning each release — pick which items each release pays down, don't try to clear it all at once.
+
+> **Status**: items 1–5 shipped in **v4.3.0** (released as `8913c19`, tag `v4.3.0`). Remaining items are mapped to v4.4 and beyond in the "Summary by release" section at the bottom.
 
 Effort scale: **S** = under an hour, **M** = half a day, **L** = a day or more.
 
@@ -111,6 +113,44 @@ Cosmetic but it's the file most likely to grow next (Phase 1 features land here)
 
 A reasonable mapping for planning purposes — not a commitment:
 
-- **v4.3 (cleanup + groundwork)**: 1, 2, 3, 4, 5 (tied to 2). One coherent "Album mode" release. Sets the stage for every Phase 1 feature.
-- **v4.4 (consolidation)**: 6, 7, 8, 9. Pure cleanup, smaller surface, faster onboarding for future work. Could ship behind no user-visible change.
+- **v4.3 (cleanup + groundwork)** ✅ **SHIPPED**: items 1, 2, 3, 4, 5. One coherent "Album mode" release. Set the stage for every Phase 1 feature. Released `8913c19`, tag `v4.3.0`.
+- **v4.4 (consolidation + first Phase 1 feature)**: items 6, 7, 8, 9 (cleanup) plus item 15 (search by caption/hashtag/username — the first user-visible payoff of v4.3's metadata pipeline). Window: 4–6 weeks after v4.3.
 - **Anytime**: 10, 11, 12, 13. Bundle into a release whenever you're touching the same files for other reasons.
+
+---
+
+## Phase 1 features — candidates for v4.5+
+
+Enabled by the v4.3 metadata pipeline. Pick one per release; do **not** ship more than one feature in a single release while the codebase has no automated browser tests.
+
+### 15. Search captured posts by caption / hashtag / username — **planned for v4.4**
+
+Items now carry `metadata.caption`, `metadata.owner`, and `metadata.hashtags`. A simple search box at the top of the gallery that filters the current tab by substring match against caption + owner + hashtag would expose all of that immediately.
+
+- **Fix sketch**: text input in `gallery.html`, debounced `oninput` handler in `gallery.js` that filters `getCurrentItems()` results before pagination. Match against `(item.metadata?.caption || '') + ' ' + (item.metadata?.owner || '') + ' ' + (item.metadata?.hashtags || []).join(' ')`, case-insensitive. Empty input = no filter. Effort: **S**.
+- Track usage with `Analytics.trackFeature('gallery_search', { query_length, match_count })` so you can see if it's used.
+
+### 16. Sort gallery by date / owner / like count
+
+Drop-down next to the search box. Default stays "capture order." Sort keys are `metadata.takenAt`, `metadata.owner` (alphabetical), `metadata.likeCount`. Items lacking the field sort last.
+
+- Effort: **S**.
+
+### 17. CSV / JSON export of captured items with metadata
+
+Power users have already asked for this implicitly via the `export_urls` feature. With v4.3 metadata, a richer export becomes possible: shortcode, owner, date, caption, like count, post URL, media URL.
+
+- **Fix sketch**: new buttons `Export CSV` / `Export JSON` next to the existing `Export URLs`. Generate the file in-memory, trigger download via blob URL.
+- Effort: **S** for JSON, **S** for CSV (escape commas/quotes/newlines in captions carefully).
+
+### 18. Per-post ZIP download (album bundle)
+
+For carousel posts: download all slides + a `metadata.json` as a single zip named `<shortcode>.zip`. Requires bringing in JSZip (~30KB) — the only real npm dep this project would have.
+
+- Effort: **M**. The zipping itself is small; the cost is bundling JSZip into the build (without a bundler) and adding `web_accessible_resources` if needed.
+
+### 19. Owner-grouped folders in batch downloads
+
+When downloading multiple items, group them into per-owner folders inside a single zip. Builds on #18.
+
+- Effort: **S** once #18 lands. Bundle into a release whenever you're touching the same files for other reasons.
