@@ -90,6 +90,46 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // Easter egg: clicking the logo opens an "About the maker" card.
+  // Hidden until triggered. Glass overlay over the popup; Esc / × /
+  // backdrop click closes.
+  const aboutToggle = document.getElementById('about-toggle');
+  const aboutOverlay = document.getElementById('about-overlay');
+  const aboutClose = document.getElementById('about-close');
+
+  function showAbout() {
+    if (!aboutOverlay) return;
+    aboutOverlay.hidden = false;
+    aboutOverlay.classList.add('visible');
+    aboutOverlay.setAttribute('aria-hidden', 'false');
+    // Focus the close button so Esc / Tab navigation is obvious.
+    if (aboutClose) aboutClose.focus();
+    if (window.Analytics) Analytics.trackFeature('about_opened', {});
+  }
+
+  function hideAbout() {
+    if (!aboutOverlay) return;
+    aboutOverlay.classList.remove('visible');
+    aboutOverlay.setAttribute('aria-hidden', 'true');
+    // Keep `hidden` synced so the dialog is removed from the AT tree when closed.
+    aboutOverlay.hidden = true;
+    if (aboutToggle) aboutToggle.focus();
+  }
+
+  if (aboutToggle) aboutToggle.addEventListener('click', showAbout);
+  if (aboutClose)  aboutClose.addEventListener('click', hideAbout);
+  if (aboutOverlay) {
+    aboutOverlay.addEventListener('click', function (e) {
+      // Click on the backdrop (not the card) closes
+      if (e.target === aboutOverlay) hideAbout();
+    });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && aboutOverlay && aboutOverlay.classList.contains('visible')) {
+      hideAbout();
+    }
+  });
+
   // Check if banner should show
   checkSupportBanner();
 

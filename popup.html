@@ -137,11 +137,35 @@
       gap: var(--space-3);
       margin-bottom: var(--space-5);
     }
+    /* Logo lives inside a button — easter-egg trigger for the About card.
+       The button itself is transparent; the logo image is the visual. */
+    .logo-btn {
+      flex: 0 0 auto;
+      width: 36px;
+      height: 36px;
+      min-height: 0;
+      padding: 0;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform var(--t-spring);
+    }
+    .logo-btn:hover {
+      transform: rotate(-6deg) scale(1.06);
+    }
+    .logo-btn:active {
+      transform: rotate(0deg) scale(0.96);
+    }
     .logo {
       width: 36px;
       height: 36px;
       border-radius: var(--radius-md);
       box-shadow: 0 4px 14px rgba(225, 48, 108, 0.30);
+      display: block;
     }
     h1.title {
       font-size: 18px;
@@ -536,6 +560,132 @@
       display: inline-block;
     }
 
+    /* ---------- Easter-egg About overlay ---------- */
+    .about-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 8, 16, 0.78);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      animation: about-fade-in 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .about-overlay.visible { display: flex; }
+    @keyframes about-fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .about-card {
+      position: relative;
+      text-align: center;
+      padding: var(--space-4) var(--space-4) var(--space-3);
+      max-width: 290px;
+      width: 100%;
+      animation: about-card-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes about-card-in {
+      from { opacity: 0; transform: translateY(10px) scale(0.94); }
+      to   { opacity: 1; transform: translateY(0)   scale(1); }
+    }
+    .about-close {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 28px;
+      height: 28px;
+      min-height: 0;
+      padding: 0;
+      flex: none;
+      border-radius: 50%;
+      border: 1px solid var(--border-1);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+    }
+    .about-close:hover {
+      background: var(--surface-3);
+      color: var(--text-primary);
+      transform: rotate(90deg);
+    }
+    .about-avatar {
+      width: 116px;
+      height: 116px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--ig-pink);
+      box-shadow:
+        0 0 0 4px rgba(225, 48, 108, 0.15),
+        0 12px 32px rgba(225, 48, 108, 0.40);
+      margin: 0 auto var(--space-3);
+      display: block;
+      animation: about-avatar-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 120ms backwards;
+    }
+    @keyframes about-avatar-in {
+      from { opacity: 0; transform: scale(0.5) rotate(-12deg); }
+      to   { opacity: 1; transform: scale(1)   rotate(0deg); }
+    }
+    .about-greeting {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+      letter-spacing: 0.02em;
+    }
+    .about-name {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 0%, #d4d4dc 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: var(--space-1);
+    }
+    .about-role {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-3);
+    }
+    .about-email {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radius-pill);
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: 0 4px 14px rgba(225, 48, 108, 0.35);
+      transition: transform var(--t-spring), box-shadow var(--t-base), opacity var(--t-fast);
+    }
+    .about-email:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 22px rgba(225, 48, 108, 0.50);
+    }
+    .about-email:active {
+      transform: translateY(0);
+    }
+    .about-thanks {
+      margin-top: var(--space-3);
+      font-size: 11px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
     /* ---------- Footer (persistent coffee link, always reachable) ---------- */
     .footer {
       margin-top: var(--space-3);
@@ -569,7 +719,9 @@
     </div>
 
     <header class="header">
-      <img class="logo" src="assets/icons/icon-128.png" alt="">
+      <button class="logo-btn" id="about-toggle" aria-label="About the maker" title="Click me 👋">
+        <img class="logo" src="assets/icons/icon-128.png" alt="">
+      </button>
       <h1 class="title">IG Exporter</h1>
       <span class="version" id="version" aria-label="Extension version"></span>
     </header>
@@ -637,6 +789,23 @@
     <div class="not-instagram">
       <h2><span class="emoji" aria-hidden="true">📍</span> Open Instagram</h2>
       <p>Navigate to instagram.com to use this extension.</p>
+    </div>
+  </div>
+
+  <!-- Easter egg: hidden "about the maker" overlay revealed by clicking the
+       popup logo. Glass over the popup; Esc / × / backdrop click closes. -->
+  <div id="about-overlay" class="about-overlay" hidden aria-hidden="true"
+       role="dialog" aria-modal="true" aria-labelledby="about-name-label">
+    <div class="about-card" role="document">
+      <button class="about-close" id="about-close" aria-label="Close">×</button>
+      <img class="about-avatar" src="assets/icons/maker.png" alt="Tomer Har Yoffi">
+      <div class="about-greeting">👋 Hi, I'm</div>
+      <div class="about-name" id="about-name-label">Tomer Har Yoffi</div>
+      <div class="about-role">Maker of IG Exporter</div>
+      <a class="about-email" href="mailto:tomer.haryoffi@gmail.com">
+        <span class="emoji" aria-hidden="true">✉️</span> tomer.haryoffi@gmail.com
+      </a>
+      <div class="about-thanks">Thanks for using my extension!</div>
     </div>
   </div>
 
