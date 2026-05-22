@@ -22,6 +22,10 @@ venv/
 # Node
 node_modules/
 
+# Raw screenshots used by compose_screenshots.py — capture locally,
+# they don't belong in the repo. The README in that folder is committed.
+assets/screenshots/raw/*.png
+
 # Third-party Claude Code skill (~1.9MB, not committed — install via:
 #   cp -R /path/to/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max/SKILL.md \
 #         /path/to/ui-ux-pro-max-skill/src/ui-ux-pro-max/{scripts,data,templates} \
