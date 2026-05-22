@@ -22,14 +22,22 @@ cp popup.html "$DIST_DIR/"
 cp popup.js "$DIST_DIR/"
 cp gallery.html "$DIST_DIR/"
 cp gallery.js "$DIST_DIR/"
-cp -r assets "$DIST_DIR/"
+
+# Copy only the runtime assets the extension actually uses (icons).
+# assets/screenshots/ holds Chrome Web Store marketing PNGs (~8MB) that
+# would otherwise bloat the user's downloaded package for no benefit.
+mkdir -p "$DIST_DIR/assets"
+cp -r assets/icons "$DIST_DIR/assets/"
+
+# Strip macOS metadata that may have snuck in from Finder.
+find "$DIST_DIR" -name '.DS_Store' -delete
 
 # Copy optional files if they exist
 [ -f privacy-policy.html ] && cp privacy-policy.html "$DIST_DIR/"
 
-# Create zip
+# Create zip — exclude any .DS_Store stragglers.
 cd "$DIST_DIR"
-zip -r "../$ZIP_NAME" ./*
+zip -r "../$ZIP_NAME" ./* -x '*.DS_Store'
 cd ..
 
 echo "Build complete: $ZIP_NAME"
