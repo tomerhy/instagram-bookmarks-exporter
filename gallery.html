@@ -906,15 +906,15 @@
       
       <div class="actions">
         <button id="download-current">Download</button>
-        <button id="export">Export Images</button>
-        <button id="import">Import</button>
+        <button id="export" title="Export everything as JSON (images + videos with metadata)">Export All</button>
+        <button id="import" title="Import a JSON backup (or legacy .txt URL list)">Import</button>
         <button id="copy">Copy Images</button>
         <button id="clear">Clear All</button>
         <button id="donate">Donate</button>
       </div>
       <div id="status"></div>
       <div id="progress"><div id="progress-bar"></div></div>
-      <input id="file-input" type="file" accept=".txt" />
+      <input id="file-input" type="file" accept=".json,.txt,application/json,text/plain" />
       
       </div>
     

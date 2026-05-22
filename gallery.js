@@ -542,13 +542,72 @@ function loadData() {
   });
 }
 
-// Update button labels based on current tab
+// Update button labels based on current tab.
+// Note: Export is no longer tab-specific — it dumps both images and videos
+// with full metadata, so its label stays constant. Copy is still per-tab
+// (it's a quick URL-only clipboard action, not a backup).
 function updateButtonLabels() {
   var label = currentTab === "images" ? "Images" : "Videos";
-  var exportBtn = document.getElementById("export");
   var copyBtn = document.getElementById("copy");
-  if (exportBtn) exportBtn.textContent = "Export " + label;
   if (copyBtn) copyBtn.textContent = "Copy " + label;
+}
+
+// ----------------------------------------------------------------------------
+// Export / import payload helpers — kept pure so tests can verify schema
+// without spinning up a DOM. Schema is documented in the EXPORT_FORMAT_VERSION.
+// ----------------------------------------------------------------------------
+var EXPORT_FORMAT_VERSION = 1;
+
+// Build a full-fidelity JSON-serializable payload from in-memory state.
+// Preserves metadata, carouselSize, postUrl, scrapedAt — everything an item
+// carried at capture time — so an export → import round-trip is lossless.
+function buildExportPayload(images, videos, extensionVersion) {
+  return {
+    format: "instagram-saved-media-exporter",
+    formatVersion: EXPORT_FORMAT_VERSION,
+    extensionVersion: extensionVersion || null,
+    exportedAt: new Date().toISOString(),
+    images: Array.isArray(images) ? images.slice() : [],
+    videos: Array.isArray(videos) ? videos.slice() : []
+  };
+}
+
+// Parse imported file text. Returns one of:
+//   { format: 'json', images: [...], videos: [...] }  — full backup
+//   { format: 'txt',  urls: [...] }                   — legacy URL list
+// Throws on completely unparseable input.
+function parseImportPayload(text) {
+  var trimmed = (text || "").trim();
+  if (!trimmed) {
+    throw new Error("Empty file");
+  }
+
+  // JSON first: a valid backup starts with `{` and parses as our schema.
+  if (trimmed.charAt(0) === "{") {
+    var data;
+    try {
+      data = JSON.parse(trimmed);
+    } catch (e) {
+      throw new Error("Invalid JSON: " + e.message);
+    }
+    if (data && (Array.isArray(data.images) || Array.isArray(data.videos))) {
+      return {
+        format: "json",
+        images: Array.isArray(data.images) ? data.images : [],
+        videos: Array.isArray(data.videos) ? data.videos : []
+      };
+    }
+    throw new Error("JSON file does not contain images/videos arrays");
+  }
+
+  // Otherwise treat as URL-per-line (the pre-v4.3.6 export format).
+  var urls = trimmed.split(/\r?\n/)
+    .map(function(l) { return l.trim(); })
+    .filter(Boolean);
+  if (!urls.length) {
+    throw new Error("No URLs found in file");
+  }
+  return { format: "txt", urls: urls };
 }
 
 // Tab switching
@@ -640,18 +699,28 @@ document.getElementById("copy")?.addEventListener("click", function() {
 });
 
 document.getElementById("export")?.addEventListener("click", function() {
-  var urls = getCurrentItems().map(getUrl).filter(Boolean);
-  var blob = new Blob([urls.join("\n")], { type: "text/plain" });
+  var extVersion = null;
+  try { extVersion = chrome.runtime.getManifest().version; } catch (_) {}
+  var payload = buildExportPayload(allMedia.images, allMedia.videos, extVersion);
+  var json = JSON.stringify(payload, null, 2);
+  var blob = new Blob([json], { type: "application/json" });
   var a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "instagram-" + currentTab + ".txt";
+  // Date stamp so successive exports don't overwrite each other.
+  var stamp = new Date().toISOString().slice(0, 10);
+  a.download = "instagram-export-" + stamp + ".json";
   a.click();
-  setStatus("Exported " + urls.length + " URLs");
-  
-  // Track export
+
+  var total = payload.images.length + payload.videos.length;
+  setStatus("Exported " + total + " items (" +
+    payload.images.length + " images, " + payload.videos.length + " videos)");
+
   if (window.Analytics) {
-    Analytics.trackButtonClick('export_urls', 'gallery');
-    Analytics.trackFeature('export_urls', { count: urls.length, type: currentTab });
+    Analytics.trackButtonClick('export_all', 'gallery');
+    Analytics.trackFeature('export_all', {
+      images: payload.images.length,
+      videos: payload.videos.length
+    });
   }
 });
 
@@ -695,32 +764,55 @@ document.getElementById("import")?.addEventListener("click", function() {
 document.getElementById("file-input")?.addEventListener("change", function() {
   var file = this.files[0];
   if (!file) return;
-  
+
+  var fileInput = this;
   var reader = new FileReader();
   reader.onload = function() {
-    var urls = reader.result.split(/\r?\n/).filter(function(l) { return l.trim(); });
-    var items = urls.map(function(url) {
-      return { type: currentTab === 'images' ? 'image' : 'video', url: url, thumbnail: url };
-    });
-    
-    if (currentTab === "images") {
-      allMedia.images = items;
-    } else {
-      allMedia.videos = items;
+    var parsed;
+    try {
+      parsed = parseImportPayload(reader.result);
+    } catch (e) {
+      setStatus("Import failed: " + e.message);
+      fileInput.value = "";
+      return;
     }
-    
+
+    if (parsed.format === "json") {
+      // Full-fidelity backup: replace both tabs, preserve all metadata.
+      allMedia.images = parsed.images;
+      allMedia.videos = parsed.videos;
+      var total = parsed.images.length + parsed.videos.length;
+      setStatus("Imported " + total + " items (" +
+        parsed.images.length + " images, " + parsed.videos.length + " videos)");
+      if (window.Analytics) {
+        Analytics.trackFeature('imported_json', {
+          images: parsed.images.length,
+          videos: parsed.videos.length
+        });
+      }
+    } else {
+      // Legacy URL list: drop into the current tab only, no metadata.
+      var items = parsed.urls.map(function(url) {
+        return { type: currentTab === 'images' ? 'image' : 'video', url: url, thumbnail: url };
+      });
+      if (currentTab === "images") {
+        allMedia.images = items;
+      } else {
+        allMedia.videos = items;
+      }
+      setStatus("Imported " + items.length + " URLs (legacy format, metadata not included)");
+      if (window.Analytics) {
+        Analytics.trackFeature('imported_txt', { count: items.length, type: currentTab });
+      }
+    }
+
     chrome.storage.local.set({
       igExporterData: { images: allMedia.images, videos: allMedia.videos }
     });
-    
+
     updateCounts();
     renderGrid();
-    setStatus("Imported " + urls.length + " items");
-    
-    // Track import feature usage
-    if (window.Analytics) {
-      Analytics.trackFeature('urls_imported', { count: urls.length, type: currentTab });
-    }
+    fileInput.value = "";  // allow re-importing the same file
   };
   reader.readAsText(file);
 });
