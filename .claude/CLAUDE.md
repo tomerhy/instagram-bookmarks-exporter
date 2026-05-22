@@ -50,7 +50,9 @@ URLs from Instagram's CDN have ephemeral signing params, so raw-string compariso
 
 ### Storage shape
 
-Single key: `chrome.storage.local['igExporterData'] = { images: [...], videos: [...], carousels: [...] }`. Each item is `{ type, url, thumbnail, postUrl, scrapedAt }`. Legacy keys `imageUrls` / `videoUrls` are still cleared on `CLEAR` for backward compat — don't write to them. `useCount` / `supportDismissed` keys drive the "buy me a coffee" banner threshold.
+Single data key: `chrome.storage.local['igExporterData'] = { images: [...], videos: [...], carousels: [...] }`. Each item is `{ type, url, thumbnail, postUrl, scrapedAt }`. Legacy keys `imageUrls` / `videoUrls` are still cleared on `CLEAR` for backward compat — don't write to them. `useCount` / `supportDismissed` keys drive the "buy me a coffee" banner threshold.
+
+`igExporterLastSeenAt` (epoch ms) is the timestamp of the last popup/gallery open. `background.js` uses it to compute the toolbar badge as items with `scrapedAt > lastSeenAt` — the badge is a *notification* (new since you last looked), not a total counter. `popup.js` bumps it on open + every 2s poll; `gallery.js` bumps it on load and on new captures arriving. `onInstalled` seeds it to `Date.now()` if missing so upgrade users don't see their entire existing library counted as "unseen."
 
 ## Conventions
 

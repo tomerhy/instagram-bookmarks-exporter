@@ -14,38 +14,57 @@ function formatBadge(total) {
   return '999+';
 }
 
-function setBadgeFromCounts(images, videos) {
-  const total = (images || 0) + (videos || 0);
-  chrome.action.setBadgeText({ text: formatBadge(total) });
+// Count items captured AFTER the user last engaged with the extension.
+// Items without a parseable scrapedAt are treated as "already seen" (legacy
+// data). When lastSeenAt is missing entirely we count nothing — the install
+// handler seeds it on first run so this only triggers in pathological cases.
+function countUnseen(items, lastSeenAt) {
+  if (!items || !items.length) return 0;
+  if (!lastSeenAt) return 0;
+  let count = 0;
+  for (const item of items) {
+    if (!item || !item.scrapedAt) continue;
+    const ts = new Date(item.scrapedAt).getTime();
+    if (!isNaN(ts) && ts > lastSeenAt) count++;
+  }
+  return count;
+}
+
+function setBadgeFromState(data, lastSeenAt) {
+  const images = (data && data.images) || [];
+  const videos = (data && data.videos) || [];
+  const unseen = countUnseen(images, lastSeenAt) + countUnseen(videos, lastSeenAt);
+  chrome.action.setBadgeText({ text: formatBadge(unseen) });
   chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
 }
 
 function refreshBadgeFromStorage() {
-  chrome.storage.local.get(['igExporterData'], (result) => {
-    const data = result.igExporterData;
-    setBadgeFromCounts(
-      (data && data.images && data.images.length) || 0,
-      (data && data.videos && data.videos.length) || 0
-    );
+  chrome.storage.local.get(['igExporterData', 'igExporterLastSeenAt'], (result) => {
+    setBadgeFromState(result.igExporterData, result.igExporterLastSeenAt);
   });
 }
 
-// Keep the badge in sync with whatever's in storage. Fires on any write —
-// content script captures, gallery clears, popup clears, manual edits.
+// Keep the badge in sync with whatever's in storage. Fires on data writes
+// (captures, clears) and on lastSeenAt bumps (popup/gallery open).
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (!changes.igExporterData) return;
-  const next = changes.igExporterData.newValue;
-  setBadgeFromCounts(
-    (next && next.images && next.images.length) || 0,
-    (next && next.videos && next.videos.length) || 0
-  );
+  if (!changes.igExporterData && !changes.igExporterLastSeenAt) return;
+  refreshBadgeFromStorage();
 });
 
-// Restore the badge after browser/extension restart — service workers don't
-// keep state across wake-ups.
+// Restore the badge after browser/extension restart. On first install (or
+// upgrade from a pre-badge-rework build), seed lastSeenAt so prior captures
+// don't all appear as "unseen" notifications.
 chrome.runtime.onStartup.addListener(refreshBadgeFromStorage);
-chrome.runtime.onInstalled.addListener(refreshBadgeFromStorage);
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.get(['igExporterLastSeenAt'], (result) => {
+    if (!result.igExporterLastSeenAt) {
+      chrome.storage.local.set({ igExporterLastSeenAt: Date.now() }, refreshBadgeFromStorage);
+    } else {
+      refreshBadgeFromStorage();
+    }
+  });
+});
 
 // Handle messages from content script and popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -73,6 +92,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // loading the source. No-op in the browser.
 if (typeof globalThis !== 'undefined' && globalThis.__IG_EXPORTER_TEST_HOOKS__) {
   globalThis.__IG_EXPORTER_TEST_HOOKS__.background = {
-    formatBadge, setBadgeFromCounts, refreshBadgeFromStorage
+    formatBadge, countUnseen, setBadgeFromState, refreshBadgeFromStorage
   };
 }

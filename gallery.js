@@ -288,8 +288,15 @@ function renderGrid() {
   if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
   
   if (items.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><h3>No ' + currentTab + ' captured yet</h3>' +
-      '<p>Go to Instagram, scroll through saved posts, then come back.</p></div>';
+    var emptyIcon = currentTab === "videos" ? "▶" : "🖼";
+    grid.innerHTML =
+      '<div class="empty-state">' +
+        '<div class="es-icon" aria-hidden="true">' + emptyIcon + '</div>' +
+        '<h3>No ' + currentTab + ' captured yet</h3>' +
+        '<p>Open Instagram and scroll through your <strong>saved posts</strong> — ' +
+        'captures appear here automatically as you go.</p>' +
+        '<a class="btn-link" href="https://www.instagram.com/" target="_blank" rel="noopener">Open Instagram</a>' +
+      '</div>';
     if (viewerPlaceholder) {
       viewerPlaceholder.style.display = "flex";
       viewerPlaceholder.innerHTML = "Select an item to preview";
@@ -307,6 +314,20 @@ function renderGrid() {
     var card = document.createElement("div");
     card.className = "card";
     card.setAttribute("data-index", globalIdx);
+    // Subtle entrance stagger — cards wave in over ~600ms total. Capped so
+    // pages with hundreds of items don't get a 3-second cascade.
+    card.style.animationDelay = Math.min(idx * 28, 600) + "ms";
+    // Keyboard accessibility: cards are interactive, must be tabbable +
+    // announced as buttons + report selection state to assistive tech.
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-pressed", "false");
+    var ownerForLabel = (item.metadata && item.metadata.owner) ? " by @" + item.metadata.owner : "";
+    var sizeForLabel = (item.carouselSize && item.carouselSize > 1) ? ", album of " + item.carouselSize : "";
+    card.setAttribute(
+      "aria-label",
+      (currentTab === "videos" ? "Video " : "Image ") + (globalIdx + 1) + ownerForLabel + sizeForLabel
+    );
     
     var thumbUrl = getThumbnail(item) || getUrl(item);
     
@@ -363,8 +384,12 @@ function renderGrid() {
     }
 
     card.onclick = function() {
-      if (selectedCard) selectedCard.classList.remove("selected");
+      if (selectedCard) {
+        selectedCard.classList.remove("selected");
+        selectedCard.setAttribute("aria-pressed", "false");
+      }
       card.classList.add("selected");
+      card.setAttribute("aria-pressed", "true");
       selectedCard = card;
 
       if (currentTab === "videos") {
@@ -379,6 +404,13 @@ function renderGrid() {
         return;
       }
       trackItemView(item);
+    };
+    // Enter or Space activates the card from the keyboard
+    card.onkeydown = function(e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        card.click();
+      }
     };
 
     grid.appendChild(card);
@@ -432,9 +464,19 @@ function renderPagination(totalPages) {
   paginationEl.appendChild(next);
 }
 
+// Mark the badge as "seen" — opening / focusing the gallery means the user
+// has reviewed any pending captures. The popup-side counterpart lives in
+// popup.js. Together they keep the badge as a notification, not an odometer.
+function markSeen() {
+  try {
+    chrome.storage.local.set({ igExporterLastSeenAt: Date.now() });
+  } catch (e) { /* storage might be unavailable in some preview contexts */ }
+}
+
 // Load data from storage
 function loadData() {
   logDebug("Loading fresh data from storage...");
+  markSeen();
   
   // Force fresh read from storage
   chrome.storage.local.get(null, function(result) {
@@ -659,6 +701,7 @@ chrome.storage.onChanged.addListener(function(changes, area) {
   if (changes.igExporterData && changes.igExporterData.newValue) {
     allMedia.images = changes.igExporterData.newValue.images || [];
     allMedia.videos = changes.igExporterData.newValue.videos || [];
+    markSeen();
     updateCounts();
     renderGrid();
   }

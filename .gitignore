@@ -21,3 +21,9 @@ venv/
 
 # Node
 node_modules/
+
+# Third-party Claude Code skill (~1.9MB, not committed — install via:
+#   cp -R /path/to/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max/SKILL.md \
+#         /path/to/ui-ux-pro-max-skill/src/ui-ux-pro-max/{scripts,data,templates} \
+#         .claude/skills/ui-ux-pro-max/
+.claude/skills/ui-ux-pro-max/

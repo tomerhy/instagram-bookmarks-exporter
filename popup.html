@@ -1,125 +1,323 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <style>
+    /* Keep this token block in sync with gallery.html. */
     :root {
       color-scheme: dark;
+
+      /* Brand */
+      --ig-pink: #E1306C;
+      --ig-pink-dark: #c13584;
+      --ig-purple: #833ab4;
+      --ig-violet: #5851DB;
+
+      /* Semantic — selection / active state separate from brand */
+      --selected: #4F9DFF;
+      --selected-glow: rgba(79, 157, 255, 0.30);
+
+      /* Surfaces — flatter darker base, glass layers above */
+      --ig-bg: #0a0a14;
+      --surface-1: rgba(255, 255, 255, 0.04);
+      --surface-2: rgba(255, 255, 255, 0.08);
+      --surface-3: rgba(255, 255, 255, 0.12);
+
+      --glass-bg:        rgba(22, 22, 38, 0.6);
+      --glass-border:    rgba(255, 255, 255, 0.10);
+      --glass-blur:      blur(20px) saturate(140%);
+
+      /* Text — all WCAG AA against --ig-bg */
+      --text-primary:   #f6f7fb;
+      --text-secondary: #d4d4dc;
+      --text-muted:     #a8a8b8;
+      --text-dim:       #9090a4;
+
+      /* Borders */
+      --border-1: rgba(255, 255, 255, 0.10);
+      --border-2: rgba(255, 255, 255, 0.18);
+
+      /* Spacing scale (4/8px) */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+
+      /* Radii */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-pill: 999px;
+
+      /* Button heights */
+      --btn-h-sm: 32px;
+      --btn-h-md: 40px;
+      --btn-h-lg: 44px;
+
+      /* Motion — spring physics for hover overshoots */
+      --t-fast: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+      --t-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+      --t-spring: 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      /* Destructive */
+      --danger:       #ef4444;
+      --danger-soft:  rgba(239, 68, 68, 0.15);
     }
-    
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
-    
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      width: 280px;
-      background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
-      color: #fff;
-      padding: 16px;
+
+    /* Global keyboard focus ring */
+    *:focus-visible {
+      outline: 2px solid var(--selected);
+      outline-offset: 2px;
+      border-radius: 4px;
     }
-    
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .stat-delta.has-new { animation: none !important; }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;
+      width: 320px;
+      background: var(--ig-bg);
+      color: var(--text-primary);
+      padding: var(--space-5) var(--space-4) var(--space-4);
+      position: relative;
+      overflow: hidden;
+      letter-spacing: -0.01em;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Mini aurora — single brand-color blob top-right for atmosphere */
+    body::before {
+      content: "";
+      position: absolute;
+      top: -80px;
+      right: -80px;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--ig-pink) 0%, transparent 70%);
+      filter: blur(60px);
+      opacity: 0.30;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: "";
+      position: absolute;
+      bottom: -100px;
+      left: -80px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--ig-violet) 0%, transparent 70%);
+      filter: blur(70px);
+      opacity: 0.25;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body > * { position: relative; z-index: 1; }
+
+    /* ---------- Header ---------- */
     .header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
+      gap: var(--space-3);
+      margin-bottom: var(--space-5);
     }
-    
     .logo {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      box-shadow: 0 4px 14px rgba(225, 48, 108, 0.30);
     }
-    
-    .title {
-      font-size: 14px;
-      font-weight: 600;
+    h1.title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      background: linear-gradient(135deg, #fff 0%, #a8a8b8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
-    
     .version {
-      font-size: 9px;
-      color: #E1306C;
-      padding: 2px 6px;
-      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--ig-pink);
+      padding: 3px var(--space-2);
+      border-radius: var(--radius-pill);
       border: 1px solid rgba(225, 48, 108, 0.4);
-      background: rgba(225, 48, 108, 0.1);
+      background: rgba(225, 48, 108, 0.10);
       margin-left: auto;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
     }
-    
-    .stats {
+
+    /* ---------- Stats ---------- */
+    dl.stats {
       display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
     }
-    
     .stat {
       flex: 1;
       text-align: center;
-      padding: 12px 8px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: var(--space-4) var(--space-2);
+      background: var(--glass-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      position: relative;
+      transition: transform var(--t-spring), border-color var(--t-base);
     }
-    
+    .stat:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-2);
+    }
     .stat-count {
-      font-size: 24px;
-      font-weight: 700;
+      font-size: 36px;
+      font-weight: 800;
       display: block;
-      margin-bottom: 2px;
+      margin-bottom: var(--space-1);
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      letter-spacing: -0.04em;
     }
-    
-    .stat-images .stat-count { color: #40c463; }
-    .stat-videos .stat-count { color: #E1306C; }
-    
+    .stat-delta {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--selected);
+      vertical-align: top;
+      margin-left: 2px;
+      opacity: 0;
+      transform: translateY(-2px);
+      transition: opacity var(--t-base), transform var(--t-base);
+    }
+    .stat-delta.has-new {
+      opacity: 1;
+      transform: translateY(0);
+      animation: delta-pulse 2.4s ease-in-out 1;
+    }
+    @keyframes delta-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 var(--selected-glow); }
+      35%      { box-shadow: 0 0 0 6px transparent; }
+    }
     .stat-label {
-      font-size: 9px;
-      color: rgba(255, 255, 255, 0.6);
+      font-size: 11px;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      letter-spacing: 0.6px;
+      font-weight: 600;
     }
 
-    .setting-row {
+    /* Empty-state pill that replaces the stats when total is 0 */
+    .stats-empty {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-4);
+      background: var(--surface-1);
+      border-radius: var(--radius-lg);
+      border: 1px dashed var(--border-2);
+      margin-bottom: var(--space-4);
+      text-align: center;
+    }
+    .stats-empty.visible { display: flex; }
+    .stats-empty .se-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .stats-empty .se-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* ---------- Sections ---------- */
+    .section {
+      margin-bottom: var(--space-4);
+    }
+    .section-title {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 700;
+      margin-bottom: var(--space-2);
+      padding-left: var(--space-1);
+    }
+
+    /* ---------- Settings ---------- */
+    label.setting-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-      margin-bottom: 12px;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      cursor: pointer;
+      transition: background-color var(--t-fast), border-color var(--t-fast);
     }
-
+    label.setting-row:hover {
+      background: var(--surface-2);
+      border-color: var(--border-2);
+    }
     .setting-label {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 500;
+      color: var(--text-primary);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--space-2);
     }
 
+    /* Toggle switch — wrapper provides 44pt hit area via padding */
     .switch {
       position: relative;
       display: inline-block;
       width: 36px;
       height: 20px;
       flex-shrink: 0;
+      padding: 12px 4px;        /* invisible hit area extends the touch target */
+      margin: -12px -4px;
+      box-sizing: content-box;
     }
-    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch input {
+      position: absolute;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      cursor: pointer;
+    }
     .slider {
       position: absolute;
-      cursor: pointer;
-      inset: 0;
+      pointer-events: none;
+      top: 12px; left: 4px;     /* compensate for the wrapper padding */
+      right: 4px; bottom: 12px;
       background: rgba(255, 255, 255, 0.15);
-      transition: .2s;
+      transition: background-color var(--t-base);
       border-radius: 20px;
     }
     .slider::before {
@@ -130,241 +328,318 @@
       left: 3px;
       top: 3px;
       background: #fff;
-      transition: .2s;
+      transition: transform var(--t-base);
       border-radius: 50%;
     }
     .switch input:checked + .slider {
-      background: linear-gradient(135deg, #833ab4, #E1306C);
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
     }
     .switch input:checked + .slider::before {
       transform: translateX(16px);
     }
-    
+    .switch input:focus-visible + .slider {
+      outline: 2px solid var(--selected);
+      outline-offset: 3px;
+    }
+
+    /* ---------- Actions ---------- */
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
     .btn-row {
       display: flex;
-      gap: 8px;
+      gap: var(--space-2);
     }
-    
+
     button {
       flex: 1;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(255, 255, 255, 0.05);
-      color: #fff;
+      min-height: var(--btn-h-md);
+      padding: 0 var(--space-4);
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-1);
+      background: var(--surface-1);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition:
+        background-color var(--t-fast),
+        border-color var(--t-fast),
+        transform var(--t-spring),
+        box-shadow var(--t-base);
+    }
+    button:hover {
+      background: var(--surface-2);
+      border-color: var(--border-2);
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+
+    /* Primary CTA — Capture; pill with brand glow */
+    .btn-primary {
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
+      border: none;
+      box-shadow: 0 4px 16px rgba(225, 48, 108, 0.35);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 6px 22px rgba(225, 48, 108, 0.50);
+      transform: translateY(-2px);
+    }
+
+    /* Secondary CTA — Gallery */
+    .btn-gallery {
+      background: linear-gradient(135deg, #405DE6, var(--ig-purple));
+      border: none;
+      box-shadow: 0 4px 16px rgba(64, 93, 230, 0.30);
+    }
+    .btn-gallery:hover {
+      box-shadow: 0 6px 22px rgba(64, 93, 230, 0.45);
+      transform: translateY(-2px);
+    }
+
+    /* Destructive — subordinate, text-link-ish pill */
+    .btn-danger {
+      flex: none;
+      width: auto;
+      align-self: center;
+      min-height: var(--btn-h-sm);
+      padding: 0 var(--space-3);
       font-size: 12px;
       font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
+      color: var(--danger);
+      background: transparent;
+      border: 1px solid var(--danger-soft);
+      box-shadow: none;
+      margin-top: var(--space-2);
     }
-    
-    button:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.3);
-    }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, #833ab4, #E1306C);
-      border: none;
-    }
-    
-    .btn-primary:hover {
-      opacity: 0.9;
-    }
-    
-    .btn-gallery {
-      background: linear-gradient(135deg, #405DE6, #833ab4);
-      border: none;
-    }
-    
-    .btn-danger {
-      background: rgba(255, 50, 50, 0.2);
-      border-color: rgba(255, 50, 50, 0.3);
-    }
-    
     .btn-danger:hover {
-      background: rgba(255, 50, 50, 0.3);
+      background: var(--danger-soft);
+      border-color: var(--danger);
+      transform: none;
+      box-shadow: none;
     }
-    
+
+    /* ---------- Status / loading ---------- */
     .status {
-      margin-top: 12px;
-      font-size: 10px;
-      color: rgba(255, 255, 255, 0.5);
+      margin-top: var(--space-3);
+      font-size: 12px;
+      color: var(--text-muted);
       text-align: center;
-      min-height: 14px;
+      min-height: 16px;
     }
-    
     .status.capturing {
-      color: #E1306C;
-      font-weight: 500;
+      color: var(--ig-pink);
+      font-weight: 600;
     }
-    
     .loading-bar {
       height: 3px;
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--surface-1);
       border-radius: 2px;
-      margin-top: 8px;
+      margin-top: var(--space-2);
       overflow: hidden;
       display: none;
     }
-    
     .loading-bar.active {
       display: block;
     }
-    
     .loading-bar-inner {
       height: 100%;
       width: 30%;
-      background: linear-gradient(90deg, #833ab4, #E1306C, #fd1d1d);
+      background: linear-gradient(90deg, var(--ig-purple), var(--ig-pink), #fd1d1d);
       border-radius: 2px;
       animation: loading-slide 1s ease-in-out infinite;
     }
-    
     @keyframes loading-slide {
-      0% { transform: translateX(-100%); }
-      50% { transform: translateX(250%); }
+      0%   { transform: translateX(-100%); }
+      50%  { transform: translateX(250%); }
       100% { transform: translateX(-100%); }
     }
-    
+
+    /* ---------- Off-Instagram state ---------- */
     .not-instagram {
       text-align: center;
-      padding: 24px 16px;
-      color: rgba(255, 255, 255, 0.6);
+      padding: var(--space-5) var(--space-4);
     }
-    
-    .not-instagram h3 {
-      color: #E1306C;
-      margin-bottom: 8px;
+    .not-instagram h2 {
+      color: var(--ig-pink);
+      margin-bottom: var(--space-2);
       font-size: 14px;
+      font-weight: 700;
     }
-    
     .not-instagram p {
       font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
     }
-    
+
+    /* ---------- Support banner (brand-aligned, was yellow) ---------- */
     .support-banner {
-      background: rgba(255, 199, 0, 0.1);
-      border: 1px solid rgba(255, 199, 0, 0.3);
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
+      background: linear-gradient(135deg, rgba(131, 58, 180, 0.15), rgba(225, 48, 108, 0.15));
+      border: 1px solid rgba(225, 48, 108, 0.25);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
       display: none;
     }
-    
     .support-banner.visible {
       display: block;
     }
-    
     .support-banner-text {
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.8);
-      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-2);
+      line-height: 1.4;
     }
-    
     .support-banner-actions {
       display: flex;
-      gap: 8px;
+      gap: var(--space-2);
     }
-    
     .support-banner-btn {
       flex: 1;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 10px;
+      min-height: var(--btn-h-sm);
+      padding: 0 var(--space-2);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 500;
       cursor: pointer;
       border: none;
+      transition: background-color var(--t-fast), opacity var(--t-fast);
     }
-    
     .support-banner-btn.primary {
-      background: #ffdd00;
-      color: #000;
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
+      color: #fff;
       font-weight: 600;
     }
-    
-    .support-banner-btn.secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.6);
+    .support-banner-btn.primary:hover {
+      opacity: 0.92;
     }
-    
+    .support-banner-btn.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+    }
+    .support-banner-btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Hide decorative emoji from screen readers without losing visual presence */
+    .emoji {
+      font-style: normal;
+      display: inline-block;
+    }
+
+    /* ---------- Footer (persistent coffee link, always reachable) ---------- */
     .footer {
-      margin-top: 12px;
+      margin-top: var(--space-3);
       text-align: center;
     }
-    
     .coffee-link {
-      font-size: 10px;
-      color: rgba(255, 255, 255, 0.4);
+      display: inline-block;
+      padding: var(--space-1) var(--space-2);
+      font-size: 11px;
+      color: var(--text-muted);                    /* ~6.2:1 — was 0.4 opacity */
       text-decoration: none;
-      transition: color 0.2s;
+      border-radius: var(--radius-sm);
+      transition: color var(--t-fast), background-color var(--t-fast);
     }
-    
     .coffee-link:hover {
       color: #ffdd00;
+      background: rgba(255, 221, 0, 0.08);
     }
   </style>
 </head>
 <body>
-  <div id="main-content">
-    <div class="support-banner" id="support-banner">
-      <div class="support-banner-text">Enjoying this extension? Consider buying me a coffee ☕</div>
+  <main id="main-content">
+    <div class="support-banner" id="support-banner" role="region" aria-label="Support the developer">
+      <div class="support-banner-text">Enjoying this extension? Consider buying me a coffee.</div>
       <div class="support-banner-actions">
-        <button class="support-banner-btn primary" id="support-btn">☕ Support</button>
+        <button class="support-banner-btn primary" id="support-btn">
+          <span class="emoji" aria-hidden="true">☕</span> Support
+        </button>
         <button class="support-banner-btn secondary" id="dismiss-btn">Maybe later</button>
       </div>
     </div>
-    
-    <div class="header">
-      <img class="logo" src="assets/icons/icon-128.png" alt="Logo">
-      <span class="title">IG Exporter</span>
-      <span class="version" id="version">v4.2.3</span>
-    </div>
-    
-    <div class="stats">
+
+    <header class="header">
+      <img class="logo" src="assets/icons/icon-128.png" alt="">
+      <h1 class="title">IG Exporter</h1>
+      <span class="version" id="version" aria-label="Extension version"></span>
+    </header>
+
+    <dl class="stats" id="stats" aria-label="Captured media counts">
       <div class="stat stat-images">
-        <span class="stat-count" id="images-count">0</span>
-        <span class="stat-label">Images</span>
+        <dd class="stat-count">
+          <span id="images-count">0</span><span class="stat-delta" id="images-delta" aria-live="polite"></span>
+        </dd>
+        <dt class="stat-label">Images</dt>
       </div>
       <div class="stat stat-videos">
-        <span class="stat-count" id="videos-count">0</span>
-        <span class="stat-label">Videos</span>
+        <dd class="stat-count">
+          <span id="videos-count">0</span><span class="stat-delta" id="videos-delta" aria-live="polite"></span>
+        </dd>
+        <dt class="stat-label">Videos</dt>
       </div>
+    </dl>
+
+    <div class="stats-empty" id="stats-empty" aria-live="polite">
+      <div class="se-title">No captures yet</div>
+      <div class="se-hint">Scroll through your saved posts — items will appear here automatically.</div>
     </div>
-    
-    <div class="setting-row">
-      <span class="setting-label">🎬 Auto-play videos</span>
-      <label class="switch">
-        <input type="checkbox" id="autoplay-toggle" checked>
-        <span class="slider"></span>
+
+    <section class="section">
+      <h2 class="section-title">Settings</h2>
+      <label class="setting-row" for="autoplay-toggle">
+        <span class="setting-label">
+          <span class="emoji" aria-hidden="true">🎬</span> Auto-play videos
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="autoplay-toggle" checked>
+          <span class="slider" aria-hidden="true"></span>
+        </span>
       </label>
-    </div>
+    </section>
 
     <div class="actions">
       <div class="btn-row">
-        <button id="capture-btn" class="btn-primary">🎠 Capture All</button>
-        <button id="gallery-btn" class="btn-gallery">🖼️ Gallery</button>
+        <button id="capture-btn" class="btn-primary">
+          <span class="emoji" aria-hidden="true">🎠</span> Capture All
+        </button>
+        <button id="gallery-btn" class="btn-gallery">
+          <span class="emoji" aria-hidden="true">🖼️</span> Gallery
+        </button>
       </div>
-      <div class="btn-row">
-        <button id="clear-btn" class="btn-danger">🗑️ Clear</button>
-      </div>
+      <button id="clear-btn" class="btn-danger">
+        <span class="emoji" aria-hidden="true">🗑️</span> Clear all data
+      </button>
     </div>
-    
-    <div class="status" id="status"></div>
-    <div class="loading-bar" id="loading-bar">
+
+    <div class="status" id="status" aria-live="polite"></div>
+    <div class="loading-bar" id="loading-bar" aria-hidden="true">
       <div class="loading-bar-inner"></div>
     </div>
-    
+
     <div class="footer">
-      <a href="#" class="coffee-link" id="coffee-link">☕ Buy me a coffee</a>
+      <a href="#" class="coffee-link" id="coffee-link">
+        <span class="emoji" aria-hidden="true">☕</span> Buy me a coffee
+      </a>
     </div>
-  </div>
-  
+  </main>
+
   <div id="not-instagram" style="display: none;">
     <div class="not-instagram">
-      <h3>📍 Open Instagram</h3>
-      <p>Navigate to instagram.com to use this extension</p>
+      <h2><span class="emoji" aria-hidden="true">📍</span> Open Instagram</h2>
+      <p>Navigate to instagram.com to use this extension.</p>
     </div>
   </div>
-  
+
   <script src="analytics.js"></script>
   <script src="popup.js"></script>
 </body>

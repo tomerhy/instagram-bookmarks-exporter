@@ -1,106 +1,242 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Instagram Media Gallery</title>
   <style>
     :root {
       color-scheme: dark;
+
+      /* Brand */
       --ig-pink: #E1306C;
       --ig-pink-dark: #c13584;
-      --ig-bg: #1a1a2e;
-      --ig-card: #16213e;
+      --ig-purple: #833ab4;
+      --ig-violet: #5851DB;
+
+      /* Semantic state — selection/active intentionally NOT pink so the
+         primary CTA (Download) stays visually distinct from "you picked this". */
+      --selected: #4F9DFF;
+      --selected-glow: rgba(79, 157, 255, 0.40);
+
+      /* Surfaces — flatter darker base with tinted layers above */
+      --ig-bg:       #0a0a14;
+      --surface-0:   rgba(255, 255, 255, 0.02);
+      --surface-1:   rgba(255, 255, 255, 0.04);
+      --surface-2:   rgba(255, 255, 255, 0.08);
+      --surface-3:   rgba(255, 255, 255, 0.12);
+
+      /* Glass — backdrop-blur surfaces */
+      --glass-bg:    rgba(22, 22, 38, 0.6);
+      --glass-bg-strong: rgba(22, 22, 38, 0.78);
+      --glass-border:    rgba(255, 255, 255, 0.10);
+      --glass-blur:  blur(20px) saturate(140%);
+
+      /* Text — all WCAG AA against --ig-bg */
+      --text-primary:   #f6f7fb;
+      --text-secondary: #d4d4dc;
+      --text-muted:     #a8a8b8;
+      --text-dim:       #9090a4;
+
+      /* Borders */
+      --border-1: rgba(255, 255, 255, 0.10);
+      --border-2: rgba(255, 255, 255, 0.18);
+
+      /* Spacing scale (4/8px) */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+      --space-7: 48px;
+
+      /* Radii */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 22px;
+      --radius-pill: 999px;
+
+      /* Button heights */
+      --btn-h-sm: 36px;
+      --btn-h-md: 42px;
+      --btn-h-lg: 48px;
+
+      /* Motion — spring-physics for delightful overshoots */
+      --t-fast: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+      --t-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+      --t-spring: 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      /* Glow */
+      --glow-pink:  0 0 30px rgba(225, 48, 108, 0.35);
+      --glow-blue:  0 0 30px rgba(79, 157, 255, 0.35);
     }
     * {
       box-sizing: border-box;
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
-      color: #fff;
-      min-height: 100vh;
+    /* Global keyboard focus ring — visible against the dark bg */
+    *:focus-visible {
+      outline: 2px solid var(--selected);
+      outline-offset: 2px;
+      border-radius: 4px;
     }
-    h2 {
-      margin: 0 0 20px;
-      font-size: 24px;
-      color: var(--ig-pink);
+    /* Respect users with motion sensitivity */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .card:hover { transform: none !important; }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", sans-serif;
+      margin: 0;
+      padding: var(--space-6) var(--space-5);
+      background: var(--ig-bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+      letter-spacing: -0.01em;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Aurora ambient gradients — large blurred brand-color blobs floating
+       behind content. The whole-page atmosphere is what makes a dark UI
+       feel premium instead of utilitarian. */
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.35;
+    }
+    body::before {
+      top: -200px;
+      left: -200px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--ig-pink) 0%, transparent 70%);
+    }
+    body::after {
+      bottom: -300px;
+      right: -200px;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, var(--ig-violet) 0%, transparent 70%);
+    }
+    /* Everything else above the aurora */
+    body > * { position: relative; z-index: 1; }
+
+    h1 {
+      margin: 0 0 var(--space-6);
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: var(--space-3);
+      background: linear-gradient(135deg, #fff 0%, #a8a8b8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
     #version {
       font-size: 11px;
+      font-weight: 600;
       color: var(--ig-pink);
-      padding: 3px 10px;
-      border-radius: 20px;
-      border: 1px solid var(--ig-pink);
-      background: rgba(225, 48, 108, 0.1);
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(225, 48, 108, 0.4);
+      background: rgba(225, 48, 108, 0.10);
+      -webkit-text-fill-color: var(--ig-pink);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
     }
-    
-    /* Tabs */
+
+    /* Tabs — segmented control with glass + subtle inner shadow */
     .tabs {
-      display: flex;
-      gap: 0;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #333;
+      display: inline-flex;
+      gap: var(--space-1);
+      margin-bottom: var(--space-5);
+      padding: 4px;
+      background: var(--surface-1);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-pill);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
     }
     .tab {
-      padding: 14px 32px;
-      font-size: 14px;
+      padding: 10px 20px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       border: none;
       background: transparent;
-      color: #888;
-      border-bottom: 3px solid transparent;
-      margin-bottom: -2px;
-      transition: all 150ms ease;
+      color: var(--text-muted);
+      border-radius: var(--radius-pill);
+      letter-spacing: -0.01em;
+      transition: color var(--t-base), background-color var(--t-base);
     }
     .tab:hover {
-      color: #ccc;
+      color: var(--text-secondary);
     }
     .tab.active {
-      color: var(--ig-pink);
-      border-bottom-color: var(--ig-pink);
+      color: var(--text-primary);
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
+      box-shadow: 0 4px 14px rgba(225, 48, 108, 0.30);
     }
     .tab-count {
-      margin-left: 8px;
-      padding: 2px 8px;
-      font-size: 11px;
-      background: rgba(225, 48, 108, 0.2);
-      border-radius: 10px;
-      color: var(--ig-pink);
+      margin-left: var(--space-2);
+      padding: 2px var(--space-2);
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-pill);
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
     }
     .tab.active .tab-count {
-      background: var(--ig-pink);
+      background: rgba(255, 255, 255, 0.20);
       color: #fff;
     }
 
-    /* Layout - 40/60 split (viewer 40%, grid 60%) */
+    /* Layout — 40/60 split on desktop, stacks below 1024px */
     #layout {
       display: flex;
-      gap: 20px;
+      gap: var(--space-5);
       align-items: flex-start;
     }
-    
-    /* Viewer Panel - 40% */
+
+    /* Viewer Panel — glass surface, floats above the aurora */
     #viewer-wrap {
       position: sticky;
-      top: 20px;
-      background: var(--ig-card);
-      border: 1px solid #333;
-      border-radius: 16px;
-      padding: 16px;
+      top: var(--space-5);
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-4);
       flex: 0 0 38%;
       max-width: 38%;
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.45),
+        0 1px 0 rgba(255, 255, 255, 0.05) inset;
     }
     #viewer-container {
       position: relative;
       background: #000;
-      border-radius: 12px;
+      border-radius: var(--radius-md);
       overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     }
     #player {
       width: 100%;
@@ -124,36 +260,40 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #555;
+      color: var(--text-muted);            /* was #555 (2.6:1) — now ~6:1 */
       font-size: 14px;
     }
-    
-    /* Fullscreen button */
+
+    /* Fullscreen button (top-right of preview, shown on hover) */
     #fullscreen-btn {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
+      top: var(--space-2);
+      right: var(--space-2);
+      width: 44px;                          /* P0-4: touch target ≥44 */
+      height: 44px;
+      border-radius: var(--radius-md);
       background: rgba(0,0,0,0.7);
       border: none;
-      color: #fff;
-      font-size: 16px;
+      color: var(--text-primary);
+      font-size: 18px;
       cursor: pointer;
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 10;
+      transition: background-color var(--t-fast);
     }
     #fullscreen-btn:hover {
       background: var(--ig-pink);
     }
-    #viewer-container:hover #fullscreen-btn {
+    /* Show on hover OR when the button itself receives keyboard focus */
+    #viewer-container:hover #fullscreen-btn,
+    #fullscreen-btn:focus-visible {
       display: flex;
     }
-    
-    /* Fullscreen overlay */
+
+    /* Fullscreen overlay — heavy glass blur over gallery, not pure black.
+       The gallery stays faintly visible behind so the user keeps context. */
     #fullscreen-overlay {
       display: none;
       position: fixed;
@@ -161,14 +301,60 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.97);
+      background: rgba(10, 10, 20, 0.85);
+      backdrop-filter: blur(40px) saturate(140%);
+      -webkit-backdrop-filter: blur(40px) saturate(140%);
       z-index: 9999;
       flex-direction: column;
       justify-content: center;
       align-items: center;
+      animation: fs-fade 240ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes fs-fade {
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
     #fullscreen-overlay.visible {
       display: flex;
+    }
+    #fullscreen-overlay #fullscreen-image,
+    #fullscreen-overlay #fullscreen-video {
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.60);
+      border-radius: var(--radius-md);
+    }
+    #fullscreen-controls.fullscreen-controls {
+      padding: var(--space-2) var(--space-3);
+      background: var(--glass-bg-strong);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-pill);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.50);
+    }
+    .fullscreen-btn {
+      min-height: 36px !important;
+      padding: 0 var(--space-3) !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      background: transparent !important;
+      border: none !important;
+      border-radius: var(--radius-pill) !important;
+      color: var(--text-secondary) !important;
+      transition: background-color var(--t-fast), color var(--t-fast) !important;
+    }
+    .fullscreen-btn:hover {
+      background: var(--surface-2) !important;
+      color: var(--text-primary) !important;
+    }
+    .fullscreen-btn.active {
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink)) !important;
+      color: #fff !important;
+      box-shadow: 0 2px 12px rgba(225, 48, 108, 0.40) !important;
+    }
+    #fullscreen-counter {
+      color: var(--text-muted) !important;
+      font-variant-numeric: tabular-nums !important;
+      font-weight: 600 !important;
     }
     #fullscreen-image, #fullscreen-video {
       max-width: 90vw;
@@ -180,20 +366,21 @@
     }
     #fullscreen-close {
       position: absolute;
-      top: 20px;
-      right: 20px;
+      top: var(--space-5);
+      right: var(--space-5);
       width: 44px;
       height: 44px;
       border-radius: 50%;
       background: rgba(255,255,255,0.1);
       border: none;
-      color: #fff;
+      color: var(--text-primary);
       font-size: 24px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       line-height: 1;
+      transition: background-color var(--t-fast);
     }
     #fullscreen-close:hover {
       background: var(--ig-pink);
@@ -202,142 +389,246 @@
       position: absolute;
       bottom: 30px;
       display: flex;
-      gap: 12px;
+      gap: var(--space-3);
       align-items: center;
     }
     .fullscreen-btn {
+      min-height: var(--btn-h-md);          /* P0-4 */
       padding: 10px 20px;
-      border-radius: 8px;
+      border-radius: var(--radius-md);
       background: rgba(255,255,255,0.1);
       border: none;
-      color: #fff;
+      color: var(--text-primary);
       font-size: 14px;
       cursor: pointer;
+      transition: background-color var(--t-fast);
     }
     .fullscreen-btn:hover {
       background: var(--ig-pink);
     }
     .fullscreen-btn.active {
-      background: var(--ig-pink);
+      background: var(--selected);          /* "currently playing" = selected color */
     }
     #fullscreen-counter {
-      color: #888;
+      color: var(--text-muted);             /* was #888 */
       font-size: 14px;
-      padding: 0 20px;
+      padding: 0 var(--space-5);
     }
-    
-    /* Slideshow controls */
+
+    /* Slideshow controls — segmented control like the tabs above */
     .slideshow-controls {
-      margin-top: 12px;
+      margin-top: var(--space-3);
       display: flex;
-      gap: 8px;
+      gap: var(--space-2);
       align-items: center;
+      flex-wrap: wrap;
     }
     .slideshow-controls label {
-      font-size: 12px;
-      color: #888;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .slideshow-group {
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      background: var(--surface-1);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-pill);
     }
     .slideshow-btn {
-      padding: 6px 12px;
-      font-size: 11px;
-      border-radius: 6px;
-      border: 1px solid #444;
-      background: #2a2a4a;
-      color: #fff;
+      min-height: 30px;
+      padding: 0 var(--space-3);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: var(--radius-pill);
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
       cursor: pointer;
+      letter-spacing: -0.01em;
+      transition: color var(--t-fast), background-color var(--t-fast);
     }
     .slideshow-btn:hover {
-      border-color: var(--ig-pink);
+      color: var(--text-primary);
+      background: var(--surface-2);
     }
     .slideshow-btn.active {
-      background: var(--ig-pink);
-      border-color: var(--ig-pink);
+      background: var(--selected);
+      color: #fff;
+      box-shadow: 0 2px 10px var(--selected-glow);
     }
-    
-    /* Actions */
+
+    /* Actions — pill buttons, primary CTA glows */
     .actions {
-      margin-top: 14px;
+      margin-top: var(--space-4);
       display: flex;
-      gap: 8px;
+      gap: var(--space-2);
       flex-wrap: wrap;
     }
     button {
-      padding: 10px 16px;
-      border-radius: 8px;
-      border: 1px solid #444;
-      background: #2a2a4a;
-      color: #fff;
-      font-size: 12px;
-      font-weight: 500;
+      min-height: var(--btn-h-md);
+      padding: 0 var(--space-4);
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-1);
+      background: var(--surface-1);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
       cursor: pointer;
-      transition: all 120ms ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition:
+        background-color var(--t-fast),
+        border-color var(--t-fast),
+        transform var(--t-spring),
+        box-shadow var(--t-base);
+    }
+    /* Lucide-style line icons */
+    .icon {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+    .icon-sm { width: 16px; height: 16px; }
+    .icon-lg { width: 20px; height: 20px; }
+    /* Icon-only round buttons (close, fullscreen) */
+    .icon-btn {
+      width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border-radius: 50%;
     }
     button:hover {
-      background: #3a3a5a;
-      border-color: var(--ig-pink);
+      background: var(--surface-2);
+      border-color: var(--border-2);
+      transform: translateY(-1px);
     }
+    button:active {
+      transform: translateY(0);
+    }
+    /* The one true primary CTA — Download, with brand glow */
     #download-current {
-      background: var(--ig-pink);
-      border-color: var(--ig-pink);
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
+      border: none;
+      box-shadow: 0 4px 16px rgba(225, 48, 108, 0.30);
     }
     #download-current:hover {
-      background: var(--ig-pink-dark);
+      box-shadow: 0 6px 22px rgba(225, 48, 108, 0.45);
+      transform: translateY(-2px);
     }
+    /* Donate — same brand gradient as primary but softer weight */
     #donate {
-      background: linear-gradient(135deg, #f5af19, #f12711);
+      background: linear-gradient(135deg, #f5af19, var(--ig-pink));
       border: none;
+      box-shadow: 0 4px 14px rgba(245, 175, 25, 0.25);
+    }
+    #donate:hover {
+      box-shadow: 0 6px 20px rgba(245, 175, 25, 0.40);
+      transform: translateY(-2px);
     }
 
     /* Info */
     #status {
-      margin-top: 12px;
+      margin-top: var(--space-3);
       font-size: 12px;
       color: var(--ig-pink);
     }
     #progress {
-      margin-top: 8px;
+      margin-top: var(--space-2);
       height: 4px;
       background: #333;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       overflow: hidden;
     }
     #progress-bar {
       height: 100%;
       width: 0%;
       background: var(--ig-pink);
-      transition: width 150ms ease;
+      transition: width var(--t-base);
     }
-    
 
-    /* Grid container - 60% */
+
+    /* Grid container */
     #grid-container {
       flex: 0 0 60%;
       max-width: 60%;
+      min-width: 0;                          /* let it shrink in flex */
     }
 
-    /* Grid - 5 columns */
+    /* Grid — responsive auto-fill */
     #grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: var(--space-3);
     }
+
+    /* Cards — sophisticated hover. Scale + glow + ring move in concert,
+       on a spring curve. Selection draws an animated outer ring. */
     .card {
-      background: var(--ig-card);
-      border: 2px solid transparent;
-      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
       overflow: hidden;
       cursor: pointer;
-      transition: all 150ms ease;
       position: relative;
       aspect-ratio: 1;
+      isolation: isolate;
+      transition:
+        transform var(--t-spring),
+        border-color var(--t-base),
+        box-shadow var(--t-base);
+      animation: card-in 360ms cubic-bezier(0.4, 0, 0.2, 1) backwards;
+    }
+    /* Subtle stagger — each card fades + slides up. animation-delay set inline
+       via gallery.js so the cascade reads visually as a wave. */
+    @keyframes card-in {
+      from { opacity: 0; transform: translateY(8px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
     }
     .card:hover {
-      border-color: var(--ig-pink);
-      transform: translateY(-2px);
+      transform: translateY(-3px) scale(1.02);
+      border-color: rgba(225, 48, 108, 0.40);
+      box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.40),
+        0 0 0 1px rgba(225, 48, 108, 0.30),
+        0 0 24px rgba(225, 48, 108, 0.20);
+      z-index: 2;
     }
+    .card:active {
+      transform: translateY(-1px) scale(1.01);
+    }
+    /* Selected — animated double ring. The outer ring "draws" with a slight
+       grow on entry; the inner border tightens. Color reserved for selection. */
     .card.selected {
-      border-color: var(--ig-pink);
-      box-shadow: 0 0 15px rgba(225, 48, 108, 0.4);
+      border-color: var(--selected);
+      box-shadow:
+        0 0 0 2px var(--selected),
+        0 0 28px var(--selected-glow),
+        0 8px 24px rgba(0, 0, 0, 0.40);
+      animation: card-select 480ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes card-select {
+      0%   { box-shadow: 0 0 0 0 var(--selected),
+                         0 0 0 var(--selected-glow); }
+      60%  { box-shadow: 0 0 0 4px var(--selected),
+                         0 0 36px var(--selected-glow); }
+      100% { box-shadow: 0 0 0 2px var(--selected),
+                         0 0 28px var(--selected-glow),
+                         0 8px 24px rgba(0, 0, 0, 0.40); }
+    }
+    .card:focus-visible {
+      outline-offset: 4px;
     }
     .thumb {
       width: 100%;
@@ -346,48 +637,22 @@
       display: block;
       background: #0a0a0a;
     }
-    .card-overlay {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      opacity: 0;
-      transition: opacity 150ms ease;
-    }
-    .card:hover .card-overlay {
-      opacity: 1;
-    }
-    .download-btn {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.7);
-      border: none;
-      color: #fff;
-      font-size: 10px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .download-btn:hover {
-      background: var(--ig-pink);
-    }
     .video-badge {
       position: absolute;
       bottom: 6px;
       left: 6px;
       background: rgba(0,0,0,0.7);
-      color: #fff;
+      color: var(--text-primary);
       font-size: 10px;
       padding: 2px 6px;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
     }
     .carousel-badge {
       position: absolute;
       top: 6px;
       left: 6px;
       background: rgba(0,0,0,0.75);
-      color: #fff;
+      color: var(--text-primary);
       font-size: 10px;
       padding: 3px 7px;
       border-radius: 10px;
@@ -401,7 +666,7 @@
       bottom: 0;
       padding: 18px 8px 6px;
       background: linear-gradient(transparent, rgba(0,0,0,0.85));
-      color: #fff;
+      color: var(--text-primary);
       font-size: 10px;
       pointer-events: none;
     }
@@ -420,29 +685,29 @@
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 10px;
       font-size: 12px;
-      color: #ccc;
+      color: var(--text-secondary);
       display: none;
     }
     #viewer-meta.visible {
       display: block;
     }
     #viewer-meta .vm-head {
-      color: #aaa;
+      color: var(--text-muted);
       font-size: 11px;
-      margin-bottom: 4px;
+      margin-bottom: var(--space-1);
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: var(--space-1) 6px;
     }
     #viewer-meta .vm-owner {
       color: var(--ig-pink);
       font-weight: 600;
     }
     #viewer-meta .vm-album {
-      color: #fff;
+      color: var(--text-primary);
     }
     #viewer-meta .vm-caption {
-      color: #ddd;
+      color: var(--text-secondary);
       line-height: 1.4;
       white-space: pre-wrap;
       word-break: break-word;
@@ -450,13 +715,13 @@
 
     .btn-link {
       display: inline-block;
-      background: linear-gradient(135deg, #833ab4, #E1306C);
-      color: #fff;
+      background: linear-gradient(135deg, #833ab4, var(--ig-pink));
+      color: var(--text-primary);
       text-decoration: none;
       padding: 12px 24px;
-      border-radius: 8px;
+      border-radius: var(--radius-md);
       font-weight: 500;
-      transition: opacity 0.2s;
+      transition: opacity var(--t-base);
     }
     .btn-link:hover {
       opacity: 0.9;
@@ -468,55 +733,144 @@
       justify-content: center;
       align-items: center;
       gap: 6px;
-      margin-top: 16px;
+      margin-top: var(--space-4);
       flex-wrap: wrap;
     }
     .page-btn {
-      min-width: 32px;
-      height: 32px;
+      min-width: var(--btn-h-sm);
+      min-height: var(--btn-h-sm);            /* P0-4: was 32px */
       padding: 0 10px;
-      border-radius: 6px;
-      border: 1px solid #444;
-      background: #2a2a4a;
-      color: #fff;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-1);
+      background: var(--surface-1);
+      color: var(--text-primary);
       font-size: 12px;
       cursor: pointer;
+      transition: border-color var(--t-fast), background-color var(--t-fast);
     }
     .page-btn:hover {
       border-color: var(--ig-pink);
     }
     .page-btn.active {
-      background: var(--ig-pink);
-      border-color: var(--ig-pink);
+      background: var(--selected);
+      border-color: var(--selected);
     }
     .page-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
     .page-info {
-      font-size: 11px;
-      color: #888;
-      padding: 0 8px;
+      font-size: 12px;
+      color: var(--text-muted);              /* was #888 (3.6:1) — now ~6.2:1 */
+      padding: 0 var(--space-2);
     }
 
-    /* Empty state */
+    /* Empty state — generous whitespace + breathing icon */
     .empty-state {
       grid-column: 1 / -1;
       text-align: center;
-      padding: 40px 20px;
-      color: #666;
+      padding: var(--space-7) var(--space-5);
+      color: var(--text-muted);
+    }
+    .empty-state .es-icon {
+      font-size: 64px;
+      margin-bottom: var(--space-4);
+      opacity: 0.4;
+      animation: breathe 3.6s ease-in-out infinite;
+      display: inline-block;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.30; transform: scale(1); }
+      50%      { opacity: 0.55; transform: scale(1.05); }
     }
     .empty-state h3 {
-      color: #888;
-      margin-bottom: 10px;
+      color: var(--text-primary);
+      margin: 0 0 var(--space-2);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .empty-state p {
+      color: var(--text-muted);
+      margin: 0 auto var(--space-5);
+      max-width: 420px;
+      line-height: 1.6;
       font-size: 14px;
+    }
+
+    /* Pagination — refined pill buttons */
+    .pagination {
+      gap: var(--space-1) !important;
+      margin-top: var(--space-5) !important;
+    }
+    .page-btn {
+      min-width: 36px !important;
+      min-height: 36px !important;
+      border-radius: var(--radius-sm) !important;
+      background: var(--surface-1) !important;
+      border: 1px solid var(--glass-border) !important;
+      font-weight: 600 !important;
+      font-variant-numeric: tabular-nums !important;
+      transition: background-color var(--t-fast), border-color var(--t-fast) !important;
+    }
+    .page-btn:hover:not(:disabled) {
+      background: var(--surface-2) !important;
+      border-color: var(--border-2) !important;
+    }
+    .page-btn.active {
+      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink)) !important;
+      border-color: transparent !important;
+      color: #fff !important;
+      box-shadow: 0 4px 14px rgba(225, 48, 108, 0.35) !important;
+    }
+    .page-info {
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      color: var(--text-muted) !important;
+      font-variant-numeric: tabular-nums !important;
+    }
+
+    /* P1-4: stack viewer + grid on narrow viewports */
+    @media (max-width: 1024px) {
+      #layout {
+        flex-direction: column;
+      }
+      #viewer-wrap,
+      #grid-container {
+        flex: 1 1 auto;
+        max-width: 100%;
+      }
+      #viewer-wrap {
+        position: relative;
+        top: 0;
+        max-height: none;
+      }
     }
 
     #file-input { display: none; }
   </style>
 </head>
 <body>
-  <h2>Instagram Media Gallery <span id="version"></span></h2>
+  <!-- Lucide-style SVG icon set; referenced via <use href="#i-name"/> -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-maximize" viewBox="0 0 24 24">
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24">
+      <path d="M18 6L6 18M6 6l12 12"/>
+    </symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24">
+      <path d="M15 18l-6-6 6-6"/>
+    </symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24">
+      <path d="M9 18l6-6-6-6"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24">
+      <path d="M5 3l14 9-14 9V3z" fill="currentColor"/>
+    </symbol>
+  </svg>
+
+  <h1>Gallery <span id="version"></span></h1>
   
   <div class="tabs">
     <button class="tab active" data-tab="images">
@@ -533,17 +887,21 @@
         <div id="viewer-placeholder">Select an item to preview</div>
         <video id="player" controls></video>
         <img id="image-viewer" alt="Preview" />
-        <button id="fullscreen-btn" title="Fullscreen">⛶</button>
+        <button id="fullscreen-btn" class="icon-btn" aria-label="Open fullscreen viewer" title="Fullscreen">
+          <svg class="icon" aria-hidden="true"><use href="#i-maximize"/></svg>
+        </button>
       </div>
       
       <div id="viewer-meta"></div>
 
       <div class="slideshow-controls" id="slideshow-controls">
-        <label>Slideshow:</label>
-        <button class="slideshow-btn" data-interval="2000">2s</button>
-        <button class="slideshow-btn" data-interval="3000">3s</button>
-        <button class="slideshow-btn" data-interval="5000">5s</button>
-        <button class="slideshow-btn" id="stop-slideshow" style="display:none;">Stop</button>
+        <label>Slideshow</label>
+        <div class="slideshow-group" role="group" aria-label="Slideshow interval">
+          <button class="slideshow-btn" data-interval="2000" aria-label="Auto-advance every 2 seconds">2s</button>
+          <button class="slideshow-btn" data-interval="3000" aria-label="Auto-advance every 3 seconds">3s</button>
+          <button class="slideshow-btn" data-interval="5000" aria-label="Auto-advance every 5 seconds">5s</button>
+          <button class="slideshow-btn" id="stop-slideshow" style="display:none;" aria-label="Stop slideshow">Stop</button>
+        </div>
       </div>
       
       <div class="actions">
@@ -570,15 +928,21 @@
   <div id="fullscreen-overlay">
     <img id="fullscreen-image" alt="Fullscreen" />
     <video id="fullscreen-video" controls autoplay></video>
-    <button id="fullscreen-close">✕</button>
-    <div id="fullscreen-controls">
-      <button class="fullscreen-btn" id="fullscreen-prev">← Prev</button>
-      <button class="fullscreen-btn" id="fs-slide-2" data-interval="2000">2s</button>
-      <button class="fullscreen-btn" id="fs-slide-3" data-interval="3000">3s</button>
-      <button class="fullscreen-btn" id="fs-slide-5" data-interval="5000">5s</button>
-      <button class="fullscreen-btn" id="fs-slide-stop" style="display:none;">Stop</button>
-      <span id="fullscreen-counter"></span>
-      <button class="fullscreen-btn" id="fullscreen-next">Next →</button>
+    <button id="fullscreen-close" class="icon-btn" aria-label="Close fullscreen viewer">
+      <svg class="icon icon-lg" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+    <div id="fullscreen-controls" class="fullscreen-controls" role="group" aria-label="Fullscreen controls">
+      <button class="fullscreen-btn" id="fullscreen-prev" aria-label="Previous item">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-left"/></svg> Prev
+      </button>
+      <button class="fullscreen-btn" id="fs-slide-2" data-interval="2000" aria-label="Auto-advance every 2 seconds">2s</button>
+      <button class="fullscreen-btn" id="fs-slide-3" data-interval="3000" aria-label="Auto-advance every 3 seconds">3s</button>
+      <button class="fullscreen-btn" id="fs-slide-5" data-interval="5000" aria-label="Auto-advance every 5 seconds">5s</button>
+      <button class="fullscreen-btn" id="fs-slide-stop" style="display:none;" aria-label="Stop slideshow">Stop</button>
+      <span id="fullscreen-counter" aria-live="polite"></span>
+      <button class="fullscreen-btn" id="fullscreen-next" aria-label="Next item">
+        Next <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+      </button>
     </div>
   </div>
 
