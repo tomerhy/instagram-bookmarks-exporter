@@ -24,6 +24,8 @@ var selectedCard = null;
 // At most one carousel can be expanded at a time. Tracking the DOM node lets
 // us collapse the previous one before expanding a new one.
 var expandedCard = null;
+// Active search query. Empty = no filter applied.
+var searchQuery = "";
 
 // Debug
 function logDebug(msg) {
@@ -154,6 +156,128 @@ function getCurrentItems() {
       carouselSize: sorted.length
     });
   });
+}
+
+// ----------------------------------------------------------------------------
+// Search — case-insensitive substring filter across owner / caption / hashtags.
+//
+// Token prefixes:
+//   @user  → match owner only
+//   #tag   → match hashtags only
+//   bare   → match across all three
+// Multiple space-separated tokens are AND-ed. An empty query matches all.
+// Items without metadata are filtered out as soon as the query is non-empty.
+// ----------------------------------------------------------------------------
+
+function _searchTokenize(query) {
+  return String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function _itemSearchHaystack(item) {
+  var meta = (item && item.metadata) || null;
+  var owner = (meta && meta.owner) ? String(meta.owner).toLowerCase() : "";
+  var caption = (meta && meta.caption) ? String(meta.caption).toLowerCase() : "";
+  var hashtags = (meta && Array.isArray(meta.hashtags))
+    ? meta.hashtags.map(function (t) { return String(t).toLowerCase(); })
+    : [];
+  return { owner: owner, caption: caption, hashtags: hashtags };
+}
+
+function _tokenMatches(token, hay) {
+  if (token.charAt(0) === "@") {
+    var name = token.slice(1);
+    return name.length > 0 && hay.owner.indexOf(name) !== -1;
+  }
+  if (token.charAt(0) === "#") {
+    var tag = token.slice(1);
+    if (!tag) return false;
+    for (var i = 0; i < hay.hashtags.length; i++) {
+      if (hay.hashtags[i].indexOf(tag) !== -1) return true;
+    }
+    return false;
+  }
+  if (hay.owner.indexOf(token) !== -1) return true;
+  if (hay.caption.indexOf(token) !== -1) return true;
+  for (var j = 0; j < hay.hashtags.length; j++) {
+    if (hay.hashtags[j].indexOf(token) !== -1) return true;
+  }
+  return false;
+}
+
+function matchesQuery(item, query) {
+  var tokens = _searchTokenize(query);
+  if (!tokens.length) return true;
+  // Items without metadata can't match any non-empty query.
+  if (!item || !item.metadata) return false;
+  var hay = _itemSearchHaystack(item);
+  for (var i = 0; i < tokens.length; i++) {
+    if (!_tokenMatches(tokens[i], hay)) return false;
+  }
+  return true;
+}
+
+// Filter the grouped current-tab items by the active search query.
+// Carousel grouping happens upstream (getCurrentItems), so each filtered
+// entry already represents an album cover when applicable.
+function getFilteredItems() {
+  var items = getCurrentItems();
+  if (!searchQuery) return items;
+  return items.filter(function (it) { return matchesQuery(it, searchQuery); });
+}
+
+// Centralized setter. Resets to page 1 (otherwise we could be stuck on a
+// page beyond the filtered total), updates the input/clear/meta UI, and
+// re-renders the grid.
+function setSearchQuery(value) {
+  var next = String(value || "");
+  if (next === searchQuery) return;
+  searchQuery = next;
+  currentPage = 1;
+  // Keep the input in sync if the change came from somewhere other than typing
+  var input = document.getElementById("search-input");
+  if (input && input.value !== next) input.value = next;
+  var clearBtn = document.getElementById("search-clear");
+  if (clearBtn) clearBtn.hidden = next.length === 0;
+  // Selection may reference a now-filtered-out card; drop it.
+  if (next) {
+    if (selectedCard) {
+      selectedCard.classList.remove("selected");
+      selectedCard.setAttribute("aria-pressed", "false");
+      selectedCard = null;
+    }
+  }
+  collapseCarousel({ instant: true });
+  renderGrid();
+  if (window.Analytics && next) {
+    Analytics.trackFeature('gallery_search', {
+      query_length: next.length,
+      has_token_modifier: /[@#]/.test(next) ? 1 : 0
+    });
+  }
+}
+
+// "Showing N of M results for '...'" row beneath the toolbar. Hidden when
+// the query is empty.
+function renderSearchMeta(filtered, total) {
+  var meta = document.getElementById("search-meta");
+  if (!meta) return;
+  if (!searchQuery) {
+    meta.hidden = true;
+    meta.innerHTML = "";
+    return;
+  }
+  meta.hidden = false;
+  var label = (filtered === total)
+    ? '<strong>' + filtered + '</strong> ' + (filtered === 1 ? 'result' : 'results') +
+      ' for <strong>' + escapeHtml(searchQuery) + '</strong>'
+    : 'Showing <strong>' + filtered + '</strong> of <strong>' + total +
+      '</strong> ' + (total === 1 ? 'item' : 'items') +
+      ' for <strong>' + escapeHtml(searchQuery) + '</strong>';
+  meta.innerHTML =
+    '<span>' + label + '</span>' +
+    '<button class="search-meta-clear" type="button">Clear</button>';
+  var clear = meta.querySelector(".search-meta-clear");
+  if (clear) clear.onclick = function () { setSearchQuery(""); };
 }
 
 // Render the metadata block under the viewer (caption, owner, date, album size).
@@ -462,22 +586,39 @@ function showVideoFallback(linkUrl, thumbnailUrl) {
 function renderGrid() {
   if (!grid) return;
   grid.innerHTML = "";
-  
-  var items = getCurrentItems();
+
+  var unfilteredCount = getCurrentItems().length;
+  var items = getFilteredItems();
   var totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
-  
+
   if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
-  
+
+  renderSearchMeta(items.length, unfilteredCount);
+
   if (items.length === 0) {
-    var emptyIcon = currentTab === "videos" ? "▶" : "🖼";
-    grid.innerHTML =
-      '<div class="empty-state">' +
-        '<div class="es-icon" aria-hidden="true">' + emptyIcon + '</div>' +
-        '<h3>No ' + currentTab + ' captured yet</h3>' +
-        '<p>Open Instagram and scroll through your <strong>saved posts</strong> — ' +
-        'captures appear here automatically as you go.</p>' +
-        '<a class="btn-link" href="https://www.instagram.com/" target="_blank" rel="noopener">Open Instagram</a>' +
-      '</div>';
+    if (searchQuery) {
+      // Distinct empty state for "no matches" vs "no captures yet"
+      grid.innerHTML =
+        '<div class="empty-state">' +
+          '<div class="es-icon" aria-hidden="true">🔎</div>' +
+          '<h3>No matches</h3>' +
+          '<p>No ' + currentTab + ' match <strong>' + escapeHtml(searchQuery) + '</strong>. ' +
+          'Try different keywords, or use <code>@user</code> / <code>#tag</code> to narrow the field.</p>' +
+          '<button class="btn-link" id="empty-clear-search">Clear search</button>' +
+        '</div>';
+      var clearBtn = document.getElementById("empty-clear-search");
+      if (clearBtn) clearBtn.onclick = function () { setSearchQuery(""); };
+    } else {
+      var emptyIcon = currentTab === "videos" ? "▶" : "🖼";
+      grid.innerHTML =
+        '<div class="empty-state">' +
+          '<div class="es-icon" aria-hidden="true">' + emptyIcon + '</div>' +
+          '<h3>No ' + currentTab + ' captured yet</h3>' +
+          '<p>Open Instagram and scroll through your <strong>saved posts</strong> — ' +
+          'captures appear here automatically as you go.</p>' +
+          '<a class="btn-link" href="https://www.instagram.com/" target="_blank" rel="noopener">Open Instagram</a>' +
+        '</div>';
+    }
     if (viewerPlaceholder) {
       viewerPlaceholder.style.display = "flex";
       viewerPlaceholder.innerHTML = "Select an item to preview";
@@ -911,6 +1052,9 @@ document.getElementById("clear")?.addEventListener("click", function() {
   // Stop any in-flight playback/slideshow and unwire the viewer from the
   // about-to-be-deleted item before storage commits.
   resetViewer();
+  // A lingering search query against empty data shows "Showing 0 of 0" —
+  // reset it so the user sees a clean "nothing captured yet" state.
+  setSearchQuery("");
 
   chrome.storage.local.set({
     igExporterData: { images: [], videos: [] }
@@ -1010,6 +1154,38 @@ if (versionEl) {
     versionEl.textContent = "v" + chrome.runtime.getManifest().version;
   } catch (e) {}
 }
+
+// Search input wiring — debounced live filter on caption / owner / hashtags.
+(function wireSearch() {
+  var input = document.getElementById("search-input");
+  var clearBtn = document.getElementById("search-clear");
+  if (!input) return;
+
+  var debounceTimer = null;
+  input.addEventListener("input", function () {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function () {
+      setSearchQuery(input.value);
+    }, 150);
+  });
+  // Esc clears immediately (no debounce) without leaving the input
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && input.value) {
+      e.stopPropagation();
+      if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+      setSearchQuery("");
+      input.focus();
+    }
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", function () {
+      if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+      setSearchQuery("");
+      input.focus();
+    });
+  }
+})();
 
 // Initialize
 loadData();
