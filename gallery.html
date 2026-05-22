@@ -647,92 +647,232 @@
       padding: 2px 6px;
       border-radius: var(--radius-sm);
     }
-    .carousel-badge {
+    /* Carousel indicator — Instagram's own album glyph in a glassmorphic
+       chip. The chip blurs whatever's behind it so the icon reads on any
+       photo (light/dark/busy) without looking like a flat sticker. */
+    .carousel-indicator {
       position: absolute;
-      top: 6px;
-      left: 6px;
-      background: rgba(0, 0, 0, 0.75);
-      color: var(--text-primary);
-      font-size: 10px;
-      padding: 3px 8px;
-      border-radius: var(--radius-pill);
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      border: none;
-      cursor: pointer;
+      top: 8px;
+      right: 8px;
       z-index: 3;
-      transition: background-color var(--t-fast), transform var(--t-fast);
+      /* Tic-tac proportions: ~52 × 24, ratio ~2.1. The wider horizontal
+         padding keeps single-digit counts from collapsing into a circle. */
+      padding: 5px 13px 5px 11px;
+      min-width: 46px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: rgba(20, 20, 30, 0.55);
+      backdrop-filter: blur(10px) saturate(160%);
+      -webkit-backdrop-filter: blur(10px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: var(--radius-pill);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.40),
+        0 1px 0 rgba(255, 255, 255, 0.08) inset;
+      transition:
+        background-color var(--t-fast),
+        border-color var(--t-fast),
+        transform var(--t-fast),
+        box-shadow var(--t-base);
     }
-    .carousel-badge:hover {
-      background: var(--ig-pink);
-      transform: scale(1.05);
+    .carousel-indicator:hover {
+      background: rgba(225, 48, 108, 0.55);  /* brand-pink wash on hover */
+      border-color: rgba(255, 255, 255, 0.22);
+      transform: scale(1.06);
+      box-shadow:
+        0 4px 14px rgba(225, 48, 108, 0.40),
+        0 1px 0 rgba(255, 255, 255, 0.12) inset;
     }
-    .card.carousel-expanded .carousel-badge {
-      background: var(--ig-pink);
+    .carousel-indicator:active {
+      transform: scale(1.02);
+    }
+    .carousel-indicator .ci-icon {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    /* Safari < 18 / very old Chromium fallback: backdrop-filter not supported
+       → fall back to a stronger solid dark so the icon still reads. */
+    @supports not (backdrop-filter: blur(1px)) {
+      .carousel-indicator {
+        background: rgba(0, 0, 0, 0.72);
+      }
+    }
+    .card.carousel-expanded .carousel-indicator {
+      display: none;
     }
 
-    /* Expanded carousel — card breaks out of its 1-column footprint and
-       shows all album slides in a horizontal scroller below the cover. */
+    /* ---- Expanded carousel drawer ----------------------------------------
+       Card breaks its 1-column footprint and lays out as:
+         [ cover hero (180px) ] [ slide drawer (flex) ]
+       The cover stays visible to preserve continuity — the user clicked an
+       album, and they should keep seeing that album's identity. The drawer
+       slides in from the right with an Apple-style ease. */
     .card.carousel-expanded {
       grid-column: 1 / -1;
       aspect-ratio: auto;
+      height: 220px;
+      display: flex;
+      align-items: stretch;
       cursor: default;
-      transform: none;
+      border-color: var(--glass-border);
       box-shadow:
-        0 0 0 2px var(--ig-pink),
-        0 0 32px rgba(225, 48, 108, 0.30),
-        0 12px 32px rgba(0, 0, 0, 0.45);
-      animation: carousel-expand 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        0 0 0 1px rgba(225, 48, 108, 0.45),
+        0 24px 60px rgba(0, 0, 0, 0.50);
+      transform: none;
+      transition:
+        box-shadow var(--t-base),
+        border-color var(--t-base);
     }
     .card.carousel-expanded:hover {
       transform: none;
     }
-    @keyframes carousel-expand {
-      from { opacity: 0.6; transform: scaleY(0.9); transform-origin: top; }
-      to   { opacity: 1;   transform: scaleY(1); }
+    /* Cover stays visible as a hero on the left */
+    .card.carousel-expanded > .thumb {
+      width: 220px;
+      height: 100%;
+      flex-shrink: 0;
+      border-right: 1px solid var(--glass-border);
     }
-    /* Hide the cover thumb when expanded; the strip takes over the visual */
-    .card.carousel-expanded > .thumb,
+    /* Meta overlay irrelevant in expanded state */
     .card.carousel-expanded > .meta-overlay {
       display: none;
     }
-    /* Horizontal slide strip inside the expanded card */
+    /* The drawer that holds the slide strip */
+    .carousel-drawer {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-3) var(--space-3) var(--space-2);
+      background:
+        linear-gradient(to right, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.15) 30%, transparent 60%),
+        var(--glass-bg);
+      animation: drawer-open 360ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes drawer-open {
+      from { opacity: 0; transform: translateX(8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    /* Close animation — slightly shorter than enter but not snappy. A gentle
+       ease (cubic-bezier 0.4, 0, 0.6, 1) keeps it deliberate; the larger
+       translate makes the drawer feel like it's gliding off, not vanishing. */
+    .carousel-drawer.is-closing {
+      animation: drawer-close 320ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
+      pointer-events: none;  /* lock interactions during the fadeout */
+    }
+    @keyframes drawer-close {
+      from { opacity: 1; transform: translateX(0) scale(1); }
+      to   { opacity: 0; transform: translateX(22px) scale(0.97); }
+    }
+    .carousel-drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-2);
+      padding: 0 var(--space-1);
+    }
+    .carousel-drawer-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+    .carousel-drawer-title strong {
+      color: var(--text-primary);
+      font-weight: 700;
+      margin-right: 4px;
+    }
+    .carousel-drawer-close {
+      width: 28px;
+      height: 28px;
+      min-height: 0;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid var(--border-1);
+      background: var(--surface-1);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color var(--t-fast), color var(--t-fast);
+    }
+    .carousel-drawer-close:hover {
+      background: var(--surface-2);
+      color: var(--text-primary);
+    }
+    .carousel-drawer-close .icon {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* The horizontal slide strip */
     .carousel-strip {
+      flex: 1;
       display: flex;
       gap: var(--space-2);
-      padding: var(--space-3);
       overflow-x: auto;
       overflow-y: hidden;
       scroll-behavior: smooth;
+      scroll-snap-type: x proximity;
       scrollbar-width: thin;
-      scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+      scrollbar-color: rgba(255, 255, 255, 0.20) transparent;
+      padding: 2px 2px 8px;
     }
-    .carousel-strip::-webkit-scrollbar {
-      height: 8px;
-    }
+    .carousel-strip::-webkit-scrollbar { height: 6px; }
+    .carousel-strip::-webkit-scrollbar-track { background: transparent; }
     .carousel-strip::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.20);
+      background: rgba(225, 48, 108, 0.35);
       border-radius: var(--radius-pill);
+    }
+    .carousel-strip::-webkit-scrollbar-thumb:hover {
+      background: rgba(225, 48, 108, 0.55);
     }
     .carousel-strip-slide {
       flex: 0 0 auto;
-      width: 160px;
-      height: 160px;
+      width: 140px;
+      height: 140px;
       padding: 0;
-      border: 2px solid transparent;
+      border: 1px solid var(--glass-border);
       border-radius: var(--radius-md);
       overflow: hidden;
       background: var(--surface-2);
       cursor: pointer;
+      scroll-snap-align: start;
+      isolation: isolate;
       transition:
-        border-color var(--t-fast),
         transform var(--t-spring),
+        border-color var(--t-base),
         box-shadow var(--t-base);
+      /* Per-slide stagger — JS sets the --i custom prop for the delay. */
+      animation: slide-in 360ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+      animation-delay: calc(var(--i, 0) * 45ms + 80ms);
+    }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateX(20px) scale(0.96); }
+      to   { opacity: 1; transform: translateX(0) scale(1); }
     }
     .carousel-strip-slide:hover {
-      transform: translateY(-2px) scale(1.03);
-      border-color: rgba(225, 48, 108, 0.40);
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.40);
+      transform: translateY(-2px) scale(1.04);
+      border-color: rgba(225, 48, 108, 0.45);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+      z-index: 2;
     }
     .carousel-strip-slide.active {
       border-color: var(--selected);
@@ -952,6 +1092,11 @@
     </symbol>
     <symbol id="i-play" viewBox="0 0 24 24">
       <path d="M5 3l14 9-14 9V3z" fill="currentColor"/>
+    </symbol>
+    <!-- Two offset rounded squares — Instagram's own album glyph. -->
+    <symbol id="i-stack" viewBox="0 0 24 24">
+      <rect x="7" y="3" width="14" height="14" rx="2.5"/>
+      <path d="M16 17v2.5A1.5 1.5 0 0 1 14.5 21h-11A1.5 1.5 0 0 1 2 19.5v-11A1.5 1.5 0 0 1 3.5 7H7"/>
     </symbol>
   </svg>
 

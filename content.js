@@ -13,6 +13,85 @@
   console.log('[IG Exporter] Content script loaded');
 
   // ============================================
+  // EXTENSION CONTEXT GUARDS
+  // ============================================
+  // In MV3, a content script can outlive the extension's service worker
+  // (eviction, update, manual reload). Once that happens every chrome.*
+  // call throws "Extension context invalidated". We wrap our chrome.*
+  // usage so the page-side capture loop survives the disconnect quietly,
+  // surfaces a single user-visible status, and stops retrying.
+
+  let extensionContextLost = false;
+
+  function isExtensionContextOk() {
+    try {
+      return !!(chrome && chrome.runtime && chrome.runtime.id);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function noteContextLoss(where) {
+    if (extensionContextLost) return;
+    extensionContextLost = true;
+    console.warn('[IG Exporter] Extension context invalidated at ' + where +
+      '. Refresh this Instagram tab to resume capturing.');
+    // setStatus is defined later in this IIFE; it always exists by the time
+    // a chrome.* call could fail at runtime, but guard anyway.
+    try {
+      if (typeof setStatus === 'function') {
+        setStatus('Extension was reloaded — refresh this tab to resume');
+      }
+    } catch (_) {}
+  }
+
+  function safeStorageSet(items, cb) {
+    if (!isExtensionContextOk()) { noteContextLoss('storage.set'); return; }
+    try {
+      chrome.storage.local.set(items, function () {
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            const msg = chrome.runtime.lastError.message || 'unknown';
+            if (/context invalidated|Receiving end does not exist/i.test(msg)) {
+              noteContextLoss('storage.set (lastError)');
+            } else {
+              console.error('[IG Exporter] Storage error:', msg);
+            }
+            return;
+          }
+          if (cb) cb();
+        } catch (_) { noteContextLoss('storage.set (callback)'); }
+      });
+    } catch (_) { noteContextLoss('storage.set (throw)'); }
+  }
+
+  function safeStorageGet(keys, cb) {
+    if (!isExtensionContextOk()) { noteContextLoss('storage.get'); return; }
+    try {
+      chrome.storage.local.get(keys, function (result) {
+        try { if (cb) cb(result || {}); }
+        catch (_) { noteContextLoss('storage.get (callback)'); }
+      });
+    } catch (_) { noteContextLoss('storage.get (throw)'); }
+  }
+
+  function safeSendMessage(msg, cb) {
+    if (!isExtensionContextOk()) { noteContextLoss('sendMessage'); return; }
+    try {
+      chrome.runtime.sendMessage(msg, function (response) {
+        try {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            // sendMessage commonly errors when no receiver is listening; we
+            // intentionally don't treat that as context loss.
+            void chrome.runtime.lastError;
+          }
+          if (cb) cb(response);
+        } catch (_) { noteContextLoss('sendMessage (callback)'); }
+      });
+    } catch (_) { noteContextLoss('sendMessage (throw)'); }
+  }
+
+  // ============================================
   // LISTEN FOR MEDIA FROM INJECTOR (runs in MAIN world)
   // ============================================
   
@@ -1463,7 +1542,7 @@
     };
     
     panel.querySelector('#ig-exp-gallery').onclick = () => {
-      chrome.runtime.sendMessage({ type: 'OPEN_GALLERY' });
+      safeSendMessage({ type: 'OPEN_GALLERY' });
     };
     
     panel.querySelector('#ig-exp-clear').onclick = () => {
@@ -1513,23 +1592,18 @@
   // ============================================
 
   function saveToStorage() {
+    if (extensionContextLost) return;  // give up quietly once we know
     const data = {
       images: state.images,
       videos: state.videos
     };
-
-    chrome.storage.local.set({ igExporterData: data }, () => {
-      if (chrome.runtime.lastError) {
-        console.error('[IG Exporter] Storage error:', chrome.runtime.lastError.message);
-        setStatus('Storage error - try clearing some data');
-      } else {
-        console.log('[IG Exporter] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
-      }
+    safeStorageSet({ igExporterData: data }, function () {
+      console.log('[IG Exporter] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
     });
   }
 
   function loadFromStorage() {
-    chrome.storage.local.get(['igExporterData'], (result) => {
+    safeStorageGet(['igExporterData'], (result) => {
       if (result.igExporterData) {
         state.images = result.igExporterData.images || [];
         state.videos = result.igExporterData.videos || [];
@@ -1629,7 +1703,7 @@
         state.seenUrls.clear();
         state.capturedShortcodes.clear();
         updatePanel();
-        chrome.storage.local.set({
+        safeStorageSet({
           igExporterData: { images: [], videos: [] },
           imageUrls: [],
           videoUrls: []
@@ -1683,7 +1757,10 @@
   if (typeof globalThis !== 'undefined' && globalThis.__IG_EXPORTER_TEST_HOOKS__) {
     globalThis.__IG_EXPORTER_TEST_HOOKS__.content = {
       extractHashtags, contextToOptions, buildItem, normalizeUrl,
-      addImage, addVideo, state
+      addImage, addVideo, state,
+      isExtensionContextOk, safeStorageSet, safeStorageGet, safeSendMessage,
+      // expose the flag indirectly via a getter so tests can assert state
+      get extensionContextLost() { return extensionContextLost; }
     };
   }
 

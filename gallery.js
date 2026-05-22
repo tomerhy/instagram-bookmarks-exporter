@@ -227,6 +227,8 @@ function getCarouselSlides(item) {
 
 // Build the markup for the horizontal slide strip. Pure-ish: takes an array
 // of slide items and returns an HTMLElement. No globals touched.
+// Each slide gets a --i CSS custom property which the strip's keyframes use
+// to stagger the slide-in animation (slide 0 fires first, slide 5 fires last).
 function buildCarouselStrip(slides) {
   var strip = document.createElement("div");
   strip.className = "carousel-strip";
@@ -241,6 +243,9 @@ function buildCarouselStrip(slides) {
     slideEl.setAttribute("role", "listitem");
     slideEl.setAttribute("aria-label", "Slide " + (i + 1) + " of " + slides.length);
     slideEl.setAttribute("data-slide-index", i);
+    // Stagger index for the keyframe delay (capped so a 50-slide album
+    // doesn't take 2.5 seconds to settle).
+    if (slideEl.style) slideEl.style.setProperty("--i", String(Math.min(i, 10)));
     var img = document.createElement("img");
     img.src = thumbUrl;
     img.loading = "lazy";
@@ -251,20 +256,51 @@ function buildCarouselStrip(slides) {
   return strip;
 }
 
-function collapseCarousel() {
+// Animated by default. Pass { instant: true } when snapping closed is the
+// right UX (Clear All, tab switch, opening a different album mid-flight).
+function collapseCarousel(opts) {
   if (!expandedCard) return;
-  expandedCard.classList.remove("carousel-expanded");
-  expandedCard.setAttribute("aria-expanded", "false");
-  var strip = expandedCard.querySelector(".carousel-strip");
-  if (strip) strip.remove();
+  var instant = !!(opts && opts.instant);
+  var card = expandedCard;
+  // Free the slot immediately so a re-expand on the same card during the
+  // close animation can race in without false "already expanded" guards.
   expandedCard = null;
+
+  var drawer = card.querySelector(".carousel-drawer:not(.is-closing)");
+
+  function finishClose() {
+    if (drawer && drawer.parentNode) drawer.remove();
+    // Belt-and-braces: drop any stray bare strip too (defensive).
+    var stray = card.querySelector(".carousel-strip");
+    if (stray) stray.remove();
+    // Only collapse the card if no new expansion has reclaimed it.
+    if (expandedCard !== card) {
+      card.classList.remove("carousel-expanded");
+      card.setAttribute("aria-expanded", "false");
+    }
+  }
+
+  if (instant || !drawer) {
+    finishClose();
+    return;
+  }
+
+  drawer.classList.add("is-closing");
+  var done = false;
+  function once() { if (!done) { done = true; finishClose(); } }
+  drawer.addEventListener("animationend", once, { once: true });
+  // Fallback if animationend never fires — e.g. prefers-reduced-motion
+  // collapses transitions to 0.01ms and may not always emit the event.
+  // Slightly longer than the CSS animation (320ms) to avoid finalizing early.
+  setTimeout(once, 420);
 }
 
 function expandCarousel(card, item) {
-  // Only one expanded at a time — collapse any predecessor.
-  if (expandedCard && expandedCard !== card) collapseCarousel();
+  // Only one expanded at a time — snap the predecessor closed so the new
+  // album's enter animation doesn't fight the old one's exit.
+  if (expandedCard && expandedCard !== card) collapseCarousel({ instant: true });
 
-  // Toggle off if it's already expanded
+  // Toggle off if it's already expanded — let this one animate out.
   if (expandedCard === card) {
     collapseCarousel();
     return;
@@ -273,10 +309,34 @@ function expandCarousel(card, item) {
   var slides = getCarouselSlides(item);
   if (!slides.length) return;
 
+  // Build the drawer: header with album count + close, then the strip.
+  var drawer = document.createElement("div");
+  drawer.className = "carousel-drawer";
+
+  var header = document.createElement("div");
+  header.className = "carousel-drawer-header";
+  header.innerHTML =
+    '<span class="carousel-drawer-title">' +
+      '<strong>' + slides.length + '</strong> slides' +
+    '</span>';
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "carousel-drawer-close";
+  closeBtn.setAttribute("aria-label", "Collapse album");
+  closeBtn.title = "Close";
+  closeBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>';
+  closeBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    collapseCarousel();
+  });
+  header.appendChild(closeBtn);
+  drawer.appendChild(header);
+
   var strip = buildCarouselStrip(slides);
-  // Clicking a slide thumb shows it in the viewer (each slide is itself an
-  // individual item with its own url/metadata).
-  strip.addEventListener("click", function(e) {
+  drawer.appendChild(strip);
+
+  // Clicking a slide thumb previews it in the viewer.
+  drawer.addEventListener("click", function (e) {
     var btn = e.target.closest(".carousel-strip-slide");
     if (!btn) return;
     e.stopPropagation();
@@ -288,12 +348,12 @@ function expandCarousel(card, item) {
     } else {
       showImage(slide);
     }
-    // Mark the chosen slide as visually active within the strip
     var prev = strip.querySelector(".carousel-strip-slide.active");
     if (prev) prev.classList.remove("active");
     btn.classList.add("active");
   });
-  card.appendChild(strip);
+
+  card.appendChild(drawer);
   card.classList.add("carousel-expanded");
   card.setAttribute("aria-expanded", "true");
   expandedCard = card;
@@ -325,7 +385,8 @@ function resetViewer() {
     meta.innerHTML = "";
   }
   if (typeof stopSlideshow === "function") stopSlideshow();
-  if (typeof collapseCarousel === "function") collapseCarousel();
+  // Clearing data is a hard reset; snap the carousel closed, don't animate.
+  if (typeof collapseCarousel === "function") collapseCarousel({ instant: true });
   currentItem = null;
   selectedCard = null;
 }
@@ -486,12 +547,14 @@ function renderGrid() {
       card.appendChild(img);
     }
 
-    // Carousel size badge — interactive: click expands the card inline into
-    // a horizontal scroller of all slides.
+    // Carousel indicator — Instagram's own two-square glyph + count, no pill
+    // background. Click expands the card into a horizontal slide drawer.
     if (item.carouselSize && item.carouselSize > 1) {
       var carBadge = document.createElement("button");
-      carBadge.className = "carousel-badge";
-      carBadge.textContent = "📷 " + item.carouselSize;
+      carBadge.className = "carousel-indicator";
+      carBadge.innerHTML =
+        '<span class="ci-count">' + item.carouselSize + '</span>' +
+        '<svg class="ci-icon" aria-hidden="true"><use href="#i-stack"/></svg>';
       carBadge.setAttribute("aria-label",
         "Show all " + item.carouselSize + " album slides");
       carBadge.setAttribute("aria-expanded", "false");
@@ -720,7 +783,8 @@ document.querySelectorAll(".tab").forEach(function(tab) {
     currentPage = 1;
     currentItem = null;
     selectedCard = null;
-    collapseCarousel();
+    // Tab switch wipes the grid — instant close is the right feel.
+    collapseCarousel({ instant: true });
     renderGrid();
     updateButtonLabels();
     

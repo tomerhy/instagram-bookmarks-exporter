@@ -27,7 +27,15 @@ function mockEl(tag) {
     parentNode: null,
     _attrs: {},
     _events: {},
-    style: {},
+    style: (function () {
+      const props = {};
+      return {
+        _props: props,
+        setProperty(k, v) { props[k] = String(v); },
+        getPropertyValue(k) { return props[k] || ''; },
+        removeProperty(k) { delete props[k]; }
+      };
+    })(),
     src: '',
     alt: '',
     loading: '',
@@ -53,19 +61,40 @@ function mockEl(tag) {
       if (i >= 0) this.children.splice(i, 1);
       return c;
     },
-    addEventListener(ev, fn) { (this._events[ev] = this._events[ev] || []).push(fn); },
-    removeEventListener() {},
-    dispatchEvent() {},
+    addEventListener(ev, fn, opts) {
+      (this._events[ev] = this._events[ev] || []).push({ fn, opts: opts || {} });
+    },
+    removeEventListener(ev, fn) {
+      if (!this._events[ev]) return;
+      this._events[ev] = this._events[ev].filter(l => l.fn !== fn);
+    },
+    // Fire all listeners for `name` (string or event-like). Honors `{once:true}`.
+    dispatchEvent(name) {
+      const evName = typeof name === 'string' ? name : (name && name.type);
+      const listeners = this._events[evName] || [];
+      const survivors = [];
+      for (const { fn, opts } of listeners) {
+        try { fn({ type: evName, target: this }); } catch (_) {}
+        if (!opts || !opts.once) survivors.push({ fn, opts });
+      }
+      this._events[evName] = survivors;
+    },
     remove() {
       if (this.parentNode) this.parentNode.removeChild(this);
     },
     querySelector(sel) {
-      const m = sel.match(/^\.(.+)$/);
+      // Supports: ".class" and ".class:not(.other)" — enough for our needs.
+      const m = sel.match(/^\.([\w-]+)(?::not\(\.([\w-]+)\))?$/);
       if (!m) return null;
       const cls = m[1];
+      const not = m[2];
       function find(node) {
         for (const c of (node.children || [])) {
-          if (c.classList && c.classList.contains && c.classList.contains(cls)) return c;
+          if (c.classList && c.classList.contains &&
+              c.classList.contains(cls) &&
+              (!not || !c.classList.contains(not))) {
+            return c;
+          }
           const sub = find(c);
           if (sub) return sub;
         }
@@ -164,17 +193,30 @@ test('expandCarousel: sets the carousel-expanded class and tracks the global', (
   assert.equal(g.expandedCard, card, 'expandedCard global should track the open card');
 });
 
-test('expandCarousel: clicking the same card again collapses it', () => {
+test('expandCarousel: clicking the same card again triggers an animated close', () => {
   const g = loadGallery();
   const card = mockEl();
   const item = { _carouselSlides: [{ url: 'a.jpg' }] };
 
   g.expandCarousel(card, item);
-  g.expandCarousel(card, item);
+  const drawer = card.querySelector('.carousel-drawer');
+  g.expandCarousel(card, item);  // toggle off
+
+  // expandedCard is nulled immediately so a re-expand can race in.
+  assert.equal(g.expandedCard, null);
+  // The drawer is mid-animation, not yet removed.
+  assert.equal(drawer.classList.contains('is-closing'), true,
+    'toggle close should set is-closing for the keyframe to play');
+  assert.equal(card.classList.contains('carousel-expanded'), true,
+    'card stays in expanded layout while the drawer animates out');
+
+  // Simulate the animation completing → finalize fires
+  drawer.dispatchEvent('animationend');
 
   assert.equal(card.classList.contains('carousel-expanded'), false,
-    'second expand call should toggle off');
-  assert.equal(g.expandedCard, null);
+    'after animationend, card collapses back to its grid slot');
+  assert.equal(card.querySelector('.carousel-drawer'), null,
+    'after animationend, drawer DOM is removed');
 });
 
 test('expandCarousel: opening another card collapses the previous one (invariant)', () => {
@@ -206,29 +248,85 @@ test('expandCarousel: refuses to open a non-album item (no slides → no-op)', (
   assert.equal(g.expandedCard, null);
 });
 
-test('collapseCarousel: removes the strip from the card and clears the global', () => {
+test('collapseCarousel({ instant: true }): synchronous full cleanup, no animation', () => {
   const g = loadGallery();
   const card = mockEl();
   const item = { _carouselSlides: [{ url: 'a.jpg' }, { url: 'b.jpg' }] };
 
   g.expandCarousel(card, item);
-  // The strip should be a child of the card now.
   const strip = card.querySelector('.carousel-strip');
   assert.ok(strip, 'expand should append a .carousel-strip child');
 
-  g.collapseCarousel();
+  g.collapseCarousel({ instant: true });
 
   assert.equal(card.classList.contains('carousel-expanded'), false);
   assert.equal(card.getAttribute('aria-expanded'), 'false');
   assert.equal(card.querySelector('.carousel-strip'), null,
-    'collapse should remove the strip from the DOM');
+    'instant collapse removes the strip immediately');
+  assert.equal(card.querySelector('.carousel-drawer'), null,
+    'instant collapse removes the drawer immediately');
   assert.equal(g.expandedCard, null);
+});
+
+test('collapseCarousel: animated by default — drawer fades out before removal', () => {
+  const g = loadGallery();
+  const card = mockEl();
+  const item = { _carouselSlides: [{ url: 'a.jpg' }] };
+  g.expandCarousel(card, item);
+  const drawer = card.querySelector('.carousel-drawer');
+
+  g.collapseCarousel();  // animated
+
+  // expandedCard cleared right away; DOM cleanup deferred to animationend
+  assert.equal(g.expandedCard, null,
+    'global is freed immediately so a re-expand can race in');
+  assert.equal(drawer.classList.contains('is-closing'), true,
+    'is-closing class triggers the drawer-close keyframe');
+  assert.equal(card.classList.contains('carousel-expanded'), true,
+    'card stays in expanded layout while drawer animates out');
+  assert.ok(card.querySelector('.carousel-drawer'),
+    'drawer is still in the DOM during the close animation');
+
+  drawer.dispatchEvent('animationend');
+
+  assert.equal(card.classList.contains('carousel-expanded'), false);
+  assert.equal(card.querySelector('.carousel-drawer'), null);
 });
 
 test('collapseCarousel: safe to call when nothing is expanded (defensive)', () => {
   const g = loadGallery();
   assert.doesNotThrow(() => g.collapseCarousel(),
     'no-op when expandedCard is null');
+});
+
+// ---------- Drawer structure (the redesigned shell, v4.3.8) ----------
+
+test('expandCarousel: wraps the strip in a .carousel-drawer with a header + close button', () => {
+  const g = loadGallery();
+  const card = mockEl();
+  const item = { _carouselSlides: [{ url: 'a.jpg' }, { url: 'b.jpg' }, { url: 'c.jpg' }] };
+  g.expandCarousel(card, item);
+
+  const drawer = card.querySelector('.carousel-drawer');
+  assert.ok(drawer, 'a .carousel-drawer wrapper should be appended');
+  assert.ok(drawer.querySelector('.carousel-drawer-header'),
+    'drawer should include a header (count + close)');
+  assert.ok(drawer.querySelector('.carousel-drawer-close'),
+    'drawer should include a close button');
+  assert.ok(drawer.querySelector('.carousel-strip'),
+    'drawer should still contain the slide strip');
+});
+
+test('buildCarouselStrip: each slide sets a --i CSS var for stagger', () => {
+  const g = loadGallery();
+  const slides = [{ url: 'a.jpg' }, { url: 'b.jpg' }, { url: 'c.jpg' }];
+  const strip = g.buildCarouselStrip(slides);
+  // The mock style records setProperty calls; verify each slide got an --i.
+  for (let i = 0; i < strip.children.length; i++) {
+    const propValue = strip.children[i].style._props['--i'];
+    assert.equal(propValue, String(i),
+      'slide ' + i + ' should set --i=' + i + ' for the stagger delay');
+  }
 });
 
 // ---------- Interaction with resetViewer ----------
