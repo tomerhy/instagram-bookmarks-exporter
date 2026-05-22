@@ -210,6 +210,36 @@ function updateCounts() {
   }
 }
 
+// Reset the viewer back to "nothing selected". Called when data is cleared
+// so the previously-displayed video doesn't keep playing in the background
+// and the metadata strip doesn't linger pointing at a deleted item.
+function resetViewer() {
+  if (player) {
+    try { player.pause(); } catch (_) {}
+    player.removeAttribute("src");
+    player.src = "";
+    try { player.load(); } catch (_) {}
+    player.style.display = "none";
+  }
+  if (imageViewer) {
+    imageViewer.removeAttribute("src");
+    imageViewer.src = "";
+    imageViewer.style.display = "none";
+  }
+  if (viewerPlaceholder) {
+    viewerPlaceholder.style.display = "flex";
+    viewerPlaceholder.innerHTML = "Select an item to preview";
+  }
+  var meta = document.getElementById("viewer-meta");
+  if (meta) {
+    meta.classList.remove("visible");
+    meta.innerHTML = "";
+  }
+  if (typeof stopSlideshow === "function") stopSlideshow();
+  currentItem = null;
+  selectedCard = null;
+}
+
 // Show image in viewer
 function showImage(item) {
   var url = getUrl(item);
@@ -626,18 +656,27 @@ document.getElementById("export")?.addEventListener("click", function() {
 });
 
 document.getElementById("clear")?.addEventListener("click", function() {
+  // Destructive + irreversible — confirm first.
+  if (!confirm("Delete all captured images and videos? This cannot be undone.")) {
+    return;
+  }
+
   // Track before clearing
   if (window.Analytics) {
     Analytics.trackButtonClick('clear_all', 'gallery');
-    Analytics.trackFeature('clear_data', { 
-      images_cleared: allMedia.images.length, 
-      videos_cleared: allMedia.videos.length 
+    Analytics.trackFeature('clear_data', {
+      images_cleared: allMedia.images.length,
+      videos_cleared: allMedia.videos.length
     });
   }
-  
+
   allMedia.images = [];
   allMedia.videos = [];
-  
+
+  // Stop any in-flight playback/slideshow and unwire the viewer from the
+  // about-to-be-deleted item before storage commits.
+  resetViewer();
+
   chrome.storage.local.set({
     igExporterData: { images: [], videos: [] }
   }, function() {
