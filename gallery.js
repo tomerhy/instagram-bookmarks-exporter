@@ -21,6 +21,9 @@ var currentPage = 1;
 var allMedia = { images: [], videos: [] };
 var currentItem = null;
 var selectedCard = null;
+// At most one carousel can be expanded at a time. Tracking the DOM node lets
+// us collapse the previous one before expanding a new one.
+var expandedCard = null;
 
 // Debug
 function logDebug(msg) {
@@ -210,6 +213,92 @@ function updateCounts() {
   }
 }
 
+// ----------------------------------------------------------------------------
+// Carousel inline expansion — clicking the album badge on a card opens an
+// in-grid horizontal strip of all its slides without leaving the gallery.
+// ----------------------------------------------------------------------------
+
+// Safely read the carousel slide list off a grouped item. Returns [] when the
+// item isn't an album, which is the convenient empty-iterate case.
+function getCarouselSlides(item) {
+  if (!item || !item._carouselSlides) return [];
+  return item._carouselSlides;
+}
+
+// Build the markup for the horizontal slide strip. Pure-ish: takes an array
+// of slide items and returns an HTMLElement. No globals touched.
+function buildCarouselStrip(slides) {
+  var strip = document.createElement("div");
+  strip.className = "carousel-strip";
+  strip.setAttribute("role", "list");
+  strip.setAttribute("aria-label", "Album slides");
+
+  for (var i = 0; i < slides.length; i++) {
+    var slide = slides[i];
+    var thumbUrl = (slide && (slide.thumbnail || slide.url)) || "";
+    var slideEl = document.createElement("button");
+    slideEl.className = "carousel-strip-slide";
+    slideEl.setAttribute("role", "listitem");
+    slideEl.setAttribute("aria-label", "Slide " + (i + 1) + " of " + slides.length);
+    slideEl.setAttribute("data-slide-index", i);
+    var img = document.createElement("img");
+    img.src = thumbUrl;
+    img.loading = "lazy";
+    img.alt = "";
+    slideEl.appendChild(img);
+    strip.appendChild(slideEl);
+  }
+  return strip;
+}
+
+function collapseCarousel() {
+  if (!expandedCard) return;
+  expandedCard.classList.remove("carousel-expanded");
+  expandedCard.setAttribute("aria-expanded", "false");
+  var strip = expandedCard.querySelector(".carousel-strip");
+  if (strip) strip.remove();
+  expandedCard = null;
+}
+
+function expandCarousel(card, item) {
+  // Only one expanded at a time — collapse any predecessor.
+  if (expandedCard && expandedCard !== card) collapseCarousel();
+
+  // Toggle off if it's already expanded
+  if (expandedCard === card) {
+    collapseCarousel();
+    return;
+  }
+
+  var slides = getCarouselSlides(item);
+  if (!slides.length) return;
+
+  var strip = buildCarouselStrip(slides);
+  // Clicking a slide thumb shows it in the viewer (each slide is itself an
+  // individual item with its own url/metadata).
+  strip.addEventListener("click", function(e) {
+    var btn = e.target.closest(".carousel-strip-slide");
+    if (!btn) return;
+    e.stopPropagation();
+    var idx = parseInt(btn.getAttribute("data-slide-index"), 10);
+    var slide = slides[idx];
+    if (!slide) return;
+    if (currentTab === "videos") {
+      showVideo(slide);
+    } else {
+      showImage(slide);
+    }
+    // Mark the chosen slide as visually active within the strip
+    var prev = strip.querySelector(".carousel-strip-slide.active");
+    if (prev) prev.classList.remove("active");
+    btn.classList.add("active");
+  });
+  card.appendChild(strip);
+  card.classList.add("carousel-expanded");
+  card.setAttribute("aria-expanded", "true");
+  expandedCard = card;
+}
+
 // Reset the viewer back to "nothing selected". Called when data is cleared
 // so the previously-displayed video doesn't keep playing in the background
 // and the metadata strip doesn't linger pointing at a deleted item.
@@ -236,6 +325,7 @@ function resetViewer() {
     meta.innerHTML = "";
   }
   if (typeof stopSlideshow === "function") stopSlideshow();
+  if (typeof collapseCarousel === "function") collapseCarousel();
   currentItem = null;
   selectedCard = null;
 }
@@ -396,12 +486,23 @@ function renderGrid() {
       card.appendChild(img);
     }
 
-    // Carousel size badge (only for grouped posts with >1 slide)
+    // Carousel size badge — interactive: click expands the card inline into
+    // a horizontal scroller of all slides.
     if (item.carouselSize && item.carouselSize > 1) {
-      var carBadge = document.createElement("div");
+      var carBadge = document.createElement("button");
       carBadge.className = "carousel-badge";
       carBadge.textContent = "📷 " + item.carouselSize;
-      carBadge.title = "Album: " + item.carouselSize + " slides";
+      carBadge.setAttribute("aria-label",
+        "Show all " + item.carouselSize + " album slides");
+      carBadge.setAttribute("aria-expanded", "false");
+      carBadge.title = "Show all " + item.carouselSize + " slides";
+      carBadge.addEventListener("click", function(e) {
+        // Don't trigger the card's own click (which would just select it).
+        e.stopPropagation();
+        expandCarousel(card, item);
+        carBadge.setAttribute("aria-expanded",
+          card.classList.contains("carousel-expanded") ? "true" : "false");
+      });
       card.appendChild(carBadge);
     }
 
@@ -619,6 +720,7 @@ document.querySelectorAll(".tab").forEach(function(tab) {
     currentPage = 1;
     currentItem = null;
     selectedCard = null;
+    collapseCarousel();
     renderGrid();
     updateButtonLabels();
     
@@ -1117,14 +1219,30 @@ document.getElementById("fs-slide-stop")?.addEventListener("click", stopSlidesho
 
 // Keyboard navigation in fullscreen
 document.addEventListener("keydown", function(e) {
+  // Esc collapses an expanded carousel (when fullscreen isn't already eating it)
+  if (e.key === "Escape" &&
+      (!fullscreenOverlay || !fullscreenOverlay.classList.contains("visible")) &&
+      expandedCard) {
+    collapseCarousel();
+    return;
+  }
   if (!fullscreenOverlay || !fullscreenOverlay.classList.contains("visible")) return;
-  
+
   if (e.key === "Escape") {
     closeFullscreen();
   } else if (e.key === "ArrowRight" || e.key === " ") {
     fullscreenNextItem();
   } else if (e.key === "ArrowLeft") {
     fullscreenPrevItem();
+  }
+});
+
+// Click outside any expanded card → collapse. Use the grid as the scope so we
+// don't collapse on clicks in the viewer panel or actions.
+document.getElementById("grid")?.addEventListener("click", function(e) {
+  if (!expandedCard) return;
+  if (!expandedCard.contains(e.target)) {
+    collapseCarousel();
   }
 });
 
