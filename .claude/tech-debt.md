@@ -134,11 +134,9 @@ Both files now share a near-identical `:root` block — `--ig-pink`, `--selected
 
 - **Effort**: **S**. Risk: low — both surfaces are extension pages, no MV3 CSP issues. Worth doing once a third surface ever needs the same tokens.
 
-### 13b. Popup buttons still use emoji icons while the gallery uses inline SVGs — **inconsistency from v4.3.8**
+### 13b. Popup buttons still use emoji icons while the gallery uses inline SVGs — ✅ **SHIPPED in v4.4.0**
 
-Gallery received a full SVG-symbol system in v4.3.8 (`#i-maximize`, `#i-x`, `#i-chevron-left/right`, `#i-stack`, `#i-search`). Popup buttons still use emoji as icon glyphs (🎠 Capture, 🖼️ Gallery, 🗑️ Clear all, 🎬 Auto-play, ☕ Buy me a coffee). Each is wrapped in `<span class="emoji" aria-hidden="true">` so screen readers ignore them, but visually they're inconsistent with the gallery's Lucide-line icons and platform-dependent in rendering.
-
-- **Fix sketch**: define the same `<svg><symbol>` set in `popup.html` (or, if 13a lands, share via a partial). Replace emojis with `<svg><use href="#i-…"/></svg>`. Effort: **S**. Won't change behavior, only visual consistency.
+Eight emoji button/label glyphs replaced with inline Lucide-style SVGs: coffee (Support + footer), film (autoplay setting), camera (Capture All), stop-square (Stop), grid (Gallery), trash (Clear), pin (Open Instagram empty state), mail (about-card email). `setBtnLabel` helper in `popup.js` updated to thread `<svg><use href="#i-…"/></svg>` instead of an emoji string. The decorative 👋 on the about card stays as raw text — that's a flourish, not a UI icon.
 
 ### 13. `gallery.js` uses `var` (84 instances) while the rest of the codebase uses `const`/`let`
 
@@ -146,9 +144,9 @@ Cosmetic but it's the file most likely to grow next (Phase 1 features land here)
 
 - **Fix**: targeted refactor. Effort: **M**.
 
-### 14. Manifest description rot risk
+### 14. Manifest description rot risk — ✅ **RESOLVED in v4.4.0** (`STORE_LISTING.md` is the checklist)
 
-`manifest.json:5` description is the marketing surface. After the autoplay claim is resolved (#1), establish a checklist: when this string changes, also update README and the Chrome Web Store listing copy. Not a code change — a process note, but worth flagging since #1 is exactly this kind of drift.
+`STORE_LISTING.md` at the repo root is now the single source of truth: short description (auto-checked against `manifest.json`), detailed description, "what's new" block, screenshots inventory, and a pre-submission checklist. Update that file when shipping a release, then paste into the store dashboard. No more drift between manifest and listing.
 
 ---
 
@@ -196,7 +194,9 @@ Round-trip preserves all metadata (owner, caption, hashtags, scrapedAt, carousel
 
 For carousel posts: "Download album" button inside the expanded drawer header bundles every slide plus a `manifest.json` into `<shortcode>.zip`. JSZip 3.10.1 (MIT, 95KB pre-gzip, 43KB after CWS zips) bundled at `lib/jszip.min.js`. `web_accessible_resources` not needed — gallery page is an extension page with full privileges. Pinned by 19 tests in `tests/album-zip.test.js`.
 
-### 19. Owner-grouped folders in batch downloads
+### 19. Owner-grouped folders in batch downloads — ✅ **SHIPPED in v4.4.0**
+
+"Download all (zip)" button in the gallery actions row bundles the current view (filter + sort + tab applied) into one zip with per-owner folders. Albums get their own subfolder per shortcode; items without owner metadata land in `_unknown/`; items without a shortcode get `item_NNNN` fallback names. Top-level `manifest.json` lists every owner group with per-item index. Confirms before starting if file count > 50. Pinned by 21 tests in `tests/library-zip.test.js`.
 
 When downloading multiple items, group them into per-owner folders inside a single zip. Builds on #18.
 
@@ -232,8 +232,8 @@ The full forkable checklist lives in [`test-checklist.md`](./test-checklist.md) 
 
 - **v4.3.0** ✅ shipped (items 1–5)
 - **v4.3.1–4.3.10** ✅ shipped (items 12, 15, 17a, plus a large polish+features sprint not originally on the roadmap)
-- **v4.4.0** ✅ shipped — cleanup (items 6, 7, 8, 9) + three Phase 1 features (16 sort, 17b CSV, 18 per-album zip). Tests grew 211 → 230. `content.js` lost ~287 lines.
-- **v4.5+**: pick from items 10, 11, 13, 13a, 13b, 19, 20 — one per release. Then item 21 (automated test coverage) once the manual checklist has proven stable across a couple of releases.
+- **v4.4.0** ✅ shipped — cleanup (items 6, 7, 8, 9, 14) + four Phase 1 features (16 sort, 17b CSV, 18 per-album zip, 19 owner-grouped library zip) + 13b (popup SVG icons). Tests grew 211 → 251. `content.js` lost ~287 lines. `STORE_LISTING.md` added as the marketing-copy source of truth.
+- **v4.5+**: pick from items 10, 11, 13, 13a, 20 — one per release. Then item 21 (automated test coverage) once the manual checklist has proven stable across a couple of releases.
 
 ### 21. Convert manual QA checklist to automated tests — **planned post-v4.4.0**
 

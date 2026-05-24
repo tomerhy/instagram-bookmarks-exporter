@@ -554,11 +554,27 @@
       background: rgba(255, 255, 255, 0.14);
     }
 
-    /* Hide decorative emoji from screen readers without losing visual presence */
+    /* Decorative emoji (the 👋 greeting on the about card etc.) */
     .emoji {
       font-style: normal;
       display: inline-block;
     }
+
+    /* Inline SVG icons — matches the system the gallery uses since v4.3.8
+       so the popup and gallery feel like one product. Lucide-style strokes. */
+    .icon {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+    .icon-sm { width: 14px; height: 14px; }
+    .icon-lg { width: 18px; height: 18px; }
 
     /* ---------- Easter-egg About overlay ---------- */
     .about-overlay {
@@ -707,12 +723,58 @@
   </style>
 </head>
 <body>
+  <!-- Lucide-style icon set (v4.4.0 popup-SVG migration, item 13b). -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-coffee" viewBox="0 0 24 24">
+      <path d="M17 8h1a4 4 0 0 1 0 8h-1"/>
+      <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
+      <line x1="6" y1="2" x2="6" y2="4"/>
+      <line x1="10" y1="2" x2="10" y2="4"/>
+      <line x1="14" y1="2" x2="14" y2="4"/>
+    </symbol>
+    <symbol id="i-film" viewBox="0 0 24 24">
+      <rect x="2" y="2" width="20" height="20" rx="2"/>
+      <line x1="7" y1="2" x2="7" y2="22"/>
+      <line x1="17" y1="2" x2="17" y2="22"/>
+      <line x1="2" y1="12" x2="22" y2="12"/>
+      <line x1="2" y1="7" x2="7" y2="7"/>
+      <line x1="2" y1="17" x2="7" y2="17"/>
+      <line x1="17" y1="17" x2="22" y2="17"/>
+      <line x1="17" y1="7" x2="22" y2="7"/>
+    </symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24">
+      <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7"/>
+      <rect x="14" y="3" width="7" height="7"/>
+      <rect x="14" y="14" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <polyline points="3 6 5 6 21 6"/>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    </symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+      <circle cx="12" cy="10" r="3"/>
+    </symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24">
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+      <polyline points="22,6 12,13 2,6"/>
+    </symbol>
+  </svg>
+
   <main id="main-content">
     <div class="support-banner" id="support-banner" role="region" aria-label="Support the developer">
       <div class="support-banner-text">Enjoying this extension? Consider buying me a coffee.</div>
       <div class="support-banner-actions">
         <button class="support-banner-btn primary" id="support-btn">
-          <span class="emoji" aria-hidden="true">☕</span> Support
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-coffee"/></svg> Support
         </button>
         <button class="support-banner-btn secondary" id="dismiss-btn">Maybe later</button>
       </div>
@@ -750,7 +812,7 @@
       <h2 class="section-title">Settings</h2>
       <label class="setting-row" for="autoplay-toggle">
         <span class="setting-label">
-          <span class="emoji" aria-hidden="true">🎬</span> Auto-play videos
+          <svg class="icon" aria-hidden="true"><use href="#i-film"/></svg> Auto-play videos
         </span>
         <span class="switch">
           <input type="checkbox" id="autoplay-toggle" checked>
@@ -762,14 +824,14 @@
     <div class="actions">
       <div class="btn-row">
         <button id="capture-btn" class="btn-primary">
-          <span class="emoji" aria-hidden="true">🎠</span> Capture All
+          <svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg> Capture All
         </button>
         <button id="gallery-btn" class="btn-gallery">
-          <span class="emoji" aria-hidden="true">🖼️</span> Gallery
+          <svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg> Gallery
         </button>
       </div>
       <button id="clear-btn" class="btn-danger">
-        <span class="emoji" aria-hidden="true">🗑️</span> Clear all data
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-trash"/></svg> Clear all data
       </button>
     </div>
 
@@ -780,14 +842,14 @@
 
     <div class="footer">
       <a href="#" class="coffee-link" id="coffee-link">
-        <span class="emoji" aria-hidden="true">☕</span> Buy me a coffee
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-coffee"/></svg> Buy me a coffee
       </a>
     </div>
   </main>
 
   <div id="not-instagram" style="display: none;">
     <div class="not-instagram">
-      <h2><span class="emoji" aria-hidden="true">📍</span> Open Instagram</h2>
+      <h2><svg class="icon icon-lg" aria-hidden="true"><use href="#i-pin"/></svg> Open Instagram</h2>
       <p>Navigate to instagram.com to use this extension.</p>
     </div>
   </div>
@@ -803,7 +865,7 @@
       <div class="about-name" id="about-name-label">Tomer Har Yoffi</div>
       <div class="about-role">Maker of IG Exporter</div>
       <a class="about-email" href="mailto:tomer.haryoffi@gmail.com">
-        <span class="emoji" aria-hidden="true">✉️</span> tomer.haryoffi@gmail.com
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-mail"/></svg> tomer.haryoffi@gmail.com
       </a>
       <div class="about-thanks">Thanks for using my extension!</div>
     </div>

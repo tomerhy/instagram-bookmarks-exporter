@@ -232,22 +232,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Inner-HTML helper that keeps the decorative emoji wrapped in an aria-hidden
-  // span so screen readers announce just the label, not "carousel horse Capture".
-  function setBtnLabel(btn, emoji, text) {
+  // Inner-HTML helper that swaps the SVG icon + label on the capture button.
+  // Uses the inline symbol set defined at the top of popup.html, so changes
+  // to icon styling apply globally via the .icon class.
+  function setBtnLabel(btn, iconId, text) {
     if (!btn) return;
     btn.innerHTML =
-      '<span class="emoji" aria-hidden="true">' + emoji + '</span> ' + text;
+      '<svg class="icon" aria-hidden="true"><use href="#' + iconId + '"/></svg> ' + text;
   }
 
   function updateCaptureState(capturing) {
     isCapturing = capturing;
     if (captureBtn) {
       if (capturing) {
-        setBtnLabel(captureBtn, '⏹️', 'Stop');
+        setBtnLabel(captureBtn, 'i-stop', 'Stop');
         setStatus('Capturing...', true);
       } else {
-        setBtnLabel(captureBtn, '🎠', 'Capture All');
+        setBtnLabel(captureBtn, 'i-camera', 'Capture All');
         setStatus('', false);
       }
     }
@@ -324,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (isCapturing) {
       if (window.Analytics) Analytics.trackButtonClick('stop_capture', 'popup');
       sendToContent({ type: 'STOP_CAROUSELS' });
-      setBtnLabel(captureBtn, '🎠', 'Capture All');
+      setBtnLabel(captureBtn, 'i-camera', 'Capture All');
       isCapturing = false;
       setStatus('Stopped', false);
     } else {
@@ -342,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
       });
-      setBtnLabel(captureBtn, '⏹️', 'Stop');
+      setBtnLabel(captureBtn, 'i-stop', 'Stop');
       isCapturing = true;
       setStatus('Capturing all posts...', true);
     }
