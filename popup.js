@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Support button handlers
   if (supportBtn) {
     supportBtn.addEventListener('click', function() {
+      if (window.Analytics) Analytics.trackButtonClick('support_banner', 'popup');
       openCoffeeLink();
       dismissBanner();
     });
@@ -104,29 +105,35 @@ document.addEventListener('DOMContentLoaded', function() {
     aboutOverlay.setAttribute('aria-hidden', 'false');
     // Focus the close button so Esc / Tab navigation is obvious.
     if (aboutClose) aboutClose.focus();
-    if (window.Analytics) Analytics.trackFeature('about_opened', {});
+    if (window.Analytics) {
+      Analytics.trackButtonClick('about_open', 'popup');
+      Analytics.trackFeature('about_opened', {});
+    }
   }
 
-  function hideAbout() {
+  function hideAbout(source) {
     if (!aboutOverlay) return;
     aboutOverlay.classList.remove('visible');
     aboutOverlay.setAttribute('aria-hidden', 'true');
     // Keep `hidden` synced so the dialog is removed from the AT tree when closed.
     aboutOverlay.hidden = true;
     if (aboutToggle) aboutToggle.focus();
+    if (window.Analytics) {
+      Analytics.trackButtonClick('about_close_' + (source || 'button'), 'popup');
+    }
   }
 
   if (aboutToggle) aboutToggle.addEventListener('click', showAbout);
-  if (aboutClose)  aboutClose.addEventListener('click', hideAbout);
+  if (aboutClose)  aboutClose.addEventListener('click', function () { hideAbout('button'); });
   if (aboutOverlay) {
     aboutOverlay.addEventListener('click', function (e) {
       // Click on the backdrop (not the card) closes
-      if (e.target === aboutOverlay) hideAbout();
+      if (e.target === aboutOverlay) hideAbout('backdrop');
     });
   }
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && aboutOverlay && aboutOverlay.classList.contains('visible')) {
-      hideAbout();
+      hideAbout('escape');
     }
   });
 

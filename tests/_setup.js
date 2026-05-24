@@ -68,7 +68,8 @@ function makeAnalyticsStub() {
     trackPageView: () => {},
     trackButtonClick: () => {},
     trackFeature: () => {},
-    trackDownload: () => {}
+    trackDownload: () => {},
+    trackError: () => {}
   };
 }
 

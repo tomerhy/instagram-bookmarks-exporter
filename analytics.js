@@ -6,6 +6,13 @@
 const GA_MEASUREMENT_ID = 'G-PX8PH6ZQED';
 const GA_API_SECRET = 'XsR9YFyZQY2_gJdKY939Lw';
 
+// Set `localStorage.setItem('ga_debug', '1')` in the popup/gallery DevTools
+// console to make every event surface in GA4's DebugView. Off by default so
+// production users aren't tagged as debug traffic.
+function isDebugMode() {
+  try { return localStorage.getItem('ga_debug') === '1'; } catch (_) { return false; }
+}
+
 // Generate or retrieve client ID
 function getClientId() {
   let clientId = localStorage.getItem('ga_client_id');
@@ -19,6 +26,7 @@ function getClientId() {
 // Send event to GA4 via Measurement Protocol
 async function sendEvent(eventName, params = {}) {
   try {
+    const debug = isDebugMode();
     const payload = {
       client_id: getClientId(),
       events: [{
@@ -26,6 +34,9 @@ async function sendEvent(eventName, params = {}) {
         params: {
           engagement_time_msec: 100,
           session_id: sessionStorage.getItem('ga_session_id') || Date.now().toString(),
+          // debug_mode=1 routes the event to GA4 DebugView (Configure → DebugView).
+          // Off in production; toggle via localStorage.setItem('ga_debug','1').
+          ...(debug ? { debug_mode: 1 } : {}),
           ...params
         }
       }]
@@ -117,10 +128,29 @@ function trackDownload(type, mediaType, count) {
   });
 }
 
+/**
+ * ERROR / FAILURE - Track things that broke so we see them in GA instead
+ * of only in user reviews.
+ * @param {string} errorName  - what failed (e.g. 'import_parse_failed')
+ * @param {object} params     - additional context (message, where, etc.)
+ *
+ * Error names in use:
+ * - import_parse_failed     - parseImportPayload threw on user-supplied file
+ * - capture_start_failed    - START_CAROUSELS message never reached the page
+ * - video_play_failed       - viewer's <video> failed to start playback
+ */
+function trackError(errorName, params = {}) {
+  sendEvent('extension_error', {
+    error_name: errorName,
+    ...params
+  });
+}
+
 // Export for use in other scripts
 window.Analytics = {
   trackPageView,
   trackButtonClick,
   trackFeature,
-  trackDownload
+  trackDownload,
+  trackError
 };

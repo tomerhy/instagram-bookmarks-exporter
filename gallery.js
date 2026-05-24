@@ -277,7 +277,10 @@ function renderSearchMeta(filtered, total) {
     '<span>' + label + '</span>' +
     '<button class="search-meta-clear" type="button">Clear</button>';
   var clear = meta.querySelector(".search-meta-clear");
-  if (clear) clear.onclick = function () { setSearchQuery(""); };
+  if (clear) clear.onclick = function () {
+    if (window.Analytics) Analytics.trackButtonClick('search_clear_meta', 'gallery');
+    setSearchQuery("");
+  };
 }
 
 // Render the metadata block under the viewer (caption, owner, date, album size).
@@ -451,6 +454,7 @@ function expandCarousel(card, item) {
   closeBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>';
   closeBtn.addEventListener("click", function (e) {
     e.stopPropagation();
+    if (window.Analytics) Analytics.trackButtonClick('carousel_collapse_x', 'gallery');
     collapseCarousel();
   });
   header.appendChild(closeBtn);
@@ -475,6 +479,12 @@ function expandCarousel(card, item) {
     var prev = strip.querySelector(".carousel-strip-slide.active");
     if (prev) prev.classList.remove("active");
     btn.classList.add("active");
+    if (window.Analytics) {
+      Analytics.trackFeature('carousel_slide_clicked', {
+        slide_index: idx,
+        total_slides: slides.length
+      });
+    }
   });
 
   card.appendChild(drawer);
@@ -607,7 +617,10 @@ function renderGrid() {
           '<button class="btn-link" id="empty-clear-search">Clear search</button>' +
         '</div>';
       var clearBtn = document.getElementById("empty-clear-search");
-      if (clearBtn) clearBtn.onclick = function () { setSearchQuery(""); };
+      if (clearBtn) clearBtn.onclick = function () {
+        if (window.Analytics) Analytics.trackButtonClick('search_clear_empty', 'gallery');
+        setSearchQuery("");
+      };
     } else {
       var emptyIcon = currentTab === "videos" ? "▶" : "🖼";
       grid.innerHTML =
@@ -703,9 +716,18 @@ function renderGrid() {
       carBadge.addEventListener("click", function(e) {
         // Don't trigger the card's own click (which would just select it).
         e.stopPropagation();
+        var wasExpanded = card.classList.contains("carousel-expanded");
         expandCarousel(card, item);
         carBadge.setAttribute("aria-expanded",
           card.classList.contains("carousel-expanded") ? "true" : "false");
+        if (window.Analytics) {
+          Analytics.trackButtonClick(wasExpanded ? 'carousel_collapse_badge' : 'carousel_expand', 'gallery');
+          if (!wasExpanded) {
+            Analytics.trackFeature('carousel_expanded', {
+              slide_count: item.carouselSize || (item._carouselSlides && item._carouselSlides.length) || 0
+            });
+          }
+        }
       });
       card.appendChild(carBadge);
     }
@@ -771,16 +793,29 @@ function renderPagination(totalPages) {
   prev.className = "page-btn";
   prev.textContent = "←";
   prev.disabled = currentPage === 1;
-  prev.onclick = function() { if (currentPage > 1) { currentPage--; renderGrid(); } };
+  prev.onclick = function() {
+    if (currentPage > 1) {
+      currentPage--;
+      if (window.Analytics) Analytics.trackButtonClick('pagination_prev', 'gallery');
+      renderGrid();
+    }
+  };
   paginationEl.appendChild(prev);
-  
+
   for (var i = 1; i <= totalPages; i++) {
     if (i <= 3 || i > totalPages - 2 || Math.abs(i - currentPage) <= 1) {
       (function(page) {
         var btn = document.createElement("button");
         btn.className = "page-btn" + (page === currentPage ? " active" : "");
         btn.textContent = page;
-        btn.onclick = function() { currentPage = page; renderGrid(); };
+        btn.onclick = function() {
+          currentPage = page;
+          if (window.Analytics) {
+            Analytics.trackButtonClick('pagination_page', 'gallery');
+            Analytics.trackFeature('pagination_jump', { page: page, total_pages: totalPages });
+          }
+          renderGrid();
+        };
         paginationEl.appendChild(btn);
       })(i);
     } else if (i === 4 || i === totalPages - 2) {
@@ -790,12 +825,18 @@ function renderPagination(totalPages) {
       paginationEl.appendChild(dots);
     }
   }
-  
+
   var next = document.createElement("button");
   next.className = "page-btn";
   next.textContent = "→";
   next.disabled = currentPage === totalPages;
-  next.onclick = function() { if (currentPage < totalPages) { currentPage++; renderGrid(); } };
+  next.onclick = function() {
+    if (currentPage < totalPages) {
+      currentPage++;
+      if (window.Analytics) Analytics.trackButtonClick('pagination_next', 'gallery');
+      renderGrid();
+    }
+  };
   paginationEl.appendChild(next);
 }
 
@@ -1083,6 +1124,9 @@ document.getElementById("file-input")?.addEventListener("change", function() {
       parsed = parseImportPayload(reader.result);
     } catch (e) {
       setStatus("Import failed: " + e.message);
+      if (window.Analytics) {
+        Analytics.trackError('import_parse_failed', { error_message: e.message });
+      }
       fileInput.value = "";
       return;
     }
@@ -1173,6 +1217,7 @@ if (versionEl) {
     if (e.key === "Escape" && input.value) {
       e.stopPropagation();
       if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+      if (window.Analytics) Analytics.trackButtonClick('search_clear_esc', 'gallery');
       setSearchQuery("");
       input.focus();
     }
@@ -1181,6 +1226,7 @@ if (versionEl) {
   if (clearBtn) {
     clearBtn.addEventListener("click", function () {
       if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+      if (window.Analytics) Analytics.trackButtonClick('search_clear_btn', 'gallery');
       setSearchQuery("");
       input.focus();
     });
@@ -1353,12 +1399,15 @@ function closeFullscreen() {
   stopSlideshow();
 }
 
-// Next/Prev in fullscreen
-function fullscreenNextItem() {
+// Next/Prev in fullscreen. Both buttons and keyboard arrows funnel here so
+// the single event covers both interaction modes.
+function fullscreenNextItem(source) {
+  if (window.Analytics) Analytics.trackButtonClick('fullscreen_next_' + (source || 'button'), 'gallery');
   showFullscreenItem(currentFullscreenIndex + 1);
 }
 
-function fullscreenPrevItem() {
+function fullscreenPrevItem(source) {
+  if (window.Analytics) Analytics.trackButtonClick('fullscreen_prev_' + (source || 'button'), 'gallery');
   showFullscreenItem(currentFullscreenIndex - 1);
 }
 
@@ -1389,7 +1438,7 @@ function setSlideshowActiveSpeed(intervalMs) {
 function startSlideshow(intervalMs) {
   stopSlideshow();
   slideshowInterval = setInterval(function() {
-    fullscreenNextItem();
+    fullscreenNextItem('slideshow');
   }, intervalMs);
 
   // Show stop button; mark the chosen speed as active.
@@ -1438,20 +1487,23 @@ if (fullscreenNext) {
 // Auto-play next video when current one ends
 if (fullscreenVideo) {
   fullscreenVideo.addEventListener("ended", function() {
-    fullscreenNextItem();
+    fullscreenNextItem('video_ended');
   });
 }
 
 // Slideshow buttons in fullscreen
 document.getElementById("fs-slide-2")?.addEventListener("click", function() {
+  if (window.Analytics) Analytics.trackButtonClick('slideshow_speed_2s', 'gallery');
   startSlideshow(2000);
 });
 
 document.getElementById("fs-slide-3")?.addEventListener("click", function() {
+  if (window.Analytics) Analytics.trackButtonClick('slideshow_speed_3s', 'gallery');
   startSlideshow(3000);
 });
 
 document.getElementById("fs-slide-5")?.addEventListener("click", function() {
+  if (window.Analytics) Analytics.trackButtonClick('slideshow_speed_5s', 'gallery');
   startSlideshow(5000);
 });
 
@@ -1471,9 +1523,9 @@ document.addEventListener("keydown", function(e) {
   if (e.key === "Escape") {
     closeFullscreen();
   } else if (e.key === "ArrowRight" || e.key === " ") {
-    fullscreenNextItem();
+    fullscreenNextItem('key');
   } else if (e.key === "ArrowLeft") {
-    fullscreenPrevItem();
+    fullscreenPrevItem('key');
   }
 });
 
@@ -1500,6 +1552,9 @@ document.querySelectorAll(".slideshow-btn[data-interval]").forEach(function(btn)
   btn.addEventListener("click", function() {
     var interval = parseInt(btn.getAttribute("data-interval"));
     if (interval) {
+      if (window.Analytics) {
+        Analytics.trackButtonClick('slideshow_speed_' + (interval / 1000) + 's_viewer', 'gallery');
+      }
       openFullscreen();
       setTimeout(function() {
         startSlideshow(interval);
