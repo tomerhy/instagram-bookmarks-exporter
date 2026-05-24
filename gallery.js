@@ -1120,6 +1120,214 @@ function _albumZipName(item) {
   return String(shortcode).replace(/[^a-zA-Z0-9._-]/g, "_") + ".zip";
 }
 
+// Sanitize a string for use as a folder name inside a zip. Empty / falsy
+// input — and inputs that sanitize to nothing-but-underscores (all
+// punctuation, no letters/digits) — collapse to "_unknown".
+function _safeFolderName(s) {
+  if (!s) return "_unknown";
+  var clean = String(s).replace(/[^a-zA-Z0-9._-]/g, "_");
+  if (!clean || /^_+$/.test(clean)) return "_unknown";
+  return clean;
+}
+
+// Pull the owner key off an item — handles legacy items pre-v4.3 that
+// lack metadata.owner. Returns the literal string '_unknown' (no leading
+// underscore conflict with real Instagram usernames since usernames can't
+// start with an underscore in URL form anyway).
+function _ownerKey(item) {
+  var owner = item && item.metadata && item.metadata.owner;
+  return owner ? String(owner) : "_unknown";
+}
+
+// Group items by owner. Preserves first-seen order both for owner keys
+// and for items within each group, so a sorted input stays meaningful.
+// Returns an array of [owner, items[]] tuples (Map iteration order is
+// equivalent but tuples test more easily).
+function groupItemsByOwner(items) {
+  if (!Array.isArray(items)) return [];
+  var groups = Object.create(null);
+  var order = [];
+  for (var i = 0; i < items.length; i++) {
+    var key = _ownerKey(items[i]);
+    if (!groups[key]) {
+      groups[key] = [];
+      order.push(key);
+    }
+    groups[key].push(items[i]);
+  }
+  return order.map(function (k) { return [k, groups[k]]; });
+}
+
+// Build the top-level manifest.json for a library zip. Lists each owner
+// group with item counts and per-item paths, so anyone unpacking the zip
+// can map files back to original posts without scraping filenames.
+function buildLibraryManifest(items, ownerGroups, extensionVersion) {
+  return {
+    format: "instagram-saved-media-exporter-library",
+    formatVersion: 1,
+    extensionVersion: extensionVersion || null,
+    exportedAt: new Date().toISOString(),
+    totalItems: Array.isArray(items) ? items.length : 0,
+    totalOwners: Array.isArray(ownerGroups) ? ownerGroups.length : 0,
+    owners: (ownerGroups || []).map(function (g) {
+      var owner = g[0], list = g[1];
+      return {
+        owner: owner === "_unknown" ? null : owner,
+        folder: _safeFolderName(owner),
+        itemCount: list.length,
+        items: list.map(function (it) {
+          var slideCount = (Array.isArray(it._carouselSlides) ? it._carouselSlides.length : 0) || 1;
+          return {
+            shortcode: it.postShortcode || null,
+            postUrl: it.postUrl || null,
+            type: it.type || null,
+            slideCount: slideCount,
+            caption: (it.metadata && it.metadata.caption) || null,
+            takenAt: (it.metadata && it.metadata.takenAt) || null,
+            likeCount: (it.metadata && typeof it.metadata.likeCount === "number")
+              ? it.metadata.likeCount : null
+          };
+        })
+      };
+    })
+  };
+}
+
+// Single-item filename inside its owner folder. Single-slide items get a
+// flat name (<shortcode>.<ext>); albums get their own subfolder so all
+// their slides stay together: <shortcode>/01.<ext>.
+function _itemPathInOwnerFolder(item, slide, slideIdx, totalSlides, fallbackIdx) {
+  var shortcode = item && item.postShortcode;
+  if (!shortcode) {
+    // Stable but unique fallback so two metadata-less items don't collide.
+    shortcode = "item_" + String(fallbackIdx + 1).padStart(4, "0");
+  } else {
+    shortcode = String(shortcode).replace(/[^a-zA-Z0-9._-]/g, "_");
+  }
+  var ext = _slideExtension(slide || item);
+  if (totalSlides > 1) {
+    // Album: nested folder.
+    var w = String(totalSlides).length;
+    var padded = String(slideIdx + 1);
+    while (padded.length < w) padded = "0" + padded;
+    return shortcode + "/" + padded + "." + ext;
+  }
+  // Single slide: flat file in the owner folder.
+  return shortcode + "." + ext;
+}
+
+// Driver: download every item the user can currently see (post-filter,
+// post-sort, current tab) as one big zip with per-owner folders inside.
+// Confirms before starting if the count is large — even at 100 items the
+// fetch + zip can take a minute and consume bandwidth.
+async function downloadLibrary() {
+  if (typeof JSZip === "undefined") {
+    setStatus("Library download not available — JSZip failed to load");
+    if (window.Analytics) Analytics.trackError('library_zip_no_jszip', {});
+    return;
+  }
+  var items = getFilteredItems();
+  if (!items.length) {
+    setStatus("Nothing to download — the current view is empty");
+    return;
+  }
+
+  // Estimate total slide count (carousels contribute more than 1).
+  var slideTotal = items.reduce(function (sum, it) {
+    var n = (Array.isArray(it._carouselSlides) ? it._carouselSlides.length : 0) || 1;
+    return sum + n;
+  }, 0);
+
+  if (slideTotal > 50) {
+    var ok = confirm(
+      "Download " + items.length + " items (" + slideTotal + " files) as a zip?\n" +
+      "This may take a minute and use significant bandwidth."
+    );
+    if (!ok) return;
+  }
+
+  var extVersion = null;
+  try { extVersion = chrome.runtime.getManifest().version; } catch (_) {}
+
+  var groups = groupItemsByOwner(items);
+  var manifest = buildLibraryManifest(items, groups, extVersion);
+  setStatus("Preparing library (" + items.length + " items, " + slideTotal + " files)...", true);
+  if (window.Analytics) {
+    Analytics.trackButtonClick('library_download', 'gallery');
+    Analytics.trackFeature('library_download_started', {
+      item_count: items.length,
+      slide_count: slideTotal,
+      owner_count: groups.length
+    });
+  }
+
+  var zip = new JSZip();
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+
+  var done = 0;
+  var failures = 0;
+  for (var g = 0; g < groups.length; g++) {
+    var ownerKey = groups[g][0];
+    var ownerList = groups[g][1];
+    var folder = _safeFolderName(ownerKey);
+    for (var i = 0; i < ownerList.length; i++) {
+      var it = ownerList[i];
+      var slides = Array.isArray(it._carouselSlides) && it._carouselSlides.length
+        ? it._carouselSlides : [it];
+      for (var s = 0; s < slides.length; s++) {
+        var slide = slides[s];
+        var url = slide && (slide.url || slide.thumbnail);
+        done++;
+        if (!url) { failures++; continue; }
+        setStatus("Fetching " + done + " / " + slideTotal + " — " + ownerKey, true);
+        try {
+          var res = await fetch(url);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          var blob = await res.blob();
+          var path = folder + "/" + _itemPathInOwnerFolder(it, slide, s, slides.length, i);
+          zip.file(path, blob);
+        } catch (e) {
+          failures++;
+          console.warn("[Gallery] Library slide fetch failed:", url, e.message);
+        }
+      }
+    }
+  }
+
+  if (failures === slideTotal) {
+    setStatus("Library download failed — every slide errored");
+    if (window.Analytics) {
+      Analytics.trackError('library_zip_all_failed', { slide_count: slideTotal });
+    }
+    return;
+  }
+
+  setStatus("Zipping " + slideTotal + " files...", true);
+  try {
+    var content = await zip.generateAsync({ type: "blob" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    var stamp = new Date().toISOString().slice(0, 10);
+    a.download = "instagram-library-" + currentTab + "-" + stamp + ".zip";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    var msg = "Downloaded " + slideTotal + " files across " + groups.length + " owners";
+    if (failures > 0) msg += " (" + failures + " failed)";
+    setStatus(msg);
+    if (window.Analytics) {
+      Analytics.trackFeature('library_download_completed', {
+        item_count: items.length,
+        slide_count: slideTotal,
+        owner_count: groups.length,
+        failure_count: failures
+      });
+    }
+  } catch (e) {
+    setStatus("Library zip failed: " + e.message);
+    if (window.Analytics) Analytics.trackError('library_zip_failed', { error_message: e.message });
+  }
+}
+
 // Driver: fetch every slide, pack into a JSZip archive alongside a
 // manifest.json, trigger download. Status updates surface progress so
 // the user sees something happening for large albums.
@@ -1405,6 +1613,10 @@ document.getElementById("clear")?.addEventListener("click", function() {
     setStatus("Cleared all data");
     logDebug("Data cleared");
   });
+});
+
+document.getElementById("download-zip")?.addEventListener("click", function () {
+  downloadLibrary();
 });
 
 document.getElementById("export-csv")?.addEventListener("click", function () {

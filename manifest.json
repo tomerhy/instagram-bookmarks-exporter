@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Instagram Saved Media Exporter",
   "version": "4.4.0",
-  "description": "Export images, videos, and carousels from your Instagram saved posts. Album mode, autoplay, and post details in gallery.",
+  "description": "Backup Instagram saved posts. Capture images, videos, carousels — with full metadata, search, and per-album zip download.",
   "icons": {
     "16": "assets/icons/icon-16.png",
     "32": "assets/icons/icon-32.png",
