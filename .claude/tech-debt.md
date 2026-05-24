@@ -108,7 +108,9 @@ Risk: if Instagram's page somehow initiates fetches via the isolated world, thos
 
 - **Fix**: delete both. Effort: **S**.
 
-### 10. Disabled CLICK-BASED CAPTURE block
+### 10. Disabled CLICK-BASED CAPTURE block — ✅ **SHIPPED in v4.4.0**
+
+40-line `/* CLICK-BASED CAPTURE (DISABLED) ... */` comment block in `content.js` deleted. Replaced with a 4-line `// Note:` pointing future readers at `git blame` if they ever want to revive the click-based pipeline. The auto-scroll path is the only capture mechanism now.
 
 40-line `/* ... END OF CLICK-BASED CAPTURE */` comment in `content.js` (around `:727-773`). `CLAUDE.md` flags this as intentional reference. If you decide it's not coming back, deleting it is fair game; if it might revive for stories/reels later, leave it.
 
@@ -118,7 +120,9 @@ Risk: if Instagram's page somehow initiates fetches via the isolated world, thos
 
 ## Low — cleanliness, not urgent
 
-### 11. Six icon-generation utilities for one task
+### 11. Six icon-generation utilities for one task — ✅ **SHIPPED in v4.4.0**
+
+Deleted: `convert-icons.html`, `convert_icons.py`, `create_icons.py`, `create_clean_icons.py`, `generate-icons.sh`. Kept: `create-icons.html` (the one the README points users at). Net: 5 files removed, single source of truth for icon generation.
 
 `create-icons.html`, `convert-icons.html`, `convert_icons.py`, `create_icons.py`, `create_clean_icons.py`, `generate-icons.sh`. The README points users at `create-icons.html` only. The icon PNGs in `assets/icons/` are committed and rarely change. Pick one, delete the rest.
 
@@ -128,17 +132,25 @@ Risk: if Instagram's page somehow initiates fetches via the isolated world, thos
 
 Replaced by `compose_screenshots.py` (real captures of the running extension framed into 1280×800 store screenshots). Raw captures go in `assets/screenshots/raw/` (gitignored); composed PNGs in `assets/screenshots/`. Old `create_screenshots.py` (PIL mockup approach with hardcoded v4.1.0 strings and pre-redesign UI) deleted.
 
-### 13a. Design tokens duplicated between `popup.html` and `gallery.html` — **surfaced during v4.3.2**
+### 13a. Design tokens duplicated between `popup.html` and `gallery.html` — ✅ **SHIPPED in v4.4.0**
 
-Both files now share a near-identical `:root` block — `--ig-pink`, `--selected`, `--surface-*`, `--space-*`, `--radius-*`, `--btn-h-*`, `--t-fast` / `--t-base` / `--t-spring`, etc. They were intentionally duplicated during the v4.3.2 redesign with "keep in sync with gallery.html" comments. Future cleanup: extract to a shared `tokens.css`, `<link>`ed from both popup and gallery HTML. Caveat: needs `web_accessible_resources` only if a content script also needed it (it doesn't). Build.sh would need to copy the new file too.
-
-- **Effort**: **S**. Risk: low — both surfaces are extension pages, no MV3 CSP issues. Worth doing once a third surface ever needs the same tokens.
+Created `tokens.css` at the repo root holding the truly shared tokens (brand, semantic, surfaces, glass, text, borders, common spacing/radii, motion). Both pages `<link rel="stylesheet" href="tokens.css">` BEFORE their inline `<style>` block. Each page's inline `:root` keeps only its surface-specific overrides — popup gets smaller buttons + `--danger`, gallery gets bigger buttons + `--glass-bg-strong` + `--surface-0` + `--glow-*` + extra spacing/radius scales. `build.sh` + `tests/build.test.js` updated to ship tokens.css in the zip.
 
 ### 13b. Popup buttons still use emoji icons while the gallery uses inline SVGs — ✅ **SHIPPED in v4.4.0**
 
 Eight emoji button/label glyphs replaced with inline Lucide-style SVGs: coffee (Support + footer), film (autoplay setting), camera (Capture All), stop-square (Stop), grid (Gallery), trash (Clear), pin (Open Instagram empty state), mail (about-card email). `setBtnLabel` helper in `popup.js` updated to thread `<svg><use href="#i-…"/></svg>` instead of an emoji string. The decorative 👋 on the about card stays as raw text — that's a flourish, not a UI icon.
 
-### 13. `gallery.js` uses `var` (84 instances) while the rest of the codebase uses `const`/`let`
+### 13. `gallery.js` uses `var` (84 instances) — 🚧 **BLOCKED on test seam refactor** (attempted in v4.4.0, reverted)
+
+Tried during the v4.4.0 cleanup pass: ran `perl -i -pe 's/\bvar /let /g' gallery.js`. Syntax was fine, but 29 unit tests immediately broke. Root cause: gallery.js is loaded via `vm.runInContext` and the test helpers (`tests/grouping.test.js`, `tests/carousel-expand.test.js`, `tests/sort.test.js`, etc.) reach into top-level state via the sandbox object — `sandbox.allMedia`, `sandbox.currentTab`, `sandbox.expandedCard`, etc. Top-level `var` declarations attach to `globalThis` (and therefore the sandbox); top-level `let` declarations do NOT, by ECMAScript spec. So `let` at the top of gallery.js makes the sandbox blind to those vars.
+
+Two paths forward, both non-trivial:
+
+1. **Test seam refactor** (preferred). Add a `__IG_EXPORTER_TEST_HOOKS__.gallery` block at the end of gallery.js exposing the needed internals via getter/setter accessors. Then migrate `tests/grouping.test.js`, `tests/sort.test.js`, `tests/search.test.js`, `tests/carousel-expand.test.js`, `tests/clear-viewer.test.js`, `tests/csv-export.test.js`, `tests/album-zip.test.js`, `tests/library-zip.test.js` from sandbox-property access to hook-based access. Roughly half a day. Then the mass-`var → let`/`const` replacement becomes safe.
+
+2. **Half-measure**: convert only inside-function `var`s (the loop counters, local temps inside helpers) to `let`/`const`. Leave the top-level `var`s alone. Mechanical but smaller value.
+
+Best ordered as a v4.5 task once a feature window opens up.
 
 Cosmetic but it's the file most likely to grow next (Phase 1 features land here). Modernizing now is cheaper than later. No behavior change risk if done with care (block-scope for `let`, no re-declaration).
 
@@ -202,7 +214,9 @@ When downloading multiple items, group them into per-owner folders inside a sing
 
 - Effort: **S** once #18 lands. Bundle into a release whenever you're touching the same files for other reasons.
 
-### 20. `createPanel()` is dead code (~160 lines)
+### 20. `createPanel()` is dead code (~160 lines) — ✅ **SHIPPED in v4.4.0** (deleted)
+
+`createPanel()` + its giant `<style>` block, `updatePanel()`, `setStatus()`, and every `setStatus(...)` / `updatePanel()` call site across the capture pipeline deleted. ~260 lines gone. The popup is the only UI surface; if someone wants an in-page floating panel later, git blame this paragraph. The dead-context fallback message that used to call `setStatus()` now relies on the popup picking up the dead-context state from storage on its next poll.
 
 `createPanel()` at `content.js:1319` defines a floating in-page panel (header, stats, "Start Capture" button, "Gallery" button, "Clear" button, status row, loading bar) plus its `<style>` block. **It is never called anywhere in the repo.** Consequences:
 
@@ -232,8 +246,11 @@ The full forkable checklist lives in [`test-checklist.md`](./test-checklist.md) 
 
 - **v4.3.0** ✅ shipped (items 1–5)
 - **v4.3.1–4.3.10** ✅ shipped (items 12, 15, 17a, plus a large polish+features sprint not originally on the roadmap)
-- **v4.4.0** ✅ shipped — cleanup (items 6, 7, 8, 9, 14) + four Phase 1 features (16 sort, 17b CSV, 18 per-album zip, 19 owner-grouped library zip) + 13b (popup SVG icons). Tests grew 211 → 251. `content.js` lost ~287 lines. `STORE_LISTING.md` added as the marketing-copy source of truth.
-- **v4.5+**: pick from items 10, 11, 13, 13a, 20 — one per release. Then item 21 (automated test coverage) once the manual checklist has proven stable across a couple of releases.
+- **v4.4.0** ✅ shipped — every cleanup item the plan tracked plus four Phase 1 features:
+    - Cleanup: 6, 7, 8, 9, 10, 11, 13a, 14, 20
+    - Features: 13b (popup SVG icons), 16 (sort), 17b (CSV), 18 (per-album zip), 19 (owner-grouped library zip)
+    - **Stats**: tests 211 → 251; `content.js` lost ~545 lines (parseApiResponse + fetch/XHR + scanDom + createPanel + the dead comment block); 5 redundant icon utilities deleted; `tokens.css` extracted; `STORE_LISTING.md` added.
+- **v4.5+**: only items **13** (gallery.js var→let, blocked on a test-seam refactor) and **21** (automated browser e2e tests) remain. The plan is now essentially clear.
 
 ### 21. Convert manual QA checklist to automated tests — **planned post-v4.4.0**
 

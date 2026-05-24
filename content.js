@@ -36,13 +36,10 @@
     extensionContextLost = true;
     console.warn('[IG Exporter] Extension context invalidated at ' + where +
       '. Refresh this Instagram tab to resume capturing.');
-    // setStatus is defined later in this IIFE; it always exists by the time
-    // a chrome.* call could fail at runtime, but guard anyway.
-    try {
-      if (typeof setStatus === 'function') {
-        setStatus('Extension was reloaded — refresh this tab to resume');
-      }
-    } catch (_) {}
+    // Note: prior versions also tried to surface this via setStatus() to the
+    // floating in-page panel. The panel was deleted in v4.4.0 (item 20); the
+    // popup is the only UI surface now, and the popup polls storage so it'll
+    // pick up the dead-context state on its next refresh.
   }
 
   function safeStorageSet(items, cb) {
@@ -126,7 +123,6 @@
     console.log(`[IG Exporter] API: +${added} new, ${skipped} dupes | Total: ${state.images.length} imgs + ${state.videos.length} vids = ${totalItems}`);
     
     if (added > 0) {
-      updatePanel();
       saveToStorage();
     }
   });
@@ -691,8 +687,6 @@
     console.log('[IG Exporter] Scrolling to load posts, API interception will capture media');
     console.log('[IG Exporter] ========================================');
     
-    setStatus('Auto-scrolling...', true);
-    
     const startImages = state.images.length;
     const startVideos = state.videos.length;
     let noNewContentCount = 0;
@@ -742,10 +736,6 @@
       const scrollAmount = viewportHeight * 0.8;
       const targetScroll = currentScroll + scrollAmount;
       
-      // Update live status
-      const totalMedia = state.images.length + state.videos.length;
-      setStatus(`Capturing... ${totalMedia} items`, true);
-      
       console.log('[IG Exporter] Scroll #' + scrollCount + ' | Media so far:', state.images.length, 'imgs +', state.videos.length, 'vids');
       
       window.scrollTo({ top: targetScroll, behavior: 'auto' });
@@ -760,7 +750,6 @@
       const mediaAfterScroll = state.images.length + state.videos.length;
       if (mediaAfterScroll > mediaBeforeScroll) {
         noNewContentCount = 0; // Reset counter
-        updatePanel(); // Update stats in real-time
         console.log('[IG Exporter] Captured', mediaAfterScroll - mediaBeforeScroll, 'new items');
       }
     }
@@ -779,62 +768,16 @@
     console.log('[IG Exporter]   Total:', state.images.length, 'imgs +', state.videos.length, 'vids');
     console.log('[IG Exporter] ========================================');
     
-    setStatus(`Done! ${newImages + newVideos} new items`);
     saveToStorage();
   }
   
-  /* ============================================
-   * CLICK-BASED CAPTURE (DISABLED - kept for future use)
-   * This code clicks each post to capture carousel slides
-   * ============================================
-  
-  async function startClickCapture() {
-    // Helper function to find posts currently in DOM
-    function findCurrentPosts() {
-      const seenShortcodes = new Set();
-      const posts = [];
-      const allLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
-      
-      allLinks.forEach(link => {
-        const href = link.href;
-        if (!href) return;
-        
-        const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
-        if (!match) return;
-        const shortcode = match[2];
-        
-        if (seenShortcodes.has(shortcode)) return;
-        seenShortcodes.add(shortcode);
-        
-        if (state.capturedShortcodes.has(shortcode)) return;
-        
-        const rect = link.getBoundingClientRect();
-        posts.push({ shortcode, top: rect.top, left: rect.left });
-      });
-      
-      posts.sort((a, b) => a.top - b.top || a.left - b.left);
-      return posts;
-    }
-    
-    // Process posts by clicking each one
-    const posts = findCurrentPosts();
-    for (const { shortcode } of posts) {
-      if (!autoClickRunning) break;
-      
-      state.capturedShortcodes.add(shortcode);
-      const link = document.querySelector(`a[href*="/p/${shortcode}"], a[href*="/reel/${shortcode}"]`);
-      if (link) {
-        await clickCarouselPost(link, shortcode);
-        await sleep(randomDelay(300, 600));
-      }
-    }
-  }
-  
-  END OF CLICK-BASED CAPTURE */
-  
+  // Note: an earlier click-based capture mode (startClickCapture) lived here
+  // before v4.4.0. It opened each post modal to walk carousel slides. Removed
+  // as part of item 10; the auto-scroll path is the only capture pipeline now.
+  // If revival is needed, git blame this comment.
+
   function stopAutoClickCapture() {
     autoClickRunning = false;
-    setStatus('Stopped');
     console.log('[IG Exporter] Auto-click stopped');
   }
   
@@ -968,207 +911,10 @@
     });
     
     if (count > 0) {
-      updatePanel();
       saveToStorage();
     }
     
     return count;
-  }
-
-  // ============================================
-  // UI PANEL
-  // ============================================
-
-  function createPanel() {
-    if (document.getElementById('ig-exporter-panel')) return;
-    
-    const panel = document.createElement('div');
-    panel.id = 'ig-exporter-panel';
-    panel.innerHTML = `
-      <div class="ig-exp-header">
-        <span class="ig-exp-title">📸 IG Exporter</span>
-        <button class="ig-exp-close" title="Minimize">−</button>
-      </div>
-      <div class="ig-exp-body">
-        <div class="ig-exp-stats">
-          <div><span id="ig-exp-images">0</span> Images</div>
-          <div><span id="ig-exp-videos">0</span> Videos</div>
-        </div>
-        <button id="ig-exp-carousels" class="ig-exp-btn-primary">📜 Start Capture</button>
-        <button id="ig-exp-gallery" class="ig-exp-btn">🖼️ Gallery</button>
-        <button id="ig-exp-clear" class="ig-exp-btn-danger">🗑️ Clear</button>
-        <div id="ig-exp-status" class="ig-exp-status"></div>
-        <div id="ig-exp-loading-bar" class="ig-exp-loading-bar" style="display:none;">
-          <div class="ig-exp-loading-bar-inner"></div>
-        </div>
-      </div>
-    `;
-    
-    // Styles
-    const style = document.createElement('style');
-    style.textContent = `
-      #ig-exporter-panel {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 200px;
-        background: #1a1a2e;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        z-index: 999999;
-        font-family: -apple-system, sans-serif;
-        color: white;
-        font-size: 13px;
-      }
-      .ig-exp-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 12px;
-        border-bottom: 1px solid #333;
-      }
-      .ig-exp-title { font-weight: 600; }
-      .ig-exp-close {
-        background: none;
-        border: none;
-        color: white;
-        font-size: 18px;
-        cursor: pointer;
-      }
-      .ig-exp-body { padding: 12px; }
-      .ig-exp-body.hidden { display: none; }
-      .ig-exp-stats {
-        display: flex;
-        justify-content: space-around;
-        margin-bottom: 12px;
-        font-size: 14px;
-      }
-      .ig-exp-stats span {
-        font-weight: bold;
-        color: #E1306C;
-      }
-      .ig-exp-btn, .ig-exp-btn-primary, .ig-exp-btn-danger {
-        width: 100%;
-        padding: 8px;
-        margin-bottom: 6px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-      }
-      .ig-exp-btn {
-        background: #333;
-        color: white;
-      }
-      .ig-exp-btn:hover { background: #444; }
-      .ig-exp-btn-primary {
-        background: linear-gradient(135deg, #833ab4, #E1306C);
-        color: white;
-      }
-      .ig-exp-btn-danger {
-        background: #dc3545;
-        color: white;
-      }
-      .ig-exp-status {
-        font-size: 11px;
-        color: #888;
-        text-align: center;
-        min-height: 16px;
-      }
-      .ig-exp-status.loading {
-        color: #E1306C;
-        font-weight: 500;
-      }
-      .ig-exp-loading-bar {
-        height: 3px;
-        background: #333;
-        border-radius: 2px;
-        margin-top: 8px;
-        overflow: hidden;
-      }
-      .ig-exp-loading-bar-inner {
-        height: 100%;
-        width: 30%;
-        background: linear-gradient(90deg, #833ab4, #E1306C, #fd1d1d);
-        border-radius: 2px;
-        animation: ig-exp-loading 1s ease-in-out infinite;
-      }
-      @keyframes ig-exp-loading {
-        0% { transform: translateX(-100%); }
-        50% { transform: translateX(200%); }
-        100% { transform: translateX(-100%); }
-      }
-      .ig-exp-pulse {
-        animation: ig-exp-pulse 1.5s ease-in-out infinite;
-      }
-      @keyframes ig-exp-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-    `;
-    document.head.appendChild(style);
-    document.body.appendChild(panel);
-    
-    // Event handlers
-    panel.querySelector('.ig-exp-close').onclick = () => {
-      panel.querySelector('.ig-exp-body').classList.toggle('hidden');
-    };
-    
-    const carouselBtn = panel.querySelector('#ig-exp-carousels');
-    carouselBtn.onclick = () => {
-      if (autoClickRunning) {
-        stopAutoClickCapture();
-        carouselBtn.textContent = '📜 Start Capture';
-      } else {
-        startAutoClickCapture();
-        carouselBtn.textContent = '⏹️ Stop';
-      }
-    };
-    
-    panel.querySelector('#ig-exp-gallery').onclick = () => {
-      safeSendMessage({ type: 'OPEN_GALLERY' });
-    };
-    
-    panel.querySelector('#ig-exp-clear').onclick = () => {
-      state.images = [];
-      state.videos = [];
-      state.seenUrls.clear();
-      state.capturedShortcodes.clear();
-      updatePanel();
-      saveToStorage();
-      setStatus('Cleared!');
-    };
-  }
-
-  function updatePanel() {
-    // Update floating panel stats
-    const imagesEl = document.getElementById('ig-exp-images');
-    const videosEl = document.getElementById('ig-exp-videos');
-    
-    if (imagesEl) imagesEl.textContent = state.images.length;
-    if (videosEl) videosEl.textContent = state.videos.length;
-    
-    console.log('[IG Exporter] Stats:', state.images.length, 'images,', state.videos.length, 'videos');
-  }
-
-  function setStatus(msg, isLoading = false) {
-    const statusEl = document.getElementById('ig-exp-status');
-    const loadingBar = document.getElementById('ig-exp-loading-bar');
-    
-    if (statusEl) {
-      statusEl.textContent = msg;
-      if (isLoading) {
-        statusEl.classList.add('loading', 'ig-exp-pulse');
-      } else {
-        statusEl.classList.remove('loading', 'ig-exp-pulse');
-      }
-    }
-    
-    if (loadingBar) {
-      loadingBar.style.display = isLoading ? 'block' : 'none';
-    }
-    
-    console.log('[IG Exporter]', msg);
   }
 
   // ============================================
@@ -1200,8 +946,7 @@
           if (v.url) state.seenUrls.add(normalizeUrl(v.url));
           if (v.postUrl) state.seenUrls.add(normalizeUrl(v.postUrl));
         });
-        
-        updatePanel();
+
         console.log('[IG Exporter] Loaded:', state.images.length, 'images,', state.videos.length, 'videos');
       }
     });
@@ -1230,7 +975,6 @@
       state.videos = [];
       state.seenUrls.clear();
       state.capturedShortcodes.clear();
-      updatePanel();
       console.log('[IG Exporter] Storage cleared externally; in-memory state reset');
     }
   });
@@ -1273,7 +1017,6 @@
         state.videos = [];
         state.seenUrls.clear();
         state.capturedShortcodes.clear();
-        updatePanel();
         safeStorageSet({
           igExporterData: { images: [], videos: [] }
         });

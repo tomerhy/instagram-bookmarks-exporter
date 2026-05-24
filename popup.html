@@ -2,64 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- Shared design tokens, also imported by gallery.html. -->
+  <link rel="stylesheet" href="tokens.css">
   <style>
-    /* Keep this token block in sync with gallery.html. */
+    /* Popup-specific token overrides — values that intentionally differ from
+       the gallery (more compact buttons, lower selection-glow opacity, a
+       destructive-color palette for the Clear button). */
     :root {
-      color-scheme: dark;
-
-      /* Brand */
-      --ig-pink: #E1306C;
-      --ig-pink-dark: #c13584;
-      --ig-purple: #833ab4;
-      --ig-violet: #5851DB;
-
-      /* Semantic — selection / active state separate from brand */
-      --selected: #4F9DFF;
       --selected-glow: rgba(79, 157, 255, 0.30);
 
-      /* Surfaces — flatter darker base, glass layers above */
-      --ig-bg: #0a0a14;
-      --surface-1: rgba(255, 255, 255, 0.04);
-      --surface-2: rgba(255, 255, 255, 0.08);
-      --surface-3: rgba(255, 255, 255, 0.12);
-
-      --glass-bg:        rgba(22, 22, 38, 0.6);
-      --glass-border:    rgba(255, 255, 255, 0.10);
-      --glass-blur:      blur(20px) saturate(140%);
-
-      /* Text — all WCAG AA against --ig-bg */
-      --text-primary:   #f6f7fb;
-      --text-secondary: #d4d4dc;
-      --text-muted:     #a8a8b8;
-      --text-dim:       #9090a4;
-
-      /* Borders */
-      --border-1: rgba(255, 255, 255, 0.10);
-      --border-2: rgba(255, 255, 255, 0.18);
-
-      /* Spacing scale (4/8px) */
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 12px;
-      --space-4: 16px;
-      --space-5: 24px;
-      --space-6: 32px;
-
-      /* Radii */
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --radius-pill: 999px;
-
-      /* Button heights */
+      /* Button heights — popup is small, so buttons are too */
       --btn-h-sm: 32px;
       --btn-h-md: 40px;
       --btn-h-lg: 44px;
-
-      /* Motion — spring physics for hover overshoots */
-      --t-fast: 140ms cubic-bezier(0.4, 0, 0.2, 1);
-      --t-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
-      --t-spring: 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
       /* Destructive */
       --danger:       #ef4444;

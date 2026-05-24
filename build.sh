@@ -12,6 +12,7 @@ mkdir -p "$DIST_DIR"
 
 # Copy extension files
 cp manifest.json "$DIST_DIR/"
+cp tokens.css "$DIST_DIR/"
 cp background.js "$DIST_DIR/"
 cp content.js "$DIST_DIR/"
 cp content-styles.css "$DIST_DIR/"

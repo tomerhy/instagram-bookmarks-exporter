@@ -31,6 +31,7 @@ const SOURCE_FILES = [
   'popup.js',
   'gallery.html',
   'gallery.js',
+  'tokens.css',
   'build.sh',
   'privacy-policy.html'
 ];
@@ -49,6 +50,7 @@ const REQUIRED_IN_ZIP = [
   'popup.js',
   'gallery.html',
   'gallery.js',
+  'tokens.css',          // shared design tokens linked from popup + gallery
   'lib/jszip.min.js',    // <script> in gallery.html — per-album ZIP feature
   'assets/icons/icon-16.png',
   'assets/icons/icon-32.png',
