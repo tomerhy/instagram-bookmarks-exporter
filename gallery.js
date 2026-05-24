@@ -533,6 +533,18 @@ function expandCarousel(card, item) {
       '<strong>' + slides.length + '</strong> slides' +
     '</span>';
 
+  // Download-album button — bundles all slides + manifest.json into a zip.
+  var downloadBtn = document.createElement("button");
+  downloadBtn.className = "carousel-drawer-download";
+  downloadBtn.setAttribute("aria-label", "Download album as zip");
+  downloadBtn.title = "Download album as zip";
+  downloadBtn.innerHTML = '<svg class="icon-sm" aria-hidden="true"><use href="#i-download"/></svg><span>Download album</span>';
+  downloadBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    downloadAlbum(item);
+  });
+  header.appendChild(downloadBtn);
+
   var closeBtn = document.createElement("button");
   closeBtn.className = "carousel-drawer-close";
   closeBtn.setAttribute("aria-label", "Collapse album");
@@ -1031,6 +1043,160 @@ function parseImportPayload(text) {
     throw new Error("No URLs found in file");
   }
   return { format: "txt", urls: urls };
+}
+
+// ----------------------------------------------------------------------------
+// Per-album ZIP download — for carousel posts, bundle all slides + a
+// manifest.json into a single <shortcode>.zip. Uses JSZip (loaded via
+// gallery.html before this file). Helpers below are pure so the manifest
+// shape and filename rules can be tested without spinning up JSZip.
+// ----------------------------------------------------------------------------
+
+// Pick a file extension for a slide. Prefer the URL's extension when it's
+// a known media type; otherwise infer from the slide's type field. Falls
+// back to ".bin" so we never produce nameless files.
+function _slideExtension(slide) {
+  var url = (slide && (slide.url || slide.thumbnail)) || "";
+  // Strip query string + signed-URL params before reading extension.
+  var bare = String(url).split(/[?#]/)[0];
+  var m = bare.match(/\.([a-zA-Z0-9]{2,5})$/);
+  if (m) {
+    var ext = m[1].toLowerCase();
+    if (/^(jpg|jpeg|png|gif|webp|mp4|mov|webm|heic|avif)$/.test(ext)) {
+      return ext === "jpeg" ? "jpg" : ext;
+    }
+  }
+  if (slide && slide.type === "video") return "mp4";
+  if (slide && slide.type === "image") return "jpg";
+  return "bin";
+}
+
+// 1-indexed, zero-padded so files sort correctly in archive tools.
+function albumFilename(slide, idx, totalSlides) {
+  var n = idx + 1;
+  var width = String(totalSlides).length;
+  var padded = String(n);
+  while (padded.length < width) padded = "0" + padded;
+  return padded + "." + _slideExtension(slide);
+}
+
+// Build the manifest.json content for an album zip. Captures everything
+// that's useful for re-importing or archival lookup later. Pure — takes
+// the grouped item and returns a JSON-serializable object.
+function buildAlbumManifest(item, extensionVersion) {
+  if (!item) return null;
+  var slides = Array.isArray(item._carouselSlides) ? item._carouselSlides : [item];
+  var meta = item.metadata || {};
+  return {
+    format: "instagram-saved-media-exporter-album",
+    formatVersion: 1,
+    extensionVersion: extensionVersion || null,
+    exportedAt: new Date().toISOString(),
+    shortcode: item.postShortcode || null,
+    postUrl: item.postUrl || null,
+    owner: meta.owner || null,
+    caption: meta.caption || null,
+    takenAt: meta.takenAt || null,
+    likeCount: typeof meta.likeCount === "number" ? meta.likeCount : null,
+    hashtags: Array.isArray(meta.hashtags) ? meta.hashtags.slice() : [],
+    slides: slides.map(function (s, i) {
+      return {
+        index: i,
+        filename: albumFilename(s, i, slides.length),
+        type: s.type || null,
+        url: s.url || null,
+        thumbnail: s.thumbnail || null,
+        carouselIndex: typeof s.carouselIndex === "number" ? s.carouselIndex : null
+      };
+    })
+  };
+}
+
+// Sanitize a string so it's safe as a filename prefix. Falls back to
+// "album" so we never produce a nameless zip.
+function _albumZipName(item) {
+  var shortcode = (item && item.postShortcode) || "album";
+  // Strip anything that's not safe on any common filesystem.
+  return String(shortcode).replace(/[^a-zA-Z0-9._-]/g, "_") + ".zip";
+}
+
+// Driver: fetch every slide, pack into a JSZip archive alongside a
+// manifest.json, trigger download. Status updates surface progress so
+// the user sees something happening for large albums.
+async function downloadAlbum(item) {
+  if (typeof JSZip === "undefined") {
+    setStatus("Album download not available — JSZip failed to load");
+    if (window.Analytics) Analytics.trackError('album_zip_no_jszip', {});
+    return;
+  }
+  var slides = Array.isArray(item && item._carouselSlides) ? item._carouselSlides : [];
+  if (!slides.length) {
+    setStatus("Nothing to download — album has no slides");
+    return;
+  }
+
+  var extVersion = null;
+  try { extVersion = chrome.runtime.getManifest().version; } catch (_) {}
+
+  setStatus("Preparing album (" + slides.length + " slides)...", true);
+  if (window.Analytics) {
+    Analytics.trackButtonClick('album_download', 'gallery');
+    Analytics.trackFeature('album_download_started', {
+      slide_count: slides.length,
+      shortcode: item.postShortcode || null
+    });
+  }
+
+  var zip = new JSZip();
+  var manifest = buildAlbumManifest(item, extVersion);
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+
+  var failures = 0;
+  for (var i = 0; i < slides.length; i++) {
+    var slide = slides[i];
+    var url = slide && (slide.url || slide.thumbnail);
+    if (!url) { failures++; continue; }
+    setStatus("Fetching " + (i + 1) + " / " + slides.length + "...", true);
+    try {
+      var res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var blob = await res.blob();
+      zip.file(albumFilename(slide, i, slides.length), blob);
+    } catch (e) {
+      failures++;
+      console.warn("[Gallery] Album slide fetch failed:", url, e.message);
+    }
+  }
+
+  if (failures === slides.length) {
+    setStatus("Album download failed — all slides errored");
+    if (window.Analytics) {
+      Analytics.trackError('album_zip_all_failed', { slide_count: slides.length });
+    }
+    return;
+  }
+
+  setStatus("Zipping " + slides.length + " slides...", true);
+  try {
+    var content = await zip.generateAsync({ type: "blob" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = _albumZipName(item);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    var msg = "Downloaded " + slides.length + " slides";
+    if (failures > 0) msg += " (" + failures + " failed)";
+    setStatus(msg);
+    if (window.Analytics) {
+      Analytics.trackFeature('album_download_completed', {
+        slide_count: slides.length,
+        failure_count: failures
+      });
+    }
+  } catch (e) {
+    setStatus("Album zip failed: " + e.message);
+    if (window.Analytics) Analytics.trackError('album_zip_failed', { error_message: e.message });
+  }
 }
 
 // ----------------------------------------------------------------------------

@@ -49,6 +49,7 @@ const REQUIRED_IN_ZIP = [
   'popup.js',
   'gallery.html',
   'gallery.js',
+  'lib/jszip.min.js',    // <script> in gallery.html — per-album ZIP feature
   'assets/icons/icon-16.png',
   'assets/icons/icon-32.png',
   'assets/icons/icon-48.png',
@@ -66,6 +67,8 @@ function stage() {
   const assetsSrc = path.join(REPO_ROOT, 'assets');
   const assetsDst = path.join(dir, 'assets');
   copyDir(assetsSrc, assetsDst);
+  // lib/ holds bundled third-party scripts (JSZip)
+  copyDir(path.join(REPO_ROOT, 'lib'), path.join(dir, 'lib'));
   // Make build.sh executable in the staged copy
   fs.chmodSync(path.join(dir, 'build.sh'), 0o755);
   return dir;

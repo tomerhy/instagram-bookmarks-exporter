@@ -23,6 +23,11 @@ cp popup.js "$DIST_DIR/"
 cp gallery.html "$DIST_DIR/"
 cp gallery.js "$DIST_DIR/"
 
+# Bundled third-party libraries — currently just JSZip for the per-album
+# download feature. ~95KB pre-gzip; CWS zips it again so download cost
+# is much lower.
+cp -r lib "$DIST_DIR/"
+
 # Copy only the runtime assets the extension actually uses (icons).
 # assets/screenshots/ holds Chrome Web Store marketing PNGs (~8MB) that
 # would otherwise bloat the user's downloaded package for no benefit.
