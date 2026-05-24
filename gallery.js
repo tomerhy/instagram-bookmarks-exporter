@@ -1033,6 +1033,61 @@ function parseImportPayload(text) {
   return { format: "txt", urls: urls };
 }
 
+// ----------------------------------------------------------------------------
+// CSV export — RFC 4180 compliant. The metadata.caption field can carry
+// newlines, commas, and quotes; we escape carefully so the file opens cleanly
+// in Excel / Numbers / Google Sheets.
+// ----------------------------------------------------------------------------
+
+var CSV_COLUMNS = [
+  "type", "url", "thumbnail",
+  "postUrl", "postShortcode",
+  "carouselIndex", "carouselSize",
+  "owner", "caption", "takenAt", "likeCount", "hashtags",
+  "scrapedAt"
+];
+
+// RFC 4180: a field that contains a comma, quote, CR, or LF must be wrapped
+// in double quotes; embedded double quotes inside a wrapped field are
+// escaped by doubling them. Everything else passes through.
+function csvEscape(val) {
+  if (val === null || val === undefined) return "";
+  var s = String(val);
+  if (s === "") return "";
+  if (/[",\r\n]/.test(s)) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+// Pure: given a flat list of items, produce a CSV string. Items lacking
+// metadata fields write empty cells, not "null" or "undefined".
+function buildCsv(items) {
+  var lines = [CSV_COLUMNS.join(",")];
+  if (!Array.isArray(items)) return lines.join("\r\n");
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i] || {};
+    var meta = it.metadata || {};
+    var tags = Array.isArray(meta.hashtags) ? meta.hashtags.join(" ") : "";
+    lines.push([
+      csvEscape(it.type),
+      csvEscape(it.url),
+      csvEscape(it.thumbnail),
+      csvEscape(it.postUrl),
+      csvEscape(it.postShortcode),
+      csvEscape(typeof it.carouselIndex === "number" ? it.carouselIndex : ""),
+      csvEscape(typeof it.carouselSize === "number" ? it.carouselSize : ""),
+      csvEscape(meta.owner),
+      csvEscape(meta.caption),
+      csvEscape(meta.takenAt),
+      csvEscape(typeof meta.likeCount === "number" ? meta.likeCount : ""),
+      csvEscape(tags),
+      csvEscape(it.scrapedAt)
+    ].join(","));
+  }
+  return lines.join("\r\n");
+}
+
 // Tab switching
 document.querySelectorAll(".tab").forEach(function(tab) {
   tab.onclick = function() {
@@ -1184,6 +1239,26 @@ document.getElementById("clear")?.addEventListener("click", function() {
     setStatus("Cleared all data");
     logDebug("Data cleared");
   });
+});
+
+document.getElementById("export-csv")?.addEventListener("click", function () {
+  // CSV is per-tab (one row per item) so the user gets exactly what they're
+  // looking at — flat structure that drops cleanly into Excel/Sheets.
+  var items = currentTab === "videos" ? allMedia.videos : allMedia.images;
+  var csv = buildCsv(items);
+  // BOM so Excel correctly detects UTF-8 (otherwise it mangles accented owners).
+  var blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  var stamp = new Date().toISOString().slice(0, 10);
+  a.download = "instagram-" + currentTab + "-" + stamp + ".csv";
+  a.click();
+
+  setStatus("Exported " + items.length + " rows to CSV");
+  if (window.Analytics) {
+    Analytics.trackButtonClick('export_csv', 'gallery');
+    Analytics.trackFeature('export_csv', { count: items.length, type: currentTab });
+  }
 });
 
 document.getElementById("import")?.addEventListener("click", function() {
