@@ -70,11 +70,11 @@ function getPostUrl(item) {
 // only) as a stable asset-level identifier for cases without a shortcode.
 function trackItemView(item) {
   if (!item || !window.Analytics) return;
-  var url = getUrl(item);
+  let url = getUrl(item);
   if (!url) return;
-  var pathname = url;
+  let pathname = url;
   try { pathname = new URL(url).pathname; } catch (e) { /* leave as-is */ }
-  var postUrl = item.postShortcode
+  let postUrl = item.postShortcode
     ? 'https://www.instagram.com/p/' + item.postShortcode + '/'
     : (item.postUrl || null);
   Analytics.trackFeature('item_viewed', {
@@ -114,23 +114,23 @@ function escapeHtml(str) {
 // individual entries. Capture order is preserved by remembering the first
 // occurrence of each group.
 function getCurrentItems() {
-  var items = currentTab === "images" ? allMedia.images : allMedia.videos;
+  let items = currentTab === "images" ? allMedia.images : allMedia.videos;
   // Items inside the same post dedupe by (shortcode, carouselIndex) so that a
   // slide URL matching the cover URL doesn't drop the slide. Items without a
   // shortcode (legacy data captured pre-v4.3) dedupe by URL.
-  var seenWithinPost = {};
-  var seenUrl = {};
-  var groupOrder = [];
-  var groupMap = {};
+  let seenWithinPost = {};
+  let seenUrl = {};
+  let groupOrder = [];
+  let groupMap = {};
 
   for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    var url = getUrl(item);
+    let item = items[i];
+    let url = getUrl(item);
     if (!url) continue;
 
     if (item && item.postShortcode) {
-      var idx = (item.carouselIndex == null) ? 'cover' : item.carouselIndex;
-      var slotKey = item.postShortcode + ':' + idx;
+      let idx = (item.carouselIndex == null) ? 'cover' : item.carouselIndex;
+      let slotKey = item.postShortcode + ':' + idx;
       if (seenWithinPost[slotKey]) continue;
       seenWithinPost[slotKey] = true;
     } else {
@@ -138,7 +138,7 @@ function getCurrentItems() {
       seenUrl[url] = true;
     }
 
-    var key = (item && item.postShortcode) ? ("post:" + item.postShortcode) : ("item:" + url);
+    let key = (item && item.postShortcode) ? ("post:" + item.postShortcode) : ("item:" + url);
     if (!groupMap[key]) {
       groupMap[key] = [];
       groupOrder.push(key);
@@ -147,11 +147,11 @@ function getCurrentItems() {
   }
 
   return groupOrder.map(function(key) {
-    var slides = groupMap[key];
+    let slides = groupMap[key];
     if (slides.length === 1) return slides[0];
-    var sorted = slides.slice().sort(function(a, b) {
-      var ai = (a.carouselIndex == null) ? 0 : a.carouselIndex;
-      var bi = (b.carouselIndex == null) ? 0 : b.carouselIndex;
+    let sorted = slides.slice().sort(function(a, b) {
+      let ai = (a.carouselIndex == null) ? 0 : a.carouselIndex;
+      let bi = (b.carouselIndex == null) ? 0 : b.carouselIndex;
       return ai - bi;
     });
     return Object.assign({}, sorted[0], {
@@ -177,10 +177,10 @@ function _searchTokenize(query) {
 }
 
 function _itemSearchHaystack(item) {
-  var meta = (item && item.metadata) || null;
-  var owner = (meta && meta.owner) ? String(meta.owner).toLowerCase() : "";
-  var caption = (meta && meta.caption) ? String(meta.caption).toLowerCase() : "";
-  var hashtags = (meta && Array.isArray(meta.hashtags))
+  let meta = (item && item.metadata) || null;
+  let owner = (meta && meta.owner) ? String(meta.owner).toLowerCase() : "";
+  let caption = (meta && meta.caption) ? String(meta.caption).toLowerCase() : "";
+  let hashtags = (meta && Array.isArray(meta.hashtags))
     ? meta.hashtags.map(function (t) { return String(t).toLowerCase(); })
     : [];
   return { owner: owner, caption: caption, hashtags: hashtags };
@@ -188,11 +188,11 @@ function _itemSearchHaystack(item) {
 
 function _tokenMatches(token, hay) {
   if (token.charAt(0) === "@") {
-    var name = token.slice(1);
+    let name = token.slice(1);
     return name.length > 0 && hay.owner.indexOf(name) !== -1;
   }
   if (token.charAt(0) === "#") {
-    var tag = token.slice(1);
+    let tag = token.slice(1);
     if (!tag) return false;
     for (var i = 0; i < hay.hashtags.length; i++) {
       if (hay.hashtags[i].indexOf(tag) !== -1) return true;
@@ -208,11 +208,11 @@ function _tokenMatches(token, hay) {
 }
 
 function matchesQuery(item, query) {
-  var tokens = _searchTokenize(query);
+  let tokens = _searchTokenize(query);
   if (!tokens.length) return true;
   // Items without metadata can't match any non-empty query.
   if (!item || !item.metadata) return false;
-  var hay = _itemSearchHaystack(item);
+  let hay = _itemSearchHaystack(item);
   for (var i = 0; i < tokens.length; i++) {
     if (!_tokenMatches(tokens[i], hay)) return false;
   }
@@ -223,7 +223,7 @@ function matchesQuery(item, query) {
 // Carousel grouping happens upstream (getCurrentItems), so each filtered
 // entry already represents an album cover when applicable.
 function getFilteredItems() {
-  var items = getCurrentItems();
+  let items = getCurrentItems();
   if (searchQuery) {
     items = items.filter(function (it) { return matchesQuery(it, searchQuery); });
   }
@@ -242,13 +242,13 @@ function applySort(items, key) {
 
   // Pre-compute (key, index) tuples so we can sort by key with a stable
   // tiebreaker on original index.
-  var tuples = items.map(function (it, i) {
+  let tuples = items.map(function (it, i) {
     return { it: it, i: i, k: _sortKey(it, key) };
   });
 
   tuples.sort(function (a, b) {
-    var aMissing = a.k === null || a.k === undefined;
-    var bMissing = b.k === null || b.k === undefined;
+    let aMissing = a.k === null || a.k === undefined;
+    let bMissing = b.k === null || b.k === undefined;
     if (aMissing && bMissing) return a.i - b.i;
     if (aMissing) return 1;   // missing → bottom
     if (bMissing) return -1;
@@ -259,8 +259,8 @@ function applySort(items, key) {
 
   // For descending keys, reverse — but keep missing-at-bottom by splitting.
   if (key === "date_desc" || key === "likes") {
-    var present = tuples.filter(function (t) { return t.k !== null && t.k !== undefined; });
-    var missing = tuples.filter(function (t) { return t.k === null || t.k === undefined; });
+    let present = tuples.filter(function (t) { return t.k !== null && t.k !== undefined; });
+    let missing = tuples.filter(function (t) { return t.k === null || t.k === undefined; });
     present.reverse();
     tuples = present.concat(missing);
   }
@@ -271,19 +271,19 @@ function applySort(items, key) {
 // Per-key extractor. Returns a comparable value, or null when the item
 // lacks the field. Centralized so sort behavior is testable in isolation.
 function _sortKey(item, key) {
-  var meta = item && item.metadata;
+  let meta = item && item.metadata;
   switch (key) {
     case "date_desc":
     case "date_asc": {
-      var d = meta && meta.takenAt ? new Date(meta.takenAt).getTime() : null;
+      let d = meta && meta.takenAt ? new Date(meta.takenAt).getTime() : null;
       return (d === null || isNaN(d)) ? null : d;
     }
     case "owner": {
-      var o = meta && meta.owner ? String(meta.owner).toLowerCase() : null;
+      let o = meta && meta.owner ? String(meta.owner).toLowerCase() : null;
       return o || null;
     }
     case "likes": {
-      var n = meta && typeof meta.likeCount === "number" ? meta.likeCount : null;
+      let n = meta && typeof meta.likeCount === "number" ? meta.likeCount : null;
       return n;
     }
     default:
@@ -292,11 +292,11 @@ function _sortKey(item, key) {
 }
 
 function setSortBy(key) {
-  var next = String(key || "default");
+  let next = String(key || "default");
   if (next === sortBy) return;
   sortBy = next;
   currentPage = 1;
-  var sel = document.getElementById("sort-select");
+  let sel = document.getElementById("sort-select");
   if (sel) {
     if (sel.value !== next) sel.value = next;
     sel.classList.toggle("is-active", next !== "default");
@@ -315,14 +315,14 @@ function setSortBy(key) {
 // page beyond the filtered total), updates the input/clear/meta UI, and
 // re-renders the grid.
 function setSearchQuery(value) {
-  var next = String(value || "");
+  let next = String(value || "");
   if (next === searchQuery) return;
   searchQuery = next;
   currentPage = 1;
   // Keep the input in sync if the change came from somewhere other than typing
-  var input = document.getElementById("search-input");
+  let input = document.getElementById("search-input");
   if (input && input.value !== next) input.value = next;
-  var clearBtn = document.getElementById("search-clear");
+  let clearBtn = document.getElementById("search-clear");
   if (clearBtn) clearBtn.hidden = next.length === 0;
   // Selection may reference a now-filtered-out card; drop it.
   if (next) {
@@ -345,7 +345,7 @@ function setSearchQuery(value) {
 // "Showing N of M results for '...'" row beneath the toolbar. Hidden when
 // the query is empty.
 function renderSearchMeta(filtered, total) {
-  var meta = document.getElementById("search-meta");
+  let meta = document.getElementById("search-meta");
   if (!meta) return;
   if (!searchQuery) {
     meta.hidden = true;
@@ -353,7 +353,7 @@ function renderSearchMeta(filtered, total) {
     return;
   }
   meta.hidden = false;
-  var label = (filtered === total)
+  let label = (filtered === total)
     ? '<strong>' + filtered + '</strong> ' + (filtered === 1 ? 'result' : 'results') +
       ' for <strong>' + escapeHtml(searchQuery) + '</strong>'
     : 'Showing <strong>' + filtered + '</strong> of <strong>' + total +
@@ -362,7 +362,7 @@ function renderSearchMeta(filtered, total) {
   meta.innerHTML =
     '<span>' + label + '</span>' +
     '<button class="search-meta-clear" type="button">Clear</button>';
-  var clear = meta.querySelector(".search-meta-clear");
+  let clear = meta.querySelector(".search-meta-clear");
   if (clear) clear.onclick = function () {
     if (window.Analytics) Analytics.trackButtonClick('search_clear_meta', 'gallery');
     setSearchQuery("");
@@ -372,11 +372,11 @@ function renderSearchMeta(filtered, total) {
 // Render the metadata block under the viewer (caption, owner, date, album size).
 // No-op when the item has no metadata (legacy items pre-v4.3).
 function renderViewerMeta(item) {
-  var el = document.getElementById("viewer-meta");
+  let el = document.getElementById("viewer-meta");
   if (!el) return;
 
-  var meta = item && item.metadata;
-  var hasAlbum = item && item.carouselSize && item.carouselSize > 1;
+  let meta = item && item.metadata;
+  let hasAlbum = item && item.carouselSize && item.carouselSize > 1;
 
   if (!meta && !hasAlbum) {
     el.classList.remove("visible");
@@ -384,20 +384,20 @@ function renderViewerMeta(item) {
     return;
   }
 
-  var headParts = [];
+  let headParts = [];
   if (meta && meta.owner) headParts.push('<span class="vm-owner">@' + escapeHtml(meta.owner) + '</span>');
   if (meta && meta.takenAt) {
-    var d = new Date(meta.takenAt);
+    let d = new Date(meta.takenAt);
     if (!isNaN(d.getTime())) headParts.push('<span class="vm-date">' + d.toLocaleDateString() + '</span>');
   }
   if (hasAlbum) {
     headParts.push('<span class="vm-album">📷 ' + item.carouselSize + ' slides</span>');
   }
 
-  var headHtml = headParts.length ? '<div class="vm-head">' + headParts.join(' · ') + '</div>' : '';
-  var captionHtml = '';
+  let headHtml = headParts.length ? '<div class="vm-head">' + headParts.join(' · ') + '</div>' : '';
+  let captionHtml = '';
   if (meta && meta.caption) {
-    var c = meta.caption.length > 280 ? meta.caption.slice(0, 280) + '…' : meta.caption;
+    let c = meta.caption.length > 280 ? meta.caption.slice(0, 280) + '…' : meta.caption;
     captionHtml = '<div class="vm-caption">' + escapeHtml(c) + '</div>';
   }
 
@@ -407,13 +407,13 @@ function renderViewerMeta(item) {
 
 // Update counts
 function updateCounts() {
-  var images = allMedia.images.length;
-  var videos = allMedia.videos.length;
+  let images = allMedia.images.length;
+  let videos = allMedia.videos.length;
   if (imageCountEl) imageCountEl.textContent = images;
   if (videoCountEl) videoCountEl.textContent = videos;
   
   // Count how many videos have playable URLs
-  var playableVideos = allMedia.videos.filter(function(v) {
+  let playableVideos = allMedia.videos.filter(function(v) {
     return isPlayableVideoUrl(getUrl(v));
   }).length;
   
@@ -421,7 +421,7 @@ function updateCounts() {
   
   // Show first video details for debugging
   if (allMedia.videos.length > 0) {
-    var v = allMedia.videos[0];
+    let v = allMedia.videos[0];
     logDebug("First video: url=" + (v.url ? v.url.substring(0, 50) : "null") + ", postUrl=" + (v.postUrl || "null"));
   }
 }
@@ -443,15 +443,15 @@ function getCarouselSlides(item) {
 // Each slide gets a --i CSS custom property which the strip's keyframes use
 // to stagger the slide-in animation (slide 0 fires first, slide 5 fires last).
 function buildCarouselStrip(slides) {
-  var strip = document.createElement("div");
+  let strip = document.createElement("div");
   strip.className = "carousel-strip";
   strip.setAttribute("role", "list");
   strip.setAttribute("aria-label", "Album slides");
 
   for (var i = 0; i < slides.length; i++) {
-    var slide = slides[i];
-    var thumbUrl = (slide && (slide.thumbnail || slide.url)) || "";
-    var slideEl = document.createElement("button");
+    let slide = slides[i];
+    let thumbUrl = (slide && (slide.thumbnail || slide.url)) || "";
+    let slideEl = document.createElement("button");
     slideEl.className = "carousel-strip-slide";
     slideEl.setAttribute("role", "listitem");
     slideEl.setAttribute("aria-label", "Slide " + (i + 1) + " of " + slides.length);
@@ -459,7 +459,7 @@ function buildCarouselStrip(slides) {
     // Stagger index for the keyframe delay (capped so a 50-slide album
     // doesn't take 2.5 seconds to settle).
     if (slideEl.style) slideEl.style.setProperty("--i", String(Math.min(i, 10)));
-    var img = document.createElement("img");
+    let img = document.createElement("img");
     img.src = thumbUrl;
     img.loading = "lazy";
     img.alt = "";
@@ -473,18 +473,18 @@ function buildCarouselStrip(slides) {
 // right UX (Clear All, tab switch, opening a different album mid-flight).
 function collapseCarousel(opts) {
   if (!expandedCard) return;
-  var instant = !!(opts && opts.instant);
-  var card = expandedCard;
+  let instant = !!(opts && opts.instant);
+  let card = expandedCard;
   // Free the slot immediately so a re-expand on the same card during the
   // close animation can race in without false "already expanded" guards.
   expandedCard = null;
 
-  var drawer = card.querySelector(".carousel-drawer:not(.is-closing)");
+  let drawer = card.querySelector(".carousel-drawer:not(.is-closing)");
 
   function finishClose() {
     if (drawer && drawer.parentNode) drawer.remove();
     // Belt-and-braces: drop any stray bare strip too (defensive).
-    var stray = card.querySelector(".carousel-strip");
+    let stray = card.querySelector(".carousel-strip");
     if (stray) stray.remove();
     // Only collapse the card if no new expansion has reclaimed it.
     if (expandedCard !== card) {
@@ -499,7 +499,7 @@ function collapseCarousel(opts) {
   }
 
   drawer.classList.add("is-closing");
-  var done = false;
+  let done = false;
   function once() { if (!done) { done = true; finishClose(); } }
   drawer.addEventListener("animationend", once, { once: true });
   // Fallback if animationend never fires — e.g. prefers-reduced-motion
@@ -519,14 +519,14 @@ function expandCarousel(card, item) {
     return;
   }
 
-  var slides = getCarouselSlides(item);
+  let slides = getCarouselSlides(item);
   if (!slides.length) return;
 
   // Build the drawer: header with album count + close, then the strip.
-  var drawer = document.createElement("div");
+  let drawer = document.createElement("div");
   drawer.className = "carousel-drawer";
 
-  var header = document.createElement("div");
+  let header = document.createElement("div");
   header.className = "carousel-drawer-header";
   header.innerHTML =
     '<span class="carousel-drawer-title">' +
@@ -534,7 +534,7 @@ function expandCarousel(card, item) {
     '</span>';
 
   // Download-album button — bundles all slides + manifest.json into a zip.
-  var downloadBtn = document.createElement("button");
+  let downloadBtn = document.createElement("button");
   downloadBtn.className = "carousel-drawer-download";
   downloadBtn.setAttribute("aria-label", "Download album as zip");
   downloadBtn.title = "Download album as zip";
@@ -545,7 +545,7 @@ function expandCarousel(card, item) {
   });
   header.appendChild(downloadBtn);
 
-  var closeBtn = document.createElement("button");
+  let closeBtn = document.createElement("button");
   closeBtn.className = "carousel-drawer-close";
   closeBtn.setAttribute("aria-label", "Collapse album");
   closeBtn.title = "Close";
@@ -558,23 +558,23 @@ function expandCarousel(card, item) {
   header.appendChild(closeBtn);
   drawer.appendChild(header);
 
-  var strip = buildCarouselStrip(slides);
+  let strip = buildCarouselStrip(slides);
   drawer.appendChild(strip);
 
   // Clicking a slide thumb previews it in the viewer.
   drawer.addEventListener("click", function (e) {
-    var btn = e.target.closest(".carousel-strip-slide");
+    let btn = e.target.closest(".carousel-strip-slide");
     if (!btn) return;
     e.stopPropagation();
-    var idx = parseInt(btn.getAttribute("data-slide-index"), 10);
-    var slide = slides[idx];
+    let idx = parseInt(btn.getAttribute("data-slide-index"), 10);
+    let slide = slides[idx];
     if (!slide) return;
     if (currentTab === "videos") {
       showVideo(slide);
     } else {
       showImage(slide);
     }
-    var prev = strip.querySelector(".carousel-strip-slide.active");
+    let prev = strip.querySelector(".carousel-strip-slide.active");
     if (prev) prev.classList.remove("active");
     btn.classList.add("active");
     if (window.Analytics) {
@@ -611,7 +611,7 @@ function resetViewer() {
     viewerPlaceholder.style.display = "flex";
     viewerPlaceholder.innerHTML = "Select an item to preview";
   }
-  var meta = document.getElementById("viewer-meta");
+  let meta = document.getElementById("viewer-meta");
   if (meta) {
     meta.classList.remove("visible");
     meta.innerHTML = "";
@@ -625,7 +625,7 @@ function resetViewer() {
 
 // Show image in viewer
 function showImage(item) {
-  var url = getUrl(item);
+  let url = getUrl(item);
   if (!url) return;
 
   if (player) { player.pause(); player.style.display = "none"; }
@@ -640,9 +640,9 @@ function showImage(item) {
 
 // Show video in viewer
 function showVideo(item) {
-  var url = getUrl(item);
-  var postUrl = getPostUrl(item);
-  var thumb = getThumbnail(item);
+  let url = getUrl(item);
+  let postUrl = getPostUrl(item);
+  let thumb = getThumbnail(item);
   
   logDebug("Video item: url=" + (url ? url.substring(0, 60) + "..." : "null") + ", postUrl=" + (postUrl || "null"));
   
@@ -650,7 +650,7 @@ function showVideo(item) {
   if (player) { player.pause(); player.src = ""; }
   
   // Check if we have a playable CDN video URL
-  var playable = isPlayableVideoUrl(url);
+  let playable = isPlayableVideoUrl(url);
   
   if (playable) {
     logDebug("Attempting to play video...");
@@ -678,7 +678,7 @@ function showVideoFallback(linkUrl, thumbnailUrl) {
   if (player) player.style.display = "none";
   if (viewerPlaceholder) {
     viewerPlaceholder.style.display = "flex";
-    var thumbHtml = thumbnailUrl ? 
+    let thumbHtml = thumbnailUrl ? 
       '<img src="' + thumbnailUrl + '" style="max-width:200px;max-height:200px;border-radius:8px;margin-bottom:15px;">' : 
       '<div style="font-size:60px;margin-bottom:15px;">🎬</div>';
     
@@ -695,9 +695,9 @@ function renderGrid() {
   if (!grid) return;
   grid.innerHTML = "";
 
-  var unfilteredCount = getCurrentItems().length;
-  var items = getFilteredItems();
-  var totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+  let unfilteredCount = getCurrentItems().length;
+  let items = getFilteredItems();
+  let totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
 
   if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
 
@@ -714,13 +714,13 @@ function renderGrid() {
           'Try different keywords, or use <code>@user</code> / <code>#tag</code> to narrow the field.</p>' +
           '<button class="btn-link" id="empty-clear-search">Clear search</button>' +
         '</div>';
-      var clearBtn = document.getElementById("empty-clear-search");
+      let clearBtn = document.getElementById("empty-clear-search");
       if (clearBtn) clearBtn.onclick = function () {
         if (window.Analytics) Analytics.trackButtonClick('search_clear_empty', 'gallery');
         setSearchQuery("");
       };
     } else {
-      var emptyIcon = currentTab === "videos" ? "▶" : "🖼";
+      let emptyIcon = currentTab === "videos" ? "▶" : "🖼";
       grid.innerHTML =
         '<div class="empty-state">' +
           '<div class="es-icon" aria-hidden="true">' + emptyIcon + '</div>' +
@@ -738,13 +738,13 @@ function renderGrid() {
     return;
   }
   
-  var start = (currentPage - 1) * ITEMS_PER_PAGE;
-  var end = Math.min(start + ITEMS_PER_PAGE, items.length);
-  var pageItems = items.slice(start, end);
+  let start = (currentPage - 1) * ITEMS_PER_PAGE;
+  let end = Math.min(start + ITEMS_PER_PAGE, items.length);
+  let pageItems = items.slice(start, end);
   
   pageItems.forEach(function(item, idx) {
-    var globalIdx = start + idx;
-    var card = document.createElement("div");
+    let globalIdx = start + idx;
+    let card = document.createElement("div");
     card.className = "card";
     card.setAttribute("data-index", globalIdx);
     // Subtle entrance stagger — cards wave in over ~600ms total. Capped so
@@ -755,19 +755,19 @@ function renderGrid() {
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-pressed", "false");
-    var ownerForLabel = (item.metadata && item.metadata.owner) ? " by @" + item.metadata.owner : "";
-    var sizeForLabel = (item.carouselSize && item.carouselSize > 1) ? ", album of " + item.carouselSize : "";
+    let ownerForLabel = (item.metadata && item.metadata.owner) ? " by @" + item.metadata.owner : "";
+    let sizeForLabel = (item.carouselSize && item.carouselSize > 1) ? ", album of " + item.carouselSize : "";
     card.setAttribute(
       "aria-label",
       (currentTab === "videos" ? "Video " : "Image ") + (globalIdx + 1) + ownerForLabel + sizeForLabel
     );
     
-    var thumbUrl = getThumbnail(item) || getUrl(item);
+    let thumbUrl = getThumbnail(item) || getUrl(item);
     
     if (currentTab === "videos") {
       // Video thumbnail
       if (thumbUrl && thumbUrl.indexOf(".mp4") === -1) {
-        var img = document.createElement("img");
+        let img = document.createElement("img");
         img.className = "thumb";
         img.src = thumbUrl;
         img.loading = "lazy";
@@ -776,20 +776,20 @@ function renderGrid() {
         };
         card.appendChild(img);
       } else {
-        var placeholder = document.createElement("div");
+        let placeholder = document.createElement("div");
         placeholder.className = "thumb";
         placeholder.style.cssText = "display:flex;align-items:center;justify-content:center;background:#222;";
         placeholder.innerHTML = '<span style="font-size:40px;">▶</span>';
         card.appendChild(placeholder);
       }
       
-      var badge = document.createElement("div");
+      let badge = document.createElement("div");
       badge.className = "video-badge";
       badge.textContent = "▶ Video";
       card.appendChild(badge);
     } else {
       // Image thumbnail
-      var img = document.createElement("img");
+      let img = document.createElement("img");
       img.className = "thumb";
       img.src = thumbUrl;
       img.loading = "lazy";
@@ -802,7 +802,7 @@ function renderGrid() {
     // Carousel indicator — Instagram's own two-square glyph + count, no pill
     // background. Click expands the card into a horizontal slide drawer.
     if (item.carouselSize && item.carouselSize > 1) {
-      var carBadge = document.createElement("button");
+      let carBadge = document.createElement("button");
       carBadge.className = "carousel-indicator";
       carBadge.innerHTML =
         '<span class="ci-count">' + item.carouselSize + '</span>' +
@@ -814,7 +814,7 @@ function renderGrid() {
       carBadge.addEventListener("click", function(e) {
         // Don't trigger the card's own click (which would just select it).
         e.stopPropagation();
-        var wasExpanded = card.classList.contains("carousel-expanded");
+        let wasExpanded = card.classList.contains("carousel-expanded");
         expandCarousel(card, item);
         carBadge.setAttribute("aria-expanded",
           card.classList.contains("carousel-expanded") ? "true" : "false");
@@ -832,7 +832,7 @@ function renderGrid() {
 
     // Owner overlay (only when metadata is present)
     if (item.metadata && item.metadata.owner) {
-      var ovl = document.createElement("div");
+      let ovl = document.createElement("div");
       ovl.className = "meta-overlay";
       ovl.innerHTML = '<div class="meta-owner">@' + escapeHtml(item.metadata.owner) + '</div>';
       card.appendChild(ovl);
@@ -887,7 +887,7 @@ function renderPagination(totalPages) {
   
   if (totalPages <= 1) return;
   
-  var prev = document.createElement("button");
+  let prev = document.createElement("button");
   prev.className = "page-btn";
   prev.textContent = "←";
   prev.disabled = currentPage === 1;
@@ -903,7 +903,7 @@ function renderPagination(totalPages) {
   for (var i = 1; i <= totalPages; i++) {
     if (i <= 3 || i > totalPages - 2 || Math.abs(i - currentPage) <= 1) {
       (function(page) {
-        var btn = document.createElement("button");
+        let btn = document.createElement("button");
         btn.className = "page-btn" + (page === currentPage ? " active" : "");
         btn.textContent = page;
         btn.onclick = function() {
@@ -917,14 +917,14 @@ function renderPagination(totalPages) {
         paginationEl.appendChild(btn);
       })(i);
     } else if (i === 4 || i === totalPages - 2) {
-      var dots = document.createElement("span");
+      let dots = document.createElement("span");
       dots.textContent = "...";
       dots.style.padding = "0 8px";
       paginationEl.appendChild(dots);
     }
   }
 
-  var next = document.createElement("button");
+  let next = document.createElement("button");
   next.className = "page-btn";
   next.textContent = "→";
   next.disabled = currentPage === totalPages;
@@ -982,8 +982,8 @@ function loadData() {
 // with full metadata, so its label stays constant. Copy is still per-tab
 // (it's a quick URL-only clipboard action, not a backup).
 function updateButtonLabels() {
-  var label = currentTab === "images" ? "Images" : "Videos";
-  var copyBtn = document.getElementById("copy");
+  let label = currentTab === "images" ? "Images" : "Videos";
+  let copyBtn = document.getElementById("copy");
   if (copyBtn) copyBtn.textContent = "Copy " + label;
 }
 
@@ -1012,14 +1012,14 @@ function buildExportPayload(images, videos, extensionVersion) {
 //   { format: 'txt',  urls: [...] }                   — legacy URL list
 // Throws on completely unparseable input.
 function parseImportPayload(text) {
-  var trimmed = (text || "").trim();
+  let trimmed = (text || "").trim();
   if (!trimmed) {
     throw new Error("Empty file");
   }
 
   // JSON first: a valid backup starts with `{` and parses as our schema.
   if (trimmed.charAt(0) === "{") {
-    var data;
+    let data;
     try {
       data = JSON.parse(trimmed);
     } catch (e) {
@@ -1036,7 +1036,7 @@ function parseImportPayload(text) {
   }
 
   // Otherwise treat as URL-per-line (the pre-v4.3.6 export format).
-  var urls = trimmed.split(/\r?\n/)
+  let urls = trimmed.split(/\r?\n/)
     .map(function(l) { return l.trim(); })
     .filter(Boolean);
   if (!urls.length) {
@@ -1056,12 +1056,12 @@ function parseImportPayload(text) {
 // a known media type; otherwise infer from the slide's type field. Falls
 // back to ".bin" so we never produce nameless files.
 function _slideExtension(slide) {
-  var url = (slide && (slide.url || slide.thumbnail)) || "";
+  let url = (slide && (slide.url || slide.thumbnail)) || "";
   // Strip query string + signed-URL params before reading extension.
-  var bare = String(url).split(/[?#]/)[0];
-  var m = bare.match(/\.([a-zA-Z0-9]{2,5})$/);
+  let bare = String(url).split(/[?#]/)[0];
+  let m = bare.match(/\.([a-zA-Z0-9]{2,5})$/);
   if (m) {
-    var ext = m[1].toLowerCase();
+    let ext = m[1].toLowerCase();
     if (/^(jpg|jpeg|png|gif|webp|mp4|mov|webm|heic|avif)$/.test(ext)) {
       return ext === "jpeg" ? "jpg" : ext;
     }
@@ -1073,9 +1073,9 @@ function _slideExtension(slide) {
 
 // 1-indexed, zero-padded so files sort correctly in archive tools.
 function albumFilename(slide, idx, totalSlides) {
-  var n = idx + 1;
-  var width = String(totalSlides).length;
-  var padded = String(n);
+  let n = idx + 1;
+  let width = String(totalSlides).length;
+  let padded = String(n);
   while (padded.length < width) padded = "0" + padded;
   return padded + "." + _slideExtension(slide);
 }
@@ -1085,8 +1085,8 @@ function albumFilename(slide, idx, totalSlides) {
 // the grouped item and returns a JSON-serializable object.
 function buildAlbumManifest(item, extensionVersion) {
   if (!item) return null;
-  var slides = Array.isArray(item._carouselSlides) ? item._carouselSlides : [item];
-  var meta = item.metadata || {};
+  let slides = Array.isArray(item._carouselSlides) ? item._carouselSlides : [item];
+  let meta = item.metadata || {};
   return {
     format: "instagram-saved-media-exporter-album",
     formatVersion: 1,
@@ -1115,7 +1115,7 @@ function buildAlbumManifest(item, extensionVersion) {
 // Sanitize a string so it's safe as a filename prefix. Falls back to
 // "album" so we never produce a nameless zip.
 function _albumZipName(item) {
-  var shortcode = (item && item.postShortcode) || "album";
+  let shortcode = (item && item.postShortcode) || "album";
   // Strip anything that's not safe on any common filesystem.
   return String(shortcode).replace(/[^a-zA-Z0-9._-]/g, "_") + ".zip";
 }
@@ -1125,7 +1125,7 @@ function _albumZipName(item) {
 // punctuation, no letters/digits) — collapse to "_unknown".
 function _safeFolderName(s) {
   if (!s) return "_unknown";
-  var clean = String(s).replace(/[^a-zA-Z0-9._-]/g, "_");
+  let clean = String(s).replace(/[^a-zA-Z0-9._-]/g, "_");
   if (!clean || /^_+$/.test(clean)) return "_unknown";
   return clean;
 }
@@ -1135,7 +1135,7 @@ function _safeFolderName(s) {
 // underscore conflict with real Instagram usernames since usernames can't
 // start with an underscore in URL form anyway).
 function _ownerKey(item) {
-  var owner = item && item.metadata && item.metadata.owner;
+  let owner = item && item.metadata && item.metadata.owner;
   return owner ? String(owner) : "_unknown";
 }
 
@@ -1145,10 +1145,10 @@ function _ownerKey(item) {
 // equivalent but tuples test more easily).
 function groupItemsByOwner(items) {
   if (!Array.isArray(items)) return [];
-  var groups = Object.create(null);
-  var order = [];
+  let groups = Object.create(null);
+  let order = [];
   for (var i = 0; i < items.length; i++) {
-    var key = _ownerKey(items[i]);
+    let key = _ownerKey(items[i]);
     if (!groups[key]) {
       groups[key] = [];
       order.push(key);
@@ -1170,13 +1170,13 @@ function buildLibraryManifest(items, ownerGroups, extensionVersion) {
     totalItems: Array.isArray(items) ? items.length : 0,
     totalOwners: Array.isArray(ownerGroups) ? ownerGroups.length : 0,
     owners: (ownerGroups || []).map(function (g) {
-      var owner = g[0], list = g[1];
+      let owner = g[0], list = g[1];
       return {
         owner: owner === "_unknown" ? null : owner,
         folder: _safeFolderName(owner),
         itemCount: list.length,
         items: list.map(function (it) {
-          var slideCount = (Array.isArray(it._carouselSlides) ? it._carouselSlides.length : 0) || 1;
+          let slideCount = (Array.isArray(it._carouselSlides) ? it._carouselSlides.length : 0) || 1;
           return {
             shortcode: it.postShortcode || null,
             postUrl: it.postUrl || null,
@@ -1197,18 +1197,18 @@ function buildLibraryManifest(items, ownerGroups, extensionVersion) {
 // flat name (<shortcode>.<ext>); albums get their own subfolder so all
 // their slides stay together: <shortcode>/01.<ext>.
 function _itemPathInOwnerFolder(item, slide, slideIdx, totalSlides, fallbackIdx) {
-  var shortcode = item && item.postShortcode;
+  let shortcode = item && item.postShortcode;
   if (!shortcode) {
     // Stable but unique fallback so two metadata-less items don't collide.
     shortcode = "item_" + String(fallbackIdx + 1).padStart(4, "0");
   } else {
     shortcode = String(shortcode).replace(/[^a-zA-Z0-9._-]/g, "_");
   }
-  var ext = _slideExtension(slide || item);
+  let ext = _slideExtension(slide || item);
   if (totalSlides > 1) {
     // Album: nested folder.
-    var w = String(totalSlides).length;
-    var padded = String(slideIdx + 1);
+    let w = String(totalSlides).length;
+    let padded = String(slideIdx + 1);
     while (padded.length < w) padded = "0" + padded;
     return shortcode + "/" + padded + "." + ext;
   }
@@ -1226,31 +1226,31 @@ async function downloadLibrary() {
     if (window.Analytics) Analytics.trackError('library_zip_no_jszip', {});
     return;
   }
-  var items = getFilteredItems();
+  let items = getFilteredItems();
   if (!items.length) {
     setStatus("Nothing to download — the current view is empty");
     return;
   }
 
   // Estimate total slide count (carousels contribute more than 1).
-  var slideTotal = items.reduce(function (sum, it) {
-    var n = (Array.isArray(it._carouselSlides) ? it._carouselSlides.length : 0) || 1;
+  let slideTotal = items.reduce(function (sum, it) {
+    let n = (Array.isArray(it._carouselSlides) ? it._carouselSlides.length : 0) || 1;
     return sum + n;
   }, 0);
 
   if (slideTotal > 50) {
-    var ok = confirm(
+    let ok = confirm(
       "Download " + items.length + " items (" + slideTotal + " files) as a zip?\n" +
       "This may take a minute and use significant bandwidth."
     );
     if (!ok) return;
   }
 
-  var extVersion = null;
+  let extVersion = null;
   try { extVersion = chrome.runtime.getManifest().version; } catch (_) {}
 
-  var groups = groupItemsByOwner(items);
-  var manifest = buildLibraryManifest(items, groups, extVersion);
+  let groups = groupItemsByOwner(items);
+  let manifest = buildLibraryManifest(items, groups, extVersion);
   setStatus("Preparing library (" + items.length + " items, " + slideTotal + " files)...", true);
   if (window.Analytics) {
     Analytics.trackButtonClick('library_download', 'gallery');
@@ -1261,30 +1261,30 @@ async function downloadLibrary() {
     });
   }
 
-  var zip = new JSZip();
+  let zip = new JSZip();
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
-  var done = 0;
-  var failures = 0;
+  let done = 0;
+  let failures = 0;
   for (var g = 0; g < groups.length; g++) {
-    var ownerKey = groups[g][0];
-    var ownerList = groups[g][1];
-    var folder = _safeFolderName(ownerKey);
+    let ownerKey = groups[g][0];
+    let ownerList = groups[g][1];
+    let folder = _safeFolderName(ownerKey);
     for (var i = 0; i < ownerList.length; i++) {
-      var it = ownerList[i];
-      var slides = Array.isArray(it._carouselSlides) && it._carouselSlides.length
+      let it = ownerList[i];
+      let slides = Array.isArray(it._carouselSlides) && it._carouselSlides.length
         ? it._carouselSlides : [it];
       for (var s = 0; s < slides.length; s++) {
-        var slide = slides[s];
-        var url = slide && (slide.url || slide.thumbnail);
+        let slide = slides[s];
+        let url = slide && (slide.url || slide.thumbnail);
         done++;
         if (!url) { failures++; continue; }
         setStatus("Fetching " + done + " / " + slideTotal + " — " + ownerKey, true);
         try {
-          var res = await fetch(url);
+          let res = await fetch(url);
           if (!res.ok) throw new Error("HTTP " + res.status);
-          var blob = await res.blob();
-          var path = folder + "/" + _itemPathInOwnerFolder(it, slide, s, slides.length, i);
+          let blob = await res.blob();
+          let path = folder + "/" + _itemPathInOwnerFolder(it, slide, s, slides.length, i);
           zip.file(path, blob);
         } catch (e) {
           failures++;
@@ -1304,14 +1304,14 @@ async function downloadLibrary() {
 
   setStatus("Zipping " + slideTotal + " files...", true);
   try {
-    var content = await zip.generateAsync({ type: "blob" });
-    var a = document.createElement("a");
+    let content = await zip.generateAsync({ type: "blob" });
+    let a = document.createElement("a");
     a.href = URL.createObjectURL(content);
-    var stamp = new Date().toISOString().slice(0, 10);
+    let stamp = new Date().toISOString().slice(0, 10);
     a.download = "instagram-library-" + currentTab + "-" + stamp + ".zip";
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-    var msg = "Downloaded " + slideTotal + " files across " + groups.length + " owners";
+    let msg = "Downloaded " + slideTotal + " files across " + groups.length + " owners";
     if (failures > 0) msg += " (" + failures + " failed)";
     setStatus(msg);
     if (window.Analytics) {
@@ -1337,13 +1337,13 @@ async function downloadAlbum(item) {
     if (window.Analytics) Analytics.trackError('album_zip_no_jszip', {});
     return;
   }
-  var slides = Array.isArray(item && item._carouselSlides) ? item._carouselSlides : [];
+  let slides = Array.isArray(item && item._carouselSlides) ? item._carouselSlides : [];
   if (!slides.length) {
     setStatus("Nothing to download — album has no slides");
     return;
   }
 
-  var extVersion = null;
+  let extVersion = null;
   try { extVersion = chrome.runtime.getManifest().version; } catch (_) {}
 
   setStatus("Preparing album (" + slides.length + " slides)...", true);
@@ -1355,20 +1355,20 @@ async function downloadAlbum(item) {
     });
   }
 
-  var zip = new JSZip();
-  var manifest = buildAlbumManifest(item, extVersion);
+  let zip = new JSZip();
+  let manifest = buildAlbumManifest(item, extVersion);
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
-  var failures = 0;
+  let failures = 0;
   for (var i = 0; i < slides.length; i++) {
-    var slide = slides[i];
-    var url = slide && (slide.url || slide.thumbnail);
+    let slide = slides[i];
+    let url = slide && (slide.url || slide.thumbnail);
     if (!url) { failures++; continue; }
     setStatus("Fetching " + (i + 1) + " / " + slides.length + "...", true);
     try {
-      var res = await fetch(url);
+      let res = await fetch(url);
       if (!res.ok) throw new Error("HTTP " + res.status);
-      var blob = await res.blob();
+      let blob = await res.blob();
       zip.file(albumFilename(slide, i, slides.length), blob);
     } catch (e) {
       failures++;
@@ -1386,13 +1386,13 @@ async function downloadAlbum(item) {
 
   setStatus("Zipping " + slides.length + " slides...", true);
   try {
-    var content = await zip.generateAsync({ type: "blob" });
-    var a = document.createElement("a");
+    let content = await zip.generateAsync({ type: "blob" });
+    let a = document.createElement("a");
     a.href = URL.createObjectURL(content);
     a.download = _albumZipName(item);
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-    var msg = "Downloaded " + slides.length + " slides";
+    let msg = "Downloaded " + slides.length + " slides";
     if (failures > 0) msg += " (" + failures + " failed)";
     setStatus(msg);
     if (window.Analytics) {
@@ -1426,7 +1426,7 @@ var CSV_COLUMNS = [
 // escaped by doubling them. Everything else passes through.
 function csvEscape(val) {
   if (val === null || val === undefined) return "";
-  var s = String(val);
+  let s = String(val);
   if (s === "") return "";
   if (/[",\r\n]/.test(s)) {
     return '"' + s.replace(/"/g, '""') + '"';
@@ -1437,12 +1437,12 @@ function csvEscape(val) {
 // Pure: given a flat list of items, produce a CSV string. Items lacking
 // metadata fields write empty cells, not "null" or "undefined".
 function buildCsv(items) {
-  var lines = [CSV_COLUMNS.join(",")];
+  let lines = [CSV_COLUMNS.join(",")];
   if (!Array.isArray(items)) return lines.join("\r\n");
   for (var i = 0; i < items.length; i++) {
-    var it = items[i] || {};
-    var meta = it.metadata || {};
-    var tags = Array.isArray(meta.hashtags) ? meta.hashtags.join(" ") : "";
+    let it = items[i] || {};
+    let meta = it.metadata || {};
+    let tags = Array.isArray(meta.hashtags) ? meta.hashtags.join(" ") : "";
     lines.push([
       csvEscape(it.type),
       csvEscape(it.url),
@@ -1477,7 +1477,7 @@ document.querySelectorAll(".tab").forEach(function(tab) {
     updateButtonLabels();
     
     // Hide slideshow controls for videos tab
-    var slideshowControls = document.getElementById("slideshow-controls");
+    let slideshowControls = document.getElementById("slideshow-controls");
     if (slideshowControls) {
       slideshowControls.style.display = currentTab === "videos" ? "none" : "flex";
     }
@@ -1496,8 +1496,8 @@ updateButtonLabels();
 document.getElementById("download-current")?.addEventListener("click", async function() {
   if (window.Analytics) Analytics.trackButtonClick('download', 'gallery');
   if (!currentItem) { setStatus("Select an item first"); return; }
-  var url = getUrl(currentItem);
-  var isVideo = currentTab === "videos";
+  let url = getUrl(currentItem);
+  let isVideo = currentTab === "videos";
   
   if (url) {
     if (isVideo) {
@@ -1513,11 +1513,11 @@ document.getElementById("download-current")?.addEventListener("click", async fun
       // Images can be fetched as blob
       setStatus("Downloading...");
       try {
-        var response = await fetch(url);
-        var blob = await response.blob();
-        var blobUrl = URL.createObjectURL(blob);
+        let response = await fetch(url);
+        let blob = await response.blob();
+        let blobUrl = URL.createObjectURL(blob);
         
-        var a = document.createElement("a");
+        let a = document.createElement("a");
         a.href = blobUrl;
         a.download = "instagram_" + Date.now() + ".jpg";
         document.body.appendChild(a);
@@ -1540,7 +1540,7 @@ document.getElementById("download-current")?.addEventListener("click", async fun
 });
 
 document.getElementById("copy")?.addEventListener("click", function() {
-  var urls = getCurrentItems().map(getUrl).filter(Boolean);
+  let urls = getCurrentItems().map(getUrl).filter(Boolean);
   navigator.clipboard.writeText(urls.join("\n")).then(function() {
     setStatus("Copied " + urls.length + " URLs");
     
@@ -1553,19 +1553,19 @@ document.getElementById("copy")?.addEventListener("click", function() {
 });
 
 document.getElementById("export")?.addEventListener("click", function() {
-  var extVersion = null;
+  let extVersion = null;
   try { extVersion = chrome.runtime.getManifest().version; } catch (_) {}
-  var payload = buildExportPayload(allMedia.images, allMedia.videos, extVersion);
-  var json = JSON.stringify(payload, null, 2);
-  var blob = new Blob([json], { type: "application/json" });
-  var a = document.createElement("a");
+  let payload = buildExportPayload(allMedia.images, allMedia.videos, extVersion);
+  let json = JSON.stringify(payload, null, 2);
+  let blob = new Blob([json], { type: "application/json" });
+  let a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   // Date stamp so successive exports don't overwrite each other.
-  var stamp = new Date().toISOString().slice(0, 10);
+  let stamp = new Date().toISOString().slice(0, 10);
   a.download = "instagram-export-" + stamp + ".json";
   a.click();
 
-  var total = payload.images.length + payload.videos.length;
+  let total = payload.images.length + payload.videos.length;
   setStatus("Exported " + total + " items (" +
     payload.images.length + " images, " + payload.videos.length + " videos)");
 
@@ -1622,13 +1622,13 @@ document.getElementById("download-zip")?.addEventListener("click", function () {
 document.getElementById("export-csv")?.addEventListener("click", function () {
   // CSV is per-tab (one row per item) so the user gets exactly what they're
   // looking at — flat structure that drops cleanly into Excel/Sheets.
-  var items = currentTab === "videos" ? allMedia.videos : allMedia.images;
-  var csv = buildCsv(items);
+  let items = currentTab === "videos" ? allMedia.videos : allMedia.images;
+  let csv = buildCsv(items);
   // BOM so Excel correctly detects UTF-8 (otherwise it mangles accented owners).
-  var blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
-  var a = document.createElement("a");
+  let blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  let a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  var stamp = new Date().toISOString().slice(0, 10);
+  let stamp = new Date().toISOString().slice(0, 10);
   a.download = "instagram-" + currentTab + "-" + stamp + ".csv";
   a.click();
 
@@ -1645,13 +1645,13 @@ document.getElementById("import")?.addEventListener("click", function() {
 });
 
 document.getElementById("file-input")?.addEventListener("change", function() {
-  var file = this.files[0];
+  let file = this.files[0];
   if (!file) return;
 
-  var fileInput = this;
-  var reader = new FileReader();
+  let fileInput = this;
+  let reader = new FileReader();
   reader.onload = function() {
-    var parsed;
+    let parsed;
     try {
       parsed = parseImportPayload(reader.result);
     } catch (e) {
@@ -1667,7 +1667,7 @@ document.getElementById("file-input")?.addEventListener("change", function() {
       // Full-fidelity backup: replace both tabs, preserve all metadata.
       allMedia.images = parsed.images;
       allMedia.videos = parsed.videos;
-      var total = parsed.images.length + parsed.videos.length;
+      let total = parsed.images.length + parsed.videos.length;
       setStatus("Imported " + total + " items (" +
         parsed.images.length + " images, " + parsed.videos.length + " videos)");
       if (window.Analytics) {
@@ -1678,7 +1678,7 @@ document.getElementById("file-input")?.addEventListener("change", function() {
       }
     } else {
       // Legacy URL list: drop into the current tab only, no metadata.
-      var items = parsed.urls.map(function(url) {
+      let items = parsed.urls.map(function(url) {
         return { type: currentTab === 'images' ? 'image' : 'video', url: url, thumbnail: url };
       });
       if (currentTab === "images") {
@@ -1733,7 +1733,7 @@ if (versionEl) {
 
 // Sort dropdown wiring.
 (function wireSort() {
-  var sel = document.getElementById("sort-select");
+  let sel = document.getElementById("sort-select");
   if (!sel) return;
   sel.addEventListener("change", function () {
     setSortBy(sel.value);
@@ -1742,11 +1742,11 @@ if (versionEl) {
 
 // Search input wiring — debounced live filter on caption / owner / hashtags.
 (function wireSearch() {
-  var input = document.getElementById("search-input");
-  var clearBtn = document.getElementById("search-clear");
+  let input = document.getElementById("search-input");
+  let clearBtn = document.getElementById("search-clear");
   if (!input) return;
 
-  var debounceTimer = null;
+  let debounceTimer = null;
   input.addEventListener("input", function () {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(function () {
@@ -1817,8 +1817,8 @@ var currentFullscreenIndex = 0;
 // Next advances into the first slide of post N+1 (instead of looping inside
 // the same carousel, which was the v4.3 behavior).
 function getFullscreenItems() {
-  var grouped = getCurrentItems();
-  var flat = [];
+  let grouped = getCurrentItems();
+  let flat = [];
   grouped.forEach(function(item) {
     if (Array.isArray(item._carouselSlides)) {
       // _carouselSlides[0] is the cover; the array already holds every slide
@@ -1835,7 +1835,7 @@ function getFullscreenItems() {
 
 // Update fullscreen counter
 function updateFullscreenCounter() {
-  var items = getFullscreenItems();
+  let items = getFullscreenItems();
   if (fullscreenCounter) {
     fullscreenCounter.textContent = (currentFullscreenIndex + 1) + " / " + items.length;
   }
@@ -1843,15 +1843,15 @@ function updateFullscreenCounter() {
 
 // Show item in fullscreen
 function showFullscreenItem(index) {
-  var items = getFullscreenItems();
+  let items = getFullscreenItems();
   if (index < 0) index = items.length - 1;
   if (index >= items.length) index = 0;
   currentFullscreenIndex = index;
   
-  var item = items[index];
-  var url = getUrl(item);
+  let item = items[index];
+  let url = getUrl(item);
   // Only check item.type for video detection - don't check URL patterns as they're unreliable
-  var isVideo = item && item.type === 'video';
+  let isVideo = item && item.type === 'video';
   
   // Stop any playing video
   if (fullscreenVideo) {
@@ -1860,10 +1860,10 @@ function showFullscreenItem(index) {
   }
   
   // Show/hide slideshow buttons based on content type
-  var btn2 = document.getElementById("fs-slide-2");
-  var btn3 = document.getElementById("fs-slide-3");
-  var btn5 = document.getElementById("fs-slide-5");
-  var stopBtn = document.getElementById("fs-slide-stop");
+  let btn2 = document.getElementById("fs-slide-2");
+  let btn3 = document.getElementById("fs-slide-3");
+  let btn5 = document.getElementById("fs-slide-5");
+  let stopBtn = document.getElementById("fs-slide-stop");
   if (isVideo) {
     // Hide slideshow buttons for videos
     if (btn2) btn2.style.display = 'none';
@@ -1898,12 +1898,12 @@ function showFullscreenItem(index) {
 
 // Open fullscreen
 function openFullscreen() {
-  var items = getFullscreenItems();
+  let items = getFullscreenItems();
   if (items.length === 0) return;
   
   // Find current item index
   if (currentItem) {
-    var url = getUrl(currentItem);
+    let url = getUrl(currentItem);
     for (var i = 0; i < items.length; i++) {
       if (getUrl(items[i]) === url) {
         currentFullscreenIndex = i;
@@ -1960,7 +1960,7 @@ var SLIDESHOW_SPEED_IDS = ["fs-slide-2", "fs-slide-3", "fs-slide-5"];
 
 function clearSlideshowActiveState() {
   for (var i = 0; i < SLIDESHOW_SPEED_IDS.length; i++) {
-    var b = document.getElementById(SLIDESHOW_SPEED_IDS[i]);
+    let b = document.getElementById(SLIDESHOW_SPEED_IDS[i]);
     if (b) b.classList.remove("active");
   }
 }
@@ -1968,7 +1968,7 @@ function clearSlideshowActiveState() {
 function setSlideshowActiveSpeed(intervalMs) {
   clearSlideshowActiveState();
   for (var i = 0; i < SLIDESHOW_SPEED_IDS.length; i++) {
-    var b = document.getElementById(SLIDESHOW_SPEED_IDS[i]);
+    let b = document.getElementById(SLIDESHOW_SPEED_IDS[i]);
     if (!b) continue;
     if (parseInt(b.getAttribute("data-interval"), 10) === intervalMs) {
       b.classList.add("active");
@@ -1983,7 +1983,7 @@ function startSlideshow(intervalMs) {
   }, intervalMs);
 
   // Show stop button; mark the chosen speed as active.
-  var stopBtn = document.getElementById("fs-slide-stop");
+  let stopBtn = document.getElementById("fs-slide-stop");
   if (stopBtn) stopBtn.style.display = "inline-block";
   setSlideshowActiveSpeed(intervalMs);
 
@@ -1999,7 +1999,7 @@ function stopSlideshow() {
     clearInterval(slideshowInterval);
     slideshowInterval = null;
   }
-  var stopBtn = document.getElementById("fs-slide-stop");
+  let stopBtn = document.getElementById("fs-slide-stop");
   if (stopBtn) stopBtn.style.display = "none";
   clearSlideshowActiveState();
 }
@@ -2091,7 +2091,7 @@ if (fullscreenOverlay) {
 // Non-fullscreen slideshow controls
 document.querySelectorAll(".slideshow-btn[data-interval]").forEach(function(btn) {
   btn.addEventListener("click", function() {
-    var interval = parseInt(btn.getAttribute("data-interval"));
+    let interval = parseInt(btn.getAttribute("data-interval"));
     if (interval) {
       if (window.Analytics) {
         Analytics.trackButtonClick('slideshow_speed_' + (interval / 1000) + 's_viewer', 'gallery');

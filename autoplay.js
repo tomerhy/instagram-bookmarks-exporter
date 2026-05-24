@@ -561,6 +561,21 @@
     })
   };
 
+  // Test seam: only fires when tests set __IG_EXPORTER_TEST_HOOKS__ before
+  // loading the source. No-op in the browser. Exposes the pure helpers
+  // (debounce, formatDuration) plus the preference-persistence functions
+  // and the live state/CONFIG objects so tests can drive setEnabled etc.
+  // DOM-heavy logic (IntersectionObserver, video wrapping, "most visible"
+  // ranking) is intentionally not exposed — that surface belongs in
+  // browser e2e tests, not unit tests.
+  if (typeof globalThis !== 'undefined' && globalThis.__IG_EXPORTER_TEST_HOOKS__) {
+    globalThis.__IG_EXPORTER_TEST_HOOKS__.autoplay = {
+      debounce, formatDuration,
+      loadPreferences, savePreferences, setEnabled,
+      state, CONFIG
+    };
+  }
+
   // Start
   if (document.readyState === 'complete') {
     init();

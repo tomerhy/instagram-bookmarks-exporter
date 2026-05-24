@@ -140,17 +140,14 @@ Created `tokens.css` at the repo root holding the truly shared tokens (brand, se
 
 Eight emoji button/label glyphs replaced with inline Lucide-style SVGs: coffee (Support + footer), film (autoplay setting), camera (Capture All), stop-square (Stop), grid (Gallery), trash (Clear), pin (Open Instagram empty state), mail (about-card email). `setBtnLabel` helper in `popup.js` updated to thread `<svg><use href="#i-…"/></svg>` instead of an emoji string. The decorative 👋 on the about card stays as raw text — that's a flourish, not a UI icon.
 
-### 13. `gallery.js` uses `var` (84 instances) — 🚧 **BLOCKED on test seam refactor** (attempted in v4.4.0, reverted)
+### 13. `gallery.js` uses `var` (84 instances) — 🟡 **HALF-MEASURE SHIPPED in v4.4.0**
 
-Tried during the v4.4.0 cleanup pass: ran `perl -i -pe 's/\bvar /let /g' gallery.js`. Syntax was fine, but 29 unit tests immediately broke. Root cause: gallery.js is loaded via `vm.runInContext` and the test helpers (`tests/grouping.test.js`, `tests/carousel-expand.test.js`, `tests/sort.test.js`, etc.) reach into top-level state via the sandbox object — `sandbox.allMedia`, `sandbox.currentTab`, `sandbox.expandedCard`, etc. Top-level `var` declarations attach to `globalThis` (and therefore the sandbox); top-level `let` declarations do NOT, by ECMAScript spec. So `let` at the top of gallery.js makes the sandbox blind to those vars.
+Shipped (path 2 from the original options): ran
+`perl -i -pe 's/^(\s+)var /$1let /g' gallery.js` — replaced **221 inside-function `var`s** with `let`, left the **32 top-level `var`s** alone. Top-level `var` is load-bearing for the test seam: gallery.js loads via `vm.runInContext` and the test helpers reach into top-level state via `sandbox.allMedia`, `sandbox.currentTab`, etc. Top-level `var` attaches to `globalThis` (and therefore the sandbox); top-level `let` does NOT, per ECMAScript spec. So the half-measure modernizes the bulk of the file (loop counters, local temps inside helpers, callback-scoped declarations) while keeping the test seam working.
 
-Two paths forward, both non-trivial:
+To go the full distance later, do **path 1**: add a `__IG_EXPORTER_TEST_HOOKS__.gallery` block at the end of gallery.js exposing the needed internals via getter/setter accessors. Then migrate `tests/grouping.test.js`, `tests/sort.test.js`, `tests/search.test.js`, `tests/carousel-expand.test.js`, `tests/clear-viewer.test.js`, `tests/csv-export.test.js`, `tests/album-zip.test.js`, `tests/library-zip.test.js` from sandbox-property access to hook-based access. Roughly half a day. Then the remaining 32 top-level `var`s can become `let` too.
 
-1. **Test seam refactor** (preferred). Add a `__IG_EXPORTER_TEST_HOOKS__.gallery` block at the end of gallery.js exposing the needed internals via getter/setter accessors. Then migrate `tests/grouping.test.js`, `tests/sort.test.js`, `tests/search.test.js`, `tests/carousel-expand.test.js`, `tests/clear-viewer.test.js`, `tests/csv-export.test.js`, `tests/album-zip.test.js`, `tests/library-zip.test.js` from sandbox-property access to hook-based access. Roughly half a day. Then the mass-`var → let`/`const` replacement becomes safe.
-
-2. **Half-measure**: convert only inside-function `var`s (the loop counters, local temps inside helpers) to `let`/`const`. Leave the top-level `var`s alone. Mechanical but smaller value.
-
-Best ordered as a v4.5 task once a feature window opens up.
+For now the half-measure is a real net win — the modernization covers ~87% of the var sites with zero test churn.
 
 Cosmetic but it's the file most likely to grow next (Phase 1 features land here). Modernizing now is cheaper than later. No behavior change risk if done with care (block-scope for `let`, no re-declaration).
 
@@ -246,17 +243,38 @@ The full forkable checklist lives in [`test-checklist.md`](./test-checklist.md) 
 
 - **v4.3.0** ✅ shipped (items 1–5)
 - **v4.3.1–4.3.10** ✅ shipped (items 12, 15, 17a, plus a large polish+features sprint not originally on the roadmap)
-- **v4.4.0** ✅ shipped — every cleanup item the plan tracked plus four Phase 1 features:
+- **v4.4.0** ✅ shipped — every cleanup item the plan tracked plus four Phase 1 features plus partial 13 + 21:
     - Cleanup: 6, 7, 8, 9, 10, 11, 13a, 14, 20
     - Features: 13b (popup SVG icons), 16 (sort), 17b (CSV), 18 (per-album zip), 19 (owner-grouped library zip)
-    - **Stats**: tests 211 → 251; `content.js` lost ~545 lines (parseApiResponse + fetch/XHR + scanDom + createPanel + the dead comment block); 5 redundant icon utilities deleted; `tokens.css` extracted; `STORE_LISTING.md` added.
-- **v4.5+**: only items **13** (gallery.js var→let, blocked on a test-seam refactor) and **21** (automated browser e2e tests) remain. The plan is now essentially clear.
+    - Half-measures: 13 (inside-function `var`→`let`; top-level `var` stays), 21 (unit/integration layer expanded with autoplay tests; e2e Playwright deferred)
+    - **Stats**: tests 50 → 268 across the v4.3/v4.4 arc; `content.js` lost ~545 lines (parseApiResponse + fetch/XHR + scanDom + createPanel + the dead comment block); 5 redundant icon utilities deleted; `tokens.css` extracted; `STORE_LISTING.md` added.
+- **v4.5+**: the tech-debt plan is **essentially clear**. Remaining items are:
+    - **13 (path 1)** — complete the var→let conversion of the 32 top-level vars, which requires migrating ~8 test files away from the sandbox-property access pattern to a hook-based access pattern. ~half a day.
+    - **21 (e2e layer)** — Playwright browser tests for sections C, D, E, I, J of the manual checklist. Gated on the user base passing the 1k-user threshold or the manual checklist taking >30 min to run.
+    - Neither blocks anything user-facing.
 
-### 21. Convert manual QA checklist to automated tests — **planned post-v4.4.0**
+### 21. Convert manual QA checklist to automated tests — 🟡 **UNIT LAYER PARTIALLY SHIPPED in v4.4.0; e2e LAYER STILL DEFERRED**
 
-After v4.4.0 ships green and the manual checklist proves the inventory is accurate, port it to real tests. Two layers:
+**Unit / integration layer — progress through v4.4.0**:
 
-- **Unit / integration**: extend `tests/` for parser + grouping + dedup + metadata extraction. The `__IG_EXPORTER_TEST_HOOKS__` seam already exists; capture 5–10 real Instagram API responses as `tests/fixtures/*.json` and assert the same checklist outcomes (sections A2, A3, A4, A7, B1–B5).
-- **Browser end-to-end**: Playwright against a stub Instagram page (or recorded HAR replay) to cover popup ↔ content ↔ gallery flows (sections C, D, E, J). This is the bigger investment — only worth doing once you have ≥1k users or the manual checklist takes >30 min to run.
+| Section | Coverage | Test file(s) |
+|---|---|---|
+| A. Capture pipeline | strong | `extraction.test.js`, `grouping.test.js`, `content-helpers.test.js`, `storage-shape.test.js` |
+| B. Metadata capture | strong | `extraction.test.js` (25 tests across REST v1 / GraphQL / XDT shapes) |
+| C. Popup UI | partial | `badge.test.js` (storage→badge sync); popup DOM behavior stays manual |
+| D. Gallery viewer + grid | strong | `search.test.js`, `sort.test.js`, `carousel-expand.test.js`, `clear-viewer.test.js`, `grouping.test.js`, `escape.test.js` |
+| E. Fullscreen + slideshow | gap | DOM/video-heavy; stays manual or e2e |
+| F. Gallery actions | strong | `export-import.test.js`, `csv-export.test.js`, `album-zip.test.js`, `library-zip.test.js` |
+| G. Background / badge | strong | `badge.test.js`, `clear-sync.test.js`, `context-guard.test.js` |
+| H. Autoplay | partial | **NEW in v4.4.0**: `autoplay.test.js` (17 tests covering CONFIG defaults, debounce, formatDuration, loadPreferences / savePreferences round-trip, setEnabled). DOM-heavy parts (IntersectionObserver, video wrapping, "most visible" ranking) stay manual. |
+| I. Selection mode | gap | inherently DOM-heavy; e2e territory |
+| J. Cross-component sync | partial | `clear-sync.test.js`, `context-guard.test.js`, popup↔content message flow stays manual |
 
-The manual checklist above is the spec. Each row maps to a test case. Effort: **L** for unit/integration coverage, **L+** for browser e2e. Owner: me. Deadline: before v4.5 ships.
+**268 unit tests** total at v4.4.0 (up from 50 at session start). Roughly **60% of the manual checklist rows** are now covered by automation; the remaining 40% are DOM / cross-process / real-browser concerns that genuinely need e2e.
+
+**E2E layer — still deferred**: Playwright against a stub Instagram page (or recorded HAR replay) for sections C, D, E, I, J browser flows. Per the original spec, "only worth doing once you have ≥1k users or the manual checklist takes >30 min to run." The current user base (~162 as of v4.4.0 release window) is below that threshold. Picking this up too early just buys a maintenance burden against a moving Instagram page. Revisit when the user base or the checklist hits the threshold.
+
+**What to add next at the unit level** (when item 21 picks up again):
+- Fixture corpus — capture 5–10 real Instagram API responses as `tests/fixtures/*.json` to harden the extraction tests against future IG schema drift.
+- Background message-handling integration tests (GET_DATA, CLEAR_DATA, OPEN_GALLERY) — currently only badge-sync is covered.
+- Popup ↔ content message round-trip tests using the chrome.runtime stub.
