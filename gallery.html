@@ -167,8 +167,57 @@
       margin-bottom: var(--space-3);
       flex-wrap: wrap;
     }
-    .search-box {
+    /* Sort dropdown — sits left of the search box, glass-styled to match */
+    .sort-wrap {
       margin-left: auto;
+      flex: 0 0 auto;
+    }
+    .sort-select {
+      height: 42px;
+      padding: 0 32px 0 14px;
+      background:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%23a8a8b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='1 1 6 6 11 1'/></svg>") no-repeat right 12px center,
+        var(--surface-1);
+      background-size: 10px 6px, auto;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-pill);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      color: var(--text-primary);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      transition: border-color var(--t-fast), background-color var(--t-fast), box-shadow var(--t-base);
+      min-width: 170px;
+    }
+    .sort-select:hover {
+      border-color: var(--border-2);
+      background-color: var(--surface-2);
+    }
+    .sort-select:focus-visible {
+      border-color: rgba(225, 48, 108, 0.40);
+      background-color: var(--surface-2);
+      box-shadow: 0 0 0 3px rgba(225, 48, 108, 0.15);
+      outline: none;
+    }
+    /* When a non-default sort is active, hint that with a brand-pink edge */
+    .sort-select.is-active {
+      border-color: rgba(225, 48, 108, 0.40);
+      color: var(--ig-pink);
+    }
+    /* Native option styling — browsers vary, but ensures dark menus on macOS */
+    .sort-select option {
+      background: var(--ig-card);
+      color: var(--text-primary);
+    }
+
+    .search-box {
+      margin-left: 0;
       display: inline-flex;
       align-items: center;
       gap: var(--space-2);
@@ -1226,6 +1275,15 @@
       <button class="tab" data-tab="videos">
         Videos <span class="tab-count" id="video-count">0</span>
       </button>
+    </div>
+    <div class="sort-wrap" role="group" aria-label="Sort order">
+      <select id="sort-select" class="sort-select" aria-label="Sort gallery">
+        <option value="default">Capture order</option>
+        <option value="date_desc">Newest post</option>
+        <option value="date_asc">Oldest post</option>
+        <option value="owner">Owner (A–Z)</option>
+        <option value="likes">Most liked</option>
+      </select>
     </div>
     <div class="search-box" role="search">
       <svg class="search-icon icon-sm" aria-hidden="true"><use href="#i-search"/></svg>

@@ -26,6 +26,9 @@ var selectedCard = null;
 var expandedCard = null;
 // Active search query. Empty = no filter applied.
 var searchQuery = "";
+// Active sort key. 'default' preserves capture order.
+// Allowed values: 'default' | 'date_desc' | 'date_asc' | 'owner' | 'likes'.
+var sortBy = "default";
 
 // Debug
 function logDebug(msg) {
@@ -221,8 +224,91 @@ function matchesQuery(item, query) {
 // entry already represents an album cover when applicable.
 function getFilteredItems() {
   var items = getCurrentItems();
-  if (!searchQuery) return items;
-  return items.filter(function (it) { return matchesQuery(it, searchQuery); });
+  if (searchQuery) {
+    items = items.filter(function (it) { return matchesQuery(it, searchQuery); });
+  }
+  return applySort(items, sortBy);
+}
+
+// Sort items by metadata. Items lacking the sort field always sink to the
+// bottom (regardless of direction), so a single bad item doesn't poison the
+// top of the list. Pure function: returns a new array, doesn't mutate input.
+//
+// Stability: when items have equal sort keys (or both lack the field), the
+// original capture order is preserved.
+function applySort(items, key) {
+  if (!Array.isArray(items) || items.length === 0) return items;
+  if (!key || key === "default") return items;
+
+  // Pre-compute (key, index) tuples so we can sort by key with a stable
+  // tiebreaker on original index.
+  var tuples = items.map(function (it, i) {
+    return { it: it, i: i, k: _sortKey(it, key) };
+  });
+
+  tuples.sort(function (a, b) {
+    var aMissing = a.k === null || a.k === undefined;
+    var bMissing = b.k === null || b.k === undefined;
+    if (aMissing && bMissing) return a.i - b.i;
+    if (aMissing) return 1;   // missing → bottom
+    if (bMissing) return -1;
+    if (a.k < b.k) return -1;
+    if (a.k > b.k) return 1;
+    return a.i - b.i;          // stable tiebreaker
+  });
+
+  // For descending keys, reverse — but keep missing-at-bottom by splitting.
+  if (key === "date_desc" || key === "likes") {
+    var present = tuples.filter(function (t) { return t.k !== null && t.k !== undefined; });
+    var missing = tuples.filter(function (t) { return t.k === null || t.k === undefined; });
+    present.reverse();
+    tuples = present.concat(missing);
+  }
+
+  return tuples.map(function (t) { return t.it; });
+}
+
+// Per-key extractor. Returns a comparable value, or null when the item
+// lacks the field. Centralized so sort behavior is testable in isolation.
+function _sortKey(item, key) {
+  var meta = item && item.metadata;
+  switch (key) {
+    case "date_desc":
+    case "date_asc": {
+      var d = meta && meta.takenAt ? new Date(meta.takenAt).getTime() : null;
+      return (d === null || isNaN(d)) ? null : d;
+    }
+    case "owner": {
+      var o = meta && meta.owner ? String(meta.owner).toLowerCase() : null;
+      return o || null;
+    }
+    case "likes": {
+      var n = meta && typeof meta.likeCount === "number" ? meta.likeCount : null;
+      return n;
+    }
+    default:
+      return null;
+  }
+}
+
+function setSortBy(key) {
+  var next = String(key || "default");
+  if (next === sortBy) return;
+  sortBy = next;
+  currentPage = 1;
+  var sel = document.getElementById("sort-select");
+  if (sel) {
+    if (sel.value !== next) sel.value = next;
+    sel.classList.toggle("is-active", next !== "default");
+  }
+  // Collapse any expanded carousel instantly — re-sorted positions could
+  // otherwise leave a drawer attached to a now-out-of-view card.
+  if (typeof collapseCarousel === "function") collapseCarousel({ instant: true });
+  renderGrid();
+  if (window.Analytics && next !== "default") {
+    Analytics.trackButtonClick("sort_" + next, "gallery");
+    Analytics.trackFeature("gallery_sort", { sort_key: next });
+  }
 }
 
 // Centralized setter. Resets to page 1 (otherwise we could be stuck on a
@@ -863,20 +949,11 @@ function loadData() {
       allMedia.images = result.igExporterData.images || [];
       allMedia.videos = result.igExporterData.videos || [];
       logDebug("Loaded: " + allMedia.images.length + " images, " + allMedia.videos.length + " videos");
-      
+
       // Show newest items first
       if (allMedia.images.length > 0) {
         logDebug("Newest image: " + (allMedia.images[allMedia.images.length - 1]?.url || "none").substring(0, 60));
       }
-    } else if (result.imageUrls || result.videoUrls) {
-      // Fallback to legacy
-      allMedia.images = (result.imageUrls || []).map(function(url) {
-        return { type: 'image', url: url, thumbnail: url };
-      });
-      allMedia.videos = (result.videoUrls || []).map(function(url) {
-        return { type: 'video', url: url };
-      });
-      logDebug("Loaded legacy: " + allMedia.images.length + " images, " + allMedia.videos.length + " videos");
     } else {
       logDebug("No data found in storage");
       allMedia.images = [];
@@ -1094,8 +1171,10 @@ document.getElementById("clear")?.addEventListener("click", function() {
   // about-to-be-deleted item before storage commits.
   resetViewer();
   // A lingering search query against empty data shows "Showing 0 of 0" —
-  // reset it so the user sees a clean "nothing captured yet" state.
+  // reset it so the user sees a clean "nothing captured yet" state. Sort
+  // resets too since "Newest post" on empty data is pointless.
   setSearchQuery("");
+  setSortBy("default");
 
   chrome.storage.local.set({
     igExporterData: { images: [], videos: [] }
@@ -1198,6 +1277,15 @@ if (versionEl) {
     versionEl.textContent = "v" + chrome.runtime.getManifest().version;
   } catch (e) {}
 }
+
+// Sort dropdown wiring.
+(function wireSort() {
+  var sel = document.getElementById("sort-select");
+  if (!sel) return;
+  sel.addEventListener("change", function () {
+    setSortBy(sel.value);
+  });
+})();
 
 // Search input wiring — debounced live filter on caption / owner / hashtags.
 (function wireSearch() {

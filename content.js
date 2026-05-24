@@ -570,19 +570,6 @@
   }
 
   // ============================================
-  // FETCH INDIVIDUAL POSTS
-  // ============================================
-
-  const fetchedCarousels = new Set();
-
-  // Note: Instagram's __a=1 API is blocked (returns 404)
-  // Carousel items are captured when user clicks on a post and we intercept the API response
-  function markCarouselForCapture(shortcode) {
-    if (fetchedCarousels.has(shortcode)) return;
-    fetchedCarousels.add(shortcode);
-    console.log('[IG Exporter] Carousel detected:', shortcode);
-  }
-
   // ============================================
   // AUTO-CLICK CAROUSEL CAPTURE
   // ============================================
@@ -1072,10 +1059,9 @@
             parseMedia(carouselItem, shortcode, idx + 1);
           });
         } else {
-          // Carousel detected but no items in API response
-          // User needs to click on the post to capture all images
-          markCarouselForCapture(shortcode);
-          // Still add the thumbnail as fallback
+          // Carousel detected but no items in API response — user needs to
+          // open the post for the carousel_media payload to surface. Add the
+          // cover thumbnail as a placeholder so the grid isn't empty.
           if (imageUrl) {
             if (addImage(imageUrl, postUrl, imageUrl)) count++;
           }
@@ -1283,113 +1269,6 @@
     });
     return origXhrSend.apply(this, args);
   };
-
-  // ============================================
-  // DOM SCANNING (fallback)
-  // ============================================
-
-  function scanDom() {
-    let count = 0;
-    
-    // Find all images
-    document.querySelectorAll('img[src*="cdninstagram"], img[src*="fbcdn"]').forEach(img => {
-      const src = img.src;
-      if (src && !src.includes('profile') && !src.includes('44x44') && !src.includes('150x150')) {
-        // Try to get higher quality from srcset
-        let bestUrl = src;
-        if (img.srcset) {
-          const parts = img.srcset.split(',');
-          let maxWidth = 0;
-          parts.forEach(part => {
-            const match = part.trim().match(/^(\S+)\s+(\d+)w$/);
-            if (match && parseInt(match[2]) > maxWidth) {
-              maxWidth = parseInt(match[2]);
-              bestUrl = match[1];
-            }
-          });
-        }
-        
-        // Find post URL
-        let postUrl = null;
-        const link = img.closest('a[href*="/p/"], a[href*="/reel/"]');
-        if (link) {
-          postUrl = link.href;
-        }
-        
-        if (addImage(bestUrl, postUrl, bestUrl)) count++;
-      }
-    });
-    
-    // Find all videos
-    document.querySelectorAll('video').forEach(video => {
-      const src = video.src || video.querySelector('source')?.src;
-      const poster = video.poster;
-      
-      let postUrl = null;
-      const link = video.closest('a[href*="/p/"], a[href*="/reel/"]') || 
-                   video.parentElement?.querySelector('a[href*="/p/"], a[href*="/reel/"]');
-      if (link) {
-        postUrl = link.href;
-      }
-      
-      if (src || postUrl) {
-        if (addVideo(src, postUrl, poster)) count++;
-      }
-    });
-    
-    // Find post links and detect carousels
-    document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(link => {
-      const href = link.href;
-      if (!href) return;
-      
-      // Extract shortcode
-      const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
-      if (!match) return;
-      const shortcode = match[2];
-      
-      // Check for carousel indicator (multiple items icon)
-      const hasCarouselIcon = link.querySelector('svg[aria-label*="Carousel"]') ||
-                              link.querySelector('[aria-label*="Carousel"]') ||
-                              link.parentElement?.querySelector('svg[aria-label*="Carousel"]');
-      
-      // Also check for the stacked squares icon (carousel indicator)
-      const svgs = link.querySelectorAll('svg');
-      let isCarousel = hasCarouselIcon;
-      svgs.forEach(svg => {
-        const path = svg.querySelector('path');
-        if (path) {
-          const d = path.getAttribute('d') || '';
-          // Carousel icon typically has a specific pattern
-          if (d.includes('M19') && d.includes('M3') && d.length > 100) {
-            isCarousel = true;
-          }
-        }
-      });
-      
-      if (isCarousel && !fetchedCarousels.has(shortcode)) {
-        markCarouselForCapture(shortcode);
-      }
-    });
-    
-    // Legacy: Find post links (for posts we haven't captured yet)
-    document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(link => {
-      const href = link.href;
-      if (!href || state.seenUrls.has(href)) return;
-      
-      // Check if it has a video icon
-      const hasVideoIcon = link.querySelector('svg[aria-label*="Clip"], svg[aria-label*="Reel"], svg[aria-label*="Video"]');
-      
-      // Get thumbnail
-      const img = link.querySelector('img');
-      const thumbnail = img?.src || null;
-      
-      if (hasVideoIcon) {
-        if (addVideo(null, href, thumbnail)) count++;
-      }
-    });
-    
-    return count;
-  }
 
   // ============================================
   // UI PANEL
@@ -1670,19 +1549,6 @@
         });
         break;
 
-      case 'SCAN':
-        const count = scanDom();
-        if (count > 0) {
-          updatePanel();
-          saveToStorage();
-        }
-        sendResponse({
-          images: state.images.length,
-          videos: state.videos.length,
-          total: state.images.length + state.videos.length
-        });
-        break;
-        
       case 'START_CAROUSELS':
         startAutoClickCapture();
         sendResponse({
@@ -1704,9 +1570,7 @@
         state.capturedShortcodes.clear();
         updatePanel();
         safeStorageSet({
-          igExporterData: { images: [], videos: [] },
-          imageUrls: [],
-          videoUrls: []
+          igExporterData: { images: [], videos: [] }
         });
         sendResponse({ ok: true });
         break;

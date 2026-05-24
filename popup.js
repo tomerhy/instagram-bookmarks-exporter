@@ -363,9 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (window.Analytics) Analytics.trackButtonClick('clear', 'popup');
     chrome.storage.local.set({
-      igExporterData: { images: [], videos: [] },
-      imageUrls: [],
-      videoUrls: []
+      igExporterData: { images: [], videos: [] }
     }, function() {
       updateStats({ images: 0, videos: 0 });
       setStatus('Cleared!');

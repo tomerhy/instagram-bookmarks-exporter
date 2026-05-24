@@ -75,13 +75,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       break;
 
     case 'GET_DATA':
-      chrome.storage.local.get(['igExporterData', 'imageUrls', 'videoUrls'], (result) => {
+      chrome.storage.local.get(['igExporterData'], (result) => {
         sendResponse(result);
       });
       return true; // Async response
 
     case 'CLEAR_DATA':
-      chrome.storage.local.remove(['igExporterData', 'imageUrls', 'videoUrls'], () => {
+      chrome.storage.local.remove(['igExporterData'], () => {
         sendResponse({ ok: true });
       });
       return true;
