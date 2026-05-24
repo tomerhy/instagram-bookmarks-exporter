@@ -2,13 +2,16 @@
 
 Snapshot at v4.2.3, amended after v4.3 shipped, amended again at v4.3.10. Items are concrete and verified against the code (file:line shown). Ranked by impact, not by effort. Use this as the input list when planning each release — pick which items each release pays down, don't try to clear it all at once.
 
-> **Status (v4.3.10)**:
+> **Status (v4.4.0)**:
 > - Items **1–5** shipped in **v4.3.0** (`8913c19`).
-> - Item **15** (search) shipped in **v4.3.9**, way earlier than planned.
-> - Item **17** (rich export) shipped *in part* — JSON export with full metadata landed in **v4.3.6**; CSV export is still pending.
-> - Item **12** (`create_screenshots.py` one-off tool) shipped — deleted and replaced by `compose_screenshots.py`.
-> - Items **6, 7, 8, 9** remain — the v4.4.0 "consolidation cleanup" release is still pending.
-> - The v4.3.1–4.3.10 sprint also shipped a large amount of UX work that wasn't on the roadmap (premium UI redesign, popup overhaul, carousel inline drawer, notification-style toolbar badge, extension-context guards, gallery Clear viewer reset, easter egg). See "What shipped in v4.3.1–4.3.10" below.
+> - v4.3.1–4.3.10 sprint shipped items **12**, **15**, **17a** plus a lot of unplanned UX/polish work — see the table at the top of the v4.3.x section.
+> - v4.4.0 (this release) shipped the original v4.4 cleanup scope **plus** three Phase 1 features:
+>     - **Items 6, 7, 9** — legacy storage keys, dead `scanDom()`, vestigial carousel dedup
+>     - **Item 8** — redundant `content.js` fetch/XHR hooks + `parseApiResponse` removed (~287 lines deleted)
+>     - **Item 16** — Sort by date / owner / likes
+>     - **Item 17b** — CSV export (completing item 17)
+>     - **Item 18** — Per-album ZIP download via bundled JSZip
+> - Remaining: items **10, 11, 13, 13a, 13b, 19, 20, 21** — see the updated release map.
 
 Effort scale: **S** = under an hour, **M** = half a day, **L** = a day or more.
 
@@ -75,25 +78,31 @@ Defined (`content.js:61`), zeroed (`content.js:1438, 1572`), persisted (`content
 
 - **Fix**: tied to #2. Either becomes the home for `state.posts` (grouped) or deleted.
 
-### 6. Legacy `imageUrls` / `videoUrls` storage keys
+### 6. Legacy `imageUrls` / `videoUrls` storage keys — ✅ **SHIPPED in v4.4.0**
 
 `gallery.js:316-322` reads them as a compat fallback. `background.js:15, 21` includes them in `GET_DATA`/`CLEAR_DATA`. `content.js:1578-1579` clears them. **Nothing in this codebase writes them.** They were the v1/v2 storage shape; users still on those versions would benefit from the fallback, but v4.2.3 has been live since Feb so the upgrade window has passed.
 
 - **Fix**: remove the fallback in `gallery.js`, drop the keys from `background.js` and the `CLEAR` handler. Effort: **S**.
 
-### 7. `scanDom()` is dead code
+### 7. `scanDom()` is dead code — ✅ **SHIPPED in v4.4.0**
 
 Defined at `content.js:1178` (~100 lines). Only called from the `SCAN` message handler at `content.js:1542`. No file in the repo sends a `SCAN` message. The capture pipeline now relies entirely on `injector.js` API interception + `parseApiResponse`. The DOM-scan was the original v1 mechanism.
 
 - **Fix**: delete `scanDom()` and the `SCAN` handler. Effort: **S**.
 
-### 8. Redundant fetch/XHR interception in `content.js`
+### 8. Redundant fetch/XHR interception in `content.js` — ✅ **SHIPPED in v4.4.0**
+
+Removed: `parseApiResponse` (~150 lines), `findCarouselMedia`, the fetch hook, and the XHR hook. Confirmed via grep that no other code path referenced these functions. The injector (MAIN world) is now the sole interception point. ~287 lines deleted from `content.js`.
+
+Risk: if Instagram's page somehow initiates fetches via the isolated world, those won't be intercepted. Per CLAUDE.md and the original tech-debt analysis, the isolated world only sees fetches initiated by other extensions or by content.js itself, so this case doesn't exist in normal operation. Manual QA on a real Instagram session before shipping v4.4.0 is the canonical verification path.
+
+### 8 (original entry)
 
 `injector.js` (MAIN world) hooks `fetch`/XHR at `document_start`, parses responses, and posts media to `content.js`. `content.js:1080-1172` *also* hooks `fetch`/XHR (isolated world) and runs `parseApiResponse` on the same responses. The isolated-world hooks pre-date the injector and are now a redundant safety net at best, dead code at worst — Instagram's page-side fetch happens in the page world, so the isolated-world hook only ever sees fetches initiated by *other* extensions or by `content.js` itself.
 
 - **Fix**: remove the duplicate hooks and `parseApiResponse` from `content.js`. Verify with logging that the injector covers all current capture cases first. Effort: **M** (mostly verification).
 
-### 9. `markCarouselForCapture` / `fetchedCarousels` dedup is purely cosmetic
+### 9. `markCarouselForCapture` / `fetchedCarousels` dedup is purely cosmetic — ✅ **SHIPPED in v4.4.0**
 
 `fetchedCarousels` set (`content.js:464`) and `markCarouselForCapture` (`content.js:468`) only suppress duplicate console logs. The function does no actual work. Dead alongside #8.
 
@@ -165,13 +174,11 @@ Glass search box in the gallery toolbar with **token-modifier grammar**: bare wo
 
 Analytics: `gallery_search { query_length, has_token_modifier }` fires per query.
 
-### 16. Sort gallery by date / owner / like count
+### 16. Sort gallery by date / owner / like count — ✅ **SHIPPED in v4.4.0**
 
-Drop-down next to the search box. Default stays "capture order." Sort keys are `metadata.takenAt`, `metadata.owner` (alphabetical), `metadata.likeCount`. Items lacking the field sort last.
+Glass-styled dropdown next to the search box. Five keys: `default` (capture order), `date_desc`, `date_asc`, `owner` (case-insensitive), `likes`. Items lacking the sort field always sink to the bottom regardless of direction; sort is stable on equal keys. Pinned by 15 tests in `tests/sort.test.js`.
 
-- Effort: **S**.
-
-### 17. CSV / JSON export of captured items with metadata — 🟡 **PARTIAL: JSON shipped in v4.3.6, CSV pending**
+### 17. CSV / JSON export of captured items with metadata — ✅ **FULLY SHIPPED (JSON v4.3.6, CSV v4.4.0)**
 
 JSON path landed in v4.3.6 as a full backup format:
 
@@ -185,11 +192,9 @@ Round-trip preserves all metadata (owner, caption, hashtags, scrapedAt, carousel
 
 **CSV still pending** for v4.5+. CSV is the harder format — the metadata.caption field carries newlines, commas, and quotes that need RFC 4180 escaping. Effort: **S** when picked up.
 
-### 18. Per-post ZIP download (album bundle)
+### 18. Per-post ZIP download (album bundle) — ✅ **SHIPPED in v4.4.0**
 
-For carousel posts: download all slides + a `metadata.json` as a single zip named `<shortcode>.zip`. Requires bringing in JSZip (~30KB) — the only real npm dep this project would have.
-
-- Effort: **M**. The zipping itself is small; the cost is bundling JSZip into the build (without a bundler) and adding `web_accessible_resources` if needed.
+For carousel posts: "Download album" button inside the expanded drawer header bundles every slide plus a `manifest.json` into `<shortcode>.zip`. JSZip 3.10.1 (MIT, 95KB pre-gzip, 43KB after CWS zips) bundled at `lib/jszip.min.js`. `web_accessible_resources` not needed — gallery page is an extension page with full privileges. Pinned by 19 tests in `tests/album-zip.test.js`.
 
 ### 19. Owner-grouped folders in batch downloads
 
@@ -223,12 +228,12 @@ The full forkable checklist lives in [`test-checklist.md`](./test-checklist.md) 
 
 ---
 
-## Updated release map (as of v4.3.10)
+## Updated release map (as of v4.4.0)
 
 - **v4.3.0** ✅ shipped (items 1–5)
-- **v4.3.1–4.3.10** ✅ shipped (items 12, 15, 17a, plus a large polish+features sprint not originally on the roadmap — see the table at the top of this file)
-- **v4.4.0 (cleanup only)** — still pending: items 6, 7, 8, 9. Validate against the manual QA checklist. **No new features.**
-- **v4.5+**: pick from items 13a, 13b, 16, 17b (CSV), 18, 19, 20 — one per release.
+- **v4.3.1–4.3.10** ✅ shipped (items 12, 15, 17a, plus a large polish+features sprint not originally on the roadmap)
+- **v4.4.0** ✅ shipped — cleanup (items 6, 7, 8, 9) + three Phase 1 features (16 sort, 17b CSV, 18 per-album zip). Tests grew 211 → 230. `content.js` lost ~287 lines.
+- **v4.5+**: pick from items 10, 11, 13, 13a, 13b, 19, 20 — one per release. Then item 21 (automated test coverage) once the manual checklist has proven stable across a couple of releases.
 
 ### 21. Convert manual QA checklist to automated tests — **planned post-v4.4.0**
 

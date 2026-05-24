@@ -25,7 +25,7 @@ Chrome Manifest V3 extension that captures media (images, videos, carousels) fro
 1. **`injector.js`** — runs in the page's **MAIN world** at `document_start`. This is the only place we can monkey-patch `window.fetch` and `XMLHttpRequest` so that Instagram's *own* API calls are intercepted before the page code captures references to them. It parses responses for `video_versions` / `image_versions2` / `carousel_media` / GraphQL `edges`, then forwards extracted media to the isolated world via `window.postMessage({ type: 'IG_EXPORTER_MEDIA', media: [...] })`.
 2. **`content.js`** — runs in the **isolated world** at `document_idle`. Listens for those `postMessage` events, owns all state (`state.images`, `state.videos`, `state.seenUrls`, `state.selectedShortcodes`), renders the floating in-page panel, drives auto-scroll, and persists to `chrome.storage.local`.
 
-If you change one, **think about the boundary**: the isolated world cannot see page-context globals, and the MAIN world cannot use `chrome.*` APIs. They communicate *only* via `window.postMessage`. `content.js` *also* installs its own `fetch`/XHR hooks as a redundant safety net (see `parseApiResponse`) — both layers run.
+If you change one, **think about the boundary**: the isolated world cannot see page-context globals, and the MAIN world cannot use `chrome.*` APIs. They communicate *only* via `window.postMessage`. (Prior to v4.4.0, `content.js` also installed its own `fetch`/XHR hooks as a "safety net" — those were removed in v4.4.0 since the isolated world only sees fetches initiated by other extensions or by `content.js` itself, never Instagram's page-side fetches. The injector is the sole interception point now.)
 
 ### Capture pipeline
 
