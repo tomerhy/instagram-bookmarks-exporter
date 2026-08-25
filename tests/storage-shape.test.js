@@ -6,11 +6,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadIIFE } = require('./_setup');
+const { loadContent } = require('./_setup');
 
 function freshContent() {
   // Fresh sandbox for each test so state doesn't leak between cases.
-  const { exposed } = loadIIFE('content.js');
+  const { exposed } = loadContent();
   return exposed;
 }
 

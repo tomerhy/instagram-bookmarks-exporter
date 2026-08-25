@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Instagram Saved Media Exporter",
-  "version": "4.4.0",
-  "description": "Backup Instagram saved posts. Capture images, videos, carousels — with full metadata, search, and per-album zip download.",
+  "name": "Saved Posts Backup & Export",
+  "version": "4.4.1",
+  "description": "Back up your own saved posts to your computer: images, videos, albums, captions. Independent tool, not affiliated with Instagram.",
   "icons": {
     "16": "assets/icons/icon-16.png",
     "32": "assets/icons/icon-32.png",
@@ -11,13 +11,11 @@
   },
   "permissions": [
     "storage",
-    "unlimitedStorage",
-    "activeTab"
+    "unlimitedStorage"
   ],
   "host_permissions": [
     "https://www.instagram.com/*",
-    "https://instagram.com/*",
-    "https://www.google-analytics.com/*"
+    "https://instagram.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -28,7 +26,7 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
-      "js": ["injector.js"],
+      "js": ["url-allowlist.js", "capture-hook.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
@@ -37,8 +35,7 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
-      "js": ["content.js", "autoplay.js"],
-      "css": ["content-styles.css"],
+      "js": ["url-allowlist.js", "content.js"],
       "run_at": "document_idle"
     }
   ],

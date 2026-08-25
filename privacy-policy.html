@@ -3,84 +3,272 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - Instagram Saved Media Exporter</title>
+  <title>Privacy Policy - Saved Posts Backup &amp; Export</title>
   <style>
+    :root {
+      --ink: #1b2430;
+      --ink-muted: #56636f;
+      --accent: #0F8B8D;
+      --rule: #dfe4e9;
+      --panel: #f4f7f8;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 800px;
+      max-width: 780px;
       margin: 0 auto;
-      padding: 40px 20px;
-      line-height: 1.6;
-      color: #333;
-      background: #fafafa;
+      padding: 48px 24px 80px;
+      line-height: 1.65;
+      color: var(--ink);
+      background: #fff;
     }
     h1 {
-      background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-size: 30px;
+      letter-spacing: -0.02em;
+      margin: 0 0 4px;
+      color: var(--ink);
     }
     h2 {
-      color: #833ab4;
-      margin-top: 30px;
+      font-size: 19px;
+      margin-top: 40px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--accent);
+      display: inline-block;
     }
-    .updated {
-      color: #666;
-      font-size: 14px;
+    h3 { font-size: 15px; margin-top: 26px; }
+    .subtitle { color: var(--ink-muted); margin: 0 0 4px; }
+    .updated { color: var(--ink-muted); font-size: 14px; margin: 0 0 32px; }
+    .disclaimer {
+      border: 1px solid var(--rule);
+      border-left: 4px solid var(--accent);
+      background: var(--panel);
+      padding: 14px 18px;
+      border-radius: 6px;
+      margin: 24px 0;
     }
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14.5px; }
+    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    th { background: var(--panel); font-weight: 700; }
+    code {
+      background: var(--panel);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+    ul { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    .never li { margin-bottom: 4px; }
+    .wrap { overflow-x: auto; }
   </style>
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: February 2026</p>
+  <p class="subtitle">Saved Posts Backup &amp; Export (Chrome extension)</p>
+  <p class="updated">Last updated: 25 August 2026 &middot; Applies to version 4.4.1 and later</p>
 
-  <h2>Overview</h2>
-  <p>
-    Instagram Saved Media Exporter is a browser extension that helps you export images and videos 
-    from your saved Instagram posts. We are committed to protecting your privacy.
-  </p>
+  <div class="disclaimer">
+    <strong>Independent third-party extension.</strong> Not affiliated with,
+    authorized by, endorsed by, or sponsored by Instagram or Meta. "Instagram"
+    is a trademark of Meta Platforms, Inc., used here only to describe factually
+    where the extension works.
+  </div>
 
-  <h2>Data Collection</h2>
-  <p>
-    This extension does <strong>NOT</strong> collect, store, or transmit any personal data to external servers.
-    All data processing happens locally in your browser.
-  </p>
-
-  <h2>What the Extension Does</h2>
+  <h2>Summary</h2>
   <ul>
-    <li>Intercepts media URLs (images and videos) from Instagram pages you visit</li>
-    <li>Stores these URLs locally in your browser's storage</li>
-    <li>Provides a gallery interface to view and download captured media</li>
+    <li>The extension captures nothing until you press <strong>Start capture</strong>, and stops when you press Stop or reload the page.</li>
+    <li>Everything it captures is stored <strong>only on your own computer</strong>, in <code>chrome.storage.local</code>.</li>
+    <li><strong>Nothing is transmitted</strong> to the developer, to any server the developer controls, or to any analytics service.</li>
+    <li>It never requests, reads, or stores your password, cookies, session tokens, authentication headers, or two-factor codes.</li>
+    <li>There is <strong>no analytics and no behavioural tracking</strong> of any kind. Versions up to and including 4.4.0 did contain Google Analytics; see <a href="#history">Change history</a>.</li>
   </ul>
 
-  <h2>Data Storage</h2>
+  <h2>What the extension processes</h2>
   <p>
-    Media URLs are stored using Chrome's local storage API (<code>chrome.storage.local</code>).
-    This data remains on your device and is never sent to any external server.
+    When capture is running, the extension reads the saved-post data that
+    Instagram has already sent to your browser for the page you are looking at,
+    and stores the following locally:
+  </p>
+  <div class="wrap">
+  <table>
+    <tr><th>Category</th><th>Example</th><th>Why it is stored</th></tr>
+    <tr><td>Media URLs</td><td>the CDN address of an image or video file</td><td>To display and download the media</td></tr>
+    <tr><td>Post URLs and shortcodes</td><td><code>/p/ABC123/</code></td><td>To group media by post and let you reopen the original</td></tr>
+    <tr><td>Usernames / post owners</td><td><code>@example</code></td><td>To group and search your library by author</td></tr>
+    <tr><td>Captions</td><td>the post's caption text</td><td>Search, and inclusion in exports</td></tr>
+    <tr><td>Timestamps</td><td>when the post was published</td><td>Sorting your library by date</td></tr>
+    <tr><td>Like counts</td><td>a number</td><td>Shown in the item details panel</td></tr>
+    <tr><td>Hashtags</td><td><code>#example</code></td><td>Derived from the caption; used for search</td></tr>
+    <tr><td>Carousel metadata</td><td>slide index, album size</td><td>To reassemble multi-image albums</td></tr>
+    <tr><td>Capture timestamps</td><td>when <em>you</em> captured the item</td><td>Powers the "new since last visit" badge</td></tr>
+    <tr><td>Extension preferences</td><td>consent timestamp, sort order, usage counter, donation-banner dismissal</td><td>To remember your settings between sessions</td></tr>
+  </table>
+  </div>
+  <p>
+    All of the above is content that is already visible to you, as the
+    signed-in user, on the pages you visit. The extension does not reach
+    content you could not otherwise see, and does not access other accounts,
+    other users' private posts, or anything behind a restriction.
   </p>
 
-  <h2>Permissions</h2>
-  <p>The extension requires the following permissions:</p>
-  <ul>
-    <li><strong>storage</strong>: To save captured media URLs locally</li>
-    <li><strong>tabs</strong>: To detect when you're on Instagram</li>
-    <li><strong>scripting</strong>: To inject content scripts for media detection</li>
-    <li><strong>Host permissions for instagram.com</strong>: To capture media from Instagram</li>
+  <h2>What the extension never touches</h2>
+  <ul class="never">
+    <li>Passwords &mdash; there is no login form anywhere in the extension, and no password field is ever read.</li>
+    <li>Cookies &mdash; the extension does not request the <code>cookies</code> permission and never reads <code>document.cookie</code>.</li>
+    <li>Session tokens, CSRF tokens, and <code>Authorization</code> headers &mdash; never read, stored, or transmitted.</li>
+    <li>Two-factor / one-time codes.</li>
+    <li>Browsing history, bookmarks, or downloads &mdash; the corresponding permissions are not requested.</li>
+    <li>Web pages other than <code>instagram.com</code> &mdash; the extension has no access to any other site.</li>
+    <li>Your keystrokes, clipboard, camera, microphone, or location.</li>
   </ul>
 
-  <h2>Third-Party Services</h2>
+  <h2>Capture happens only when you start it</h2>
   <p>
-    This extension does not use any third-party analytics, tracking, or data collection services.
+    Opening Instagram does <em>not</em> start a capture. The component that
+    reads page responses installs itself only after you press
+    <strong>Start capture</strong> in the extension popup, and removes itself
+    when you press <strong>Stop capture</strong>, when a capture finishes, or
+    whenever the page is reloaded or closed. Capture state is never persisted,
+    so every new page load begins with capture switched off.
+  </p>
+  <p>
+    Before the very first capture the extension shows a disclosure describing
+    exactly what will be read and stored, and will not proceed until you
+    accept it.
   </p>
 
-  <h2>Changes to This Policy</h2>
+  <h2>Where your data is stored, and for how long</h2>
   <p>
-    We may update this privacy policy from time to time. Any changes will be reflected on this page.
+    Captured data is written to <code>chrome.storage.local</code>, which lives
+    in your Chrome profile on your own device. It is not synced to other
+    devices by the extension and it is not sent anywhere. It is retained until
+    one of the following happens:
+  </p>
+  <ul>
+    <li>You press <strong>Clear all data</strong> in the popup, or <strong>Clear all</strong> in the gallery. Both delete the entire captured library immediately, and also reset your consent so the disclosure is shown again before the next capture.</li>
+    <li>You uninstall the extension &mdash; Chrome deletes all of its stored data.</li>
+    <li>You clear the extension's data through Chrome's own settings.</li>
+  </ul>
+  <p>
+    There is no server-side copy, so there is nothing to request deletion of
+    and no account to close.
+  </p>
+
+  <h2>Permissions and why each one is needed</h2>
+  <div class="wrap">
+  <table>
+    <tr><th>Permission</th><th>Purpose</th></tr>
+    <tr>
+      <td><code>storage</code></td>
+      <td>Save your captured library and preferences locally via <code>chrome.storage.local</code>. This is the extension's only data store.</td>
+    </tr>
+    <tr>
+      <td><code>unlimitedStorage</code></td>
+      <td>Lift Chrome's default ~10&nbsp;MB quota for local extension storage. A large saved collection with captions can exceed it, and without this the capture would fail partway and lose data. It grants no access to any data &mdash; it only raises a size limit.</td>
+    </tr>
+    <tr>
+      <td>Host access to <code>https://www.instagram.com/*</code> and <code>https://instagram.com/*</code></td>
+      <td>Run the capture scripts on the saved-posts pages, and let the popup tell whether the current tab is an Instagram tab so it can show the right screen. This is the only site the extension can reach.</td>
+    </tr>
+  </table>
+  </div>
+  <p>
+    The extension does <strong>not</strong> request <code>cookies</code>,
+    <code>webRequest</code>, <code>history</code>, <code>identity</code>,
+    <code>debugger</code>, <code>management</code>, <code>nativeMessaging</code>,
+    <code>tabs</code>, <code>scripting</code>, <code>downloads</code>, or
+    <code>&lt;all_urls&gt;</code>.
+  </p>
+
+  <h2>Network connections</h2>
+  <p>The extension itself initiates network requests only in these cases:</p>
+  <ul>
+    <li>
+      <strong>Downloading your own media.</strong> When you use Download or a
+      ZIP export, the gallery fetches the image and video files from
+      Instagram's own CDN hosts (<code>*.cdninstagram.com</code>,
+      <code>*.fbcdn.net</code>) so it can save them to your computer. Requests
+      go only to hosts on a fixed allowlist; any other address is refused.
+    </li>
+    <li>
+      <strong>Links you click.</strong> The optional support links open
+      <code>buymeacoffee.com</code> or <code>patreon.com</code> in a new tab.
+      These are ordinary links: nothing is sent unless you click, and no
+      information about you or your library is attached.
+    </li>
+  </ul>
+  <p>
+    There is no developer-operated server, no telemetry endpoint, no
+    advertising network, and no remotely loaded code. All extension code is
+    contained in the package you install, as required by Manifest V3.
+  </p>
+
+  <h2>No analytics</h2>
+  <p>
+    This extension contains no analytics, no measurement SDK, no pixel, no
+    fingerprinting, and no behavioural profiling. No persistent identifier is
+    generated for you.
+  </p>
+
+  <h2 id="history">Change history &mdash; analytics removal</h2>
+  <p>
+    Being accurate about this matters more than looking clean: versions up to
+    and including <strong>4.4.0</strong> shipped a file
+    (<code>analytics.js</code>) that sent usage events &mdash; page views,
+    button clicks, feature usage, and error names &mdash; together with a
+    randomly generated persistent client identifier to Google Analytics 4 via
+    its Measurement Protocol. Those earlier versions' privacy policy stated
+    that no analytics was used, which was incorrect.
+  </p>
+  <p>
+    As of version <strong>4.4.1</strong>: the analytics file, its measurement
+    ID and API secret, all of its call sites, and the
+    <code>google-analytics.com</code> host permission have all been removed. No
+    Instagram content, media URL, caption, or username was ever included in
+    those events, but the events themselves should not have been sent at all.
+    Version 4.4.1 also deletes the leftover
+    <code>ga_client_id</code>, <code>ga_debug</code>, and
+    <code>ga_session_id</code> values from your browser the first time you open
+    the popup or gallery.
+  </p>
+
+  <h2>Chrome Web Store User Data Policy</h2>
+  <p>
+    The extension complies with the Chrome Web Store
+    <a href="https://developer.chrome.com/docs/webstore/program-policies/user-data-faq/" target="_blank" rel="noopener">User Data Policy</a>,
+    including the Limited Use requirements:
+  </p>
+  <ul>
+    <li>Data is handled only to provide the single user-facing feature described in the store listing &mdash; backing up and exporting your own saved posts.</li>
+    <li>No data is transferred to third parties, because no data leaves your device.</li>
+    <li>No data is sold, and none is used for advertising, credit assessment, lending, or any purpose unrelated to the extension's stated function.</li>
+    <li>No human reads your data &mdash; there is no server on which to read it.</li>
+  </ul>
+
+  <h2>Terms of the sites you use</h2>
+  <p>
+    You are responsible for your own use of Instagram, including its Terms of
+    Use. This extension is a tool for saving content you can already see in
+    your own account; it does not bypass authentication, access controls,
+    paywalls, or content restrictions of any kind.
+  </p>
+
+  <h2>Children</h2>
+  <p>
+    The extension is not directed at children and collects no data from anyone,
+    of any age, on any server.
+  </p>
+
+  <h2>Changes to this policy</h2>
+  <p>
+    If the extension's data handling changes, this policy will be updated in
+    the same release and the "Last updated" date above will change. Material
+    changes will be described in the store listing's release notes.
   </p>
 
   <h2>Contact</h2>
   <p>
-    If you have any questions about this privacy policy, please open an issue on our GitHub repository.
+    Questions about this policy can be raised as an issue on the project's
+    repository, or sent to the developer contact address listed on the Chrome
+    Web Store listing page.
   </p>
 </body>
 </html>

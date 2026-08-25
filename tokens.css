@@ -2,36 +2,44 @@
    Surface-specific overrides (button heights, --selected-glow opacity,
    --glass-bg-strong, --glow-*, --danger, etc.) live inline in each page's
    own <style> block — they intentionally differ between popup (compact)
-   and gallery (premium) and shouldn't be forced into a single value.
+   and gallery (roomy) and shouldn't be forced into a single value.
 
-   Updated in v4.4.0 (item 13a). When changing a token here, both pages
-   pick it up automatically; both pages should still build a fresh zip
-   so the new tokens.css ships. */
+   Palette note (4.4.1): the accent ramp used to be Instagram's pink/purple
+   (#E1306C / #833ab4 / #5851DB) and the surfaces were tinted to match. That
+   was trade dress imitation, so the whole ramp moved to a teal-on-slate
+   archive palette that shares nothing with Instagram's brand. There is
+   deliberately no pink, magenta, orange or purple anywhere in this file, and
+   no multi-stop warm gradient.
+
+   When changing a token here, both pages pick it up automatically; both pages
+   should still build a fresh zip so the new tokens.css ships. */
 :root {
   color-scheme: dark;
 
-  /* Brand */
-  --ig-pink:        #E1306C;
-  --ig-pink-dark:   #c13584;
-  --ig-purple:      #833ab4;
-  --ig-violet:      #5851DB;
+  /* Accent — teal. Chosen to read as "archive / export", not "social feed". */
+  --accent:         #0F8B8D;
+  --accent-bright:  #14A5A7;
+  --accent-deep:    #0B6E70;
+  /* Lighter step for text/icons on dark surfaces, where the solid accent
+     would not clear WCAG AA. */
+  --accent-text:    #4FD1C5;
 
-  /* Semantic — selection/active intentionally separate from brand pink so
+  /* Semantic — selection/active intentionally separate from the accent so
      the primary CTA stays visually distinct from "you picked this". */
   --selected:       #4F9DFF;
 
-  /* Surfaces — flat dark base with translucent layers above */
-  --ig-bg:          #0a0a14;
+  /* Surfaces — neutral slate, no colour cast */
+  --app-bg:         #0D1117;
   --surface-1:      rgba(255, 255, 255, 0.04);
   --surface-2:      rgba(255, 255, 255, 0.08);
   --surface-3:      rgba(255, 255, 255, 0.12);
 
   /* Glass — backdrop-blur surfaces */
-  --glass-bg:       rgba(22, 22, 38, 0.6);
+  --glass-bg:       rgba(24, 30, 38, 0.68);
   --glass-border:   rgba(255, 255, 255, 0.10);
-  --glass-blur:     blur(20px) saturate(140%);
+  --glass-blur:     blur(20px) saturate(120%);
 
-  /* Text — all WCAG AA against --ig-bg */
+  /* Text — all WCAG AA against --app-bg */
   --text-primary:   #f6f7fb;
   --text-secondary: #d4d4dc;
   --text-muted:     #a8a8b8;
@@ -55,7 +63,7 @@
   --radius-lg:      16px;
   --radius-pill:    999px;
 
-  /* Motion — spring physics for hover overshoots */
+  /* Motion */
   --t-fast:         140ms cubic-bezier(0.4, 0, 0.2, 1);
   --t-base:         220ms cubic-bezier(0.4, 0, 0.2, 1);
   --t-spring:       320ms cubic-bezier(0.34, 1.56, 0.64, 1);

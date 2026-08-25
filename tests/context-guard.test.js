@@ -13,10 +13,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadIIFE } = require('./_setup');
+const { loadContent } = require('./_setup');
 
-function loadContent() {
-  return loadIIFE('content.js').exposed;
+// The local helper predates the shared one; it returns just the seam, which is
+// all most of the assertions below need.
+function freshContent() {
+  return loadContent().exposed;
 }
 
 // isExtensionContextOk reads chrome.runtime.id at the moment of the call —
@@ -35,20 +37,20 @@ function withChrome(fn, chromeOverride) {
 }
 
 test('isExtensionContextOk: true when chrome.runtime.id is set (normal case)', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   // Default _setup chrome stub has getManifest but no runtime.id.
   sandbox.chrome.runtime.id = 'fake-extension-id';
   assert.equal(exposed.isExtensionContextOk(), true);
 });
 
 test('isExtensionContextOk: false when chrome.runtime.id is undefined', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   delete sandbox.chrome.runtime.id;
   assert.equal(exposed.isExtensionContextOk(), false);
 });
 
 test('isExtensionContextOk: false when chrome.runtime itself throws (defensive)', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   Object.defineProperty(sandbox.chrome, 'runtime', {
     get() { throw new Error('Extension context invalidated.'); },
     configurable: true
@@ -58,7 +60,7 @@ test('isExtensionContextOk: false when chrome.runtime itself throws (defensive)'
 });
 
 test('isExtensionContextOk: false when chrome is null/undefined', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   sandbox.chrome = undefined;
   assert.equal(exposed.isExtensionContextOk(), false);
 });
@@ -66,7 +68,7 @@ test('isExtensionContextOk: false when chrome is null/undefined', () => {
 // ---------- safeStorageSet ----------
 
 test('safeStorageSet: invokes chrome.storage.local.set when context is alive', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   sandbox.chrome.runtime.id = 'fake-id';
 
   let called = null;
@@ -85,7 +87,7 @@ test('safeStorageSet: invokes chrome.storage.local.set when context is alive', (
 });
 
 test('safeStorageSet: skips the call and flips the flag when context is dead', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   delete sandbox.chrome.runtime.id;
 
   let called = false;
@@ -99,7 +101,7 @@ test('safeStorageSet: skips the call and flips the flag when context is dead', (
 });
 
 test('safeStorageSet: catches a synchronously-thrown set (extension reload mid-call)', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   sandbox.chrome.runtime.id = 'fake-id';
   sandbox.chrome.storage.local.set = function () {
     throw new Error('Extension context invalidated.');
@@ -112,7 +114,7 @@ test('safeStorageSet: catches a synchronously-thrown set (extension reload mid-c
 });
 
 test('safeStorageSet: a "context invalidated" lastError flips the flag', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   sandbox.chrome.runtime.id = 'fake-id';
   sandbox.chrome.storage.local.set = function (_items, cb) {
     sandbox.chrome.runtime.lastError = { message: 'Extension context invalidated.' };
@@ -125,7 +127,7 @@ test('safeStorageSet: a "context invalidated" lastError flips the flag', () => {
 });
 
 test('safeStorageSet: a non-context lastError does NOT flip the flag (real storage errors)', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   sandbox.chrome.runtime.id = 'fake-id';
   sandbox.chrome.storage.local.set = function (_items, cb) {
     sandbox.chrome.runtime.lastError = { message: 'QUOTA_BYTES_PER_ITEM quota exceeded' };
@@ -141,7 +143,7 @@ test('safeStorageSet: a non-context lastError does NOT flip the flag (real stora
 // ---------- safeStorageGet ----------
 
 test('safeStorageGet: passes a normalized {} when context is alive but storage returns nothing', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   sandbox.chrome.runtime.id = 'fake-id';
   sandbox.chrome.storage.local.get = function (_keys, cb) { cb(undefined); };
 
@@ -154,7 +156,7 @@ test('safeStorageGet: passes a normalized {} when context is alive but storage r
 });
 
 test('safeStorageGet: no-op when context is dead', () => {
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   delete sandbox.chrome.runtime.id;
 
   let called = false;
@@ -172,7 +174,7 @@ test('safeStorageGet: no-op when context is dead', () => {
 test('safeSendMessage: sends when alive, no-ops when dead', () => {
   let sent = null;
   {
-    const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+    const { exposed, sandbox } = require('./_setup').loadContent();
     sandbox.chrome.runtime.id = 'fake-id';
     sandbox.chrome.runtime.sendMessage = function (msg, cb) { sent = msg; cb && cb({}); };
     exposed.safeSendMessage({ type: 'PING' });
@@ -180,7 +182,7 @@ test('safeSendMessage: sends when alive, no-ops when dead', () => {
     assert.equal(exposed.extensionContextLost, false);
   }
   {
-    const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+    const { exposed, sandbox } = require('./_setup').loadContent();
     delete sandbox.chrome.runtime.id;
     sandbox.chrome.runtime.sendMessage = function () { throw new Error('should not be called'); };
     assert.doesNotThrow(() => exposed.safeSendMessage({ type: 'PING' }));
@@ -191,7 +193,7 @@ test('safeSendMessage: sends when alive, no-ops when dead', () => {
 test('safeSendMessage: a "Receiving end does not exist" lastError is NOT a context death', () => {
   // This commonly happens when the background sw isn't listening for that
   // message type — we should silently swallow it, not poison the flag.
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   sandbox.chrome.runtime.id = 'fake-id';
   sandbox.chrome.runtime.sendMessage = function (_msg, cb) {
     sandbox.chrome.runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
@@ -209,7 +211,7 @@ test('safeSendMessage: a "Receiving end does not exist" lastError is NOT a conte
 test('noteContextLoss: only fires once even after many failed calls', () => {
   // Once the flag is set, repeated failures should not re-log noisily and
   // should keep no-op-ing without flipping anything else.
-  const { exposed, sandbox } = require('./_setup').loadIIFE('content.js');
+  const { exposed, sandbox } = require('./_setup').loadContent();
   delete sandbox.chrome.runtime.id;
 
   exposed.safeStorageSet({ a: 1 });

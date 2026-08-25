@@ -1,16 +1,29 @@
 /**
- * Instagram Saved Media Exporter - Content Script
- * Simplified version focused on reliability
+ * Saved Posts Backup & Export - content script (isolated world)
+ *
+ * Owns all state and all storage writes. This is the security boundary: the
+ * MAIN-world reader (capture-hook.js) can only offer data over
+ * window.postMessage, and everything offered is re-validated here before it is
+ * allowed anywhere near chrome.storage.local.
+ *
+ * Two invariants this file exists to hold:
+ *   1. Capture is off until the user presses Start Capture, and off again the
+ *      moment they press Stop or reload the page. See `captureActive`.
+ *   2. Every URL that reaches storage passed the shared allowlist in
+ *      url-allowlist.js. See validateMediaMessage().
+ *
+ * The storage key is still `igExporterData` for backward compatibility — a
+ * user upgrading from an earlier version keeps the library they already have.
  */
 
 (function() {
   'use strict';
 
   // Prevent double injection
-  if (window.__igExporterInjected) return;
-  window.__igExporterInjected = true;
+  if (window.__sbeContentInjected) return;
+  window.__sbeContentInjected = true;
 
-  console.log('[IG Exporter] Content script loaded');
+  console.log('[SBE] Content script loaded');
 
   // ============================================
   // EXTENSION CONTEXT GUARDS
@@ -34,7 +47,7 @@
   function noteContextLoss(where) {
     if (extensionContextLost) return;
     extensionContextLost = true;
-    console.warn('[IG Exporter] Extension context invalidated at ' + where +
+    console.warn('[SBE] Extension context invalidated at ' + where +
       '. Refresh this Instagram tab to resume capturing.');
     // Note: prior versions also tried to surface this via setStatus() to the
     // floating in-page panel. The panel was deleted in v4.4.0 (item 20); the
@@ -52,7 +65,7 @@
             if (/context invalidated|Receiving end does not exist/i.test(msg)) {
               noteContextLoss('storage.set (lastError)');
             } else {
-              console.error('[IG Exporter] Storage error:', msg);
+              console.error('[SBE] Storage error:', msg);
             }
             return;
           }
@@ -89,39 +102,173 @@
   }
 
   // ============================================
-  // LISTEN FOR MEDIA FROM INJECTOR (runs in MAIN world)
+  // CAPTURE STATE — OFF BY DEFAULT
   // ============================================
-  
-  window.addEventListener('message', function(event) {
-    if (event.source !== window) return;
-    if (event.data?.type !== 'IG_EXPORTER_MEDIA') return;
+  // Nothing is read from the page and nothing is stored until the user presses
+  // Start Capture in the extension popup. This flag is deliberately *not*
+  // persisted: every page load, every tab and every navigation starts inert,
+  // so simply having instagram.com open never captures anything.
 
-    const media = event.data.media || [];
-    console.log('[IG Exporter] Received', media.length, 'media from API interceptor');
+  let captureActive = false;
+
+  // Control channel to capture-hook.js in the MAIN world (which is where the
+  // page's own fetch/XHR live). 'start' makes it wrap them, 'stop' unwraps.
+  const CONTROL_TYPE = 'SBE_CAPTURE_CONTROL';
+  const MEDIA_TYPE = 'SBE_MEDIA';
+
+  function sendCaptureControl(action) {
+    try {
+      window.postMessage({ type: CONTROL_TYPE, action: action }, window.location.origin);
+    } catch (e) {
+      console.warn('[SBE] Could not signal capture reader:', e.message);
+    }
+  }
+
+  // ============================================
+  // INBOUND MESSAGE VALIDATION
+  // ============================================
+  // capture-hook.js runs in the MAIN world, which means it shares a global
+  // scope with Instagram's own page code — so its messages arrive over the
+  // same window.postMessage channel any page script could write to. Treat
+  // every inbound payload as untrusted: verify the sender, the origin, the
+  // envelope shape, and the type of every single field before anything is
+  // allowed near storage.
+
+  const ALLOWED_MESSAGE_ORIGINS = [
+    'https://www.instagram.com',
+    'https://instagram.com'
+  ];
+
+  const LIMITS = {
+    mediaPerMessage: 400,     // matches the reader's per-response cap
+    recordsPerBucket: 20000,  // hard ceiling on stored images / videos
+    caption: 2200,            // Instagram's own caption limit
+    owner: 30,                // Instagram's own username limit
+    shortcode: 64,
+    hashtags: 60,
+    carouselSize: 50,
+    timestamp: 40
+  };
+
+  function allowedMediaUrl(value) {
+    const api = globalThis.SBE_URL;
+    if (!api || typeof api.isAllowedMediaUrl !== 'function') return false;
+    try { return api.isAllowedMediaUrl(value); } catch (_) { return false; }
+  }
+
+  // Optional metadata is sanitized rather than rejected: a caption we cannot
+  // trust becomes null, which loses one field. Rejecting the whole record
+  // would instead lose media the user asked for.
+  function cleanString(value, max) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.slice(0, max);
+    return trimmed.length ? trimmed : null;
+  }
+
+  function cleanOwner(value) {
+    const owner = cleanString(value, LIMITS.owner);
+    if (!owner) return null;
+    return /^[A-Za-z0-9._]+$/.test(owner) ? owner : null;
+  }
+
+  function cleanShortcode(value) {
+    const code = cleanString(value, LIMITS.shortcode);
+    if (!code) return null;
+    return /^[A-Za-z0-9_-]+$/.test(code) ? code : null;
+  }
+
+  function cleanTimestamp(value) {
+    const raw = cleanString(value, LIMITS.timestamp);
+    if (!raw) return null;
+    const parsed = Date.parse(raw);
+    return isNaN(parsed) ? null : raw;
+  }
+
+  function cleanCount(value) {
+    if (typeof value !== 'number' || !isFinite(value) || value < 0) return null;
+    return Math.floor(value);
+  }
+
+  function cleanIndex(value, max) {
+    if (typeof value !== 'number' || !isFinite(value)) return null;
+    const n = Math.floor(value);
+    return (n >= 0 && n < max) ? n : null;
+  }
+
+  function cleanContext(ctx) {
+    if (!ctx || typeof ctx !== 'object' || Array.isArray(ctx)) return null;
+    const size = cleanIndex(ctx.carouselSize, LIMITS.carouselSize + 1);
+    return {
+      postShortcode: cleanShortcode(ctx.postShortcode),
+      caption: cleanString(ctx.caption, LIMITS.caption),
+      owner: cleanOwner(ctx.owner),
+      takenAt: cleanTimestamp(ctx.takenAt),
+      likeCount: cleanCount(ctx.likeCount),
+      carouselSize: size && size > 0 ? size : 1,
+      carouselIndex: cleanIndex(ctx.carouselIndex, LIMITS.carouselSize)
+    };
+  }
+
+  // Returns a validated array of {type, url, thumbnail, context}, or null if
+  // the envelope itself is malformed. Individual bad items are dropped.
+  function validateMediaMessage(event) {
+    if (event.source !== window) return null;
+    if (ALLOWED_MESSAGE_ORIGINS.indexOf(event.origin) === -1) return null;
+
+    const data = event.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    if (data.type !== MEDIA_TYPE) return null;
+    if (!Array.isArray(data.media)) return null;
+
+    const accepted = [];
+    const batch = data.media.slice(0, LIMITS.mediaPerMessage);
+    for (const item of batch) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      if (item.type !== 'image' && item.type !== 'video') continue;
+      if (!allowedMediaUrl(item.url)) continue;
+      accepted.push({
+        type: item.type,
+        url: item.url,
+        thumbnail: allowedMediaUrl(item.thumbnail) ? item.thumbnail : null,
+        context: cleanContext(item.context)
+      });
+    }
+    return { accepted: accepted, dropped: data.media.length - accepted.length };
+  }
+
+  // ============================================
+  // LISTEN FOR MEDIA FROM THE MAIN-WORLD READER
+  // ============================================
+
+  window.addEventListener('message', function(event) {
+    // The capture gate comes first, before any parsing work: while capture is
+    // off, an IG_EXPORTER/SBE_MEDIA message is discarded unread.
+    if (!captureActive) return;
+
+    const result = validateMediaMessage(event);
+    if (!result) return;
+
+    if (atRecordLimit()) {
+      console.warn('[SBE] Storage record limit reached (' +
+        LIMITS.recordsPerBucket + ' per type); ignoring further captures.');
+      return;
+    }
 
     let added = 0;
     let skipped = 0;
-    media.forEach(item => {
+    result.accepted.forEach(item => {
       const opts = contextToOptions(item.context);
-      if (item.type === 'video' && item.url) {
-        if (addVideo(item.url, null, item.thumbnail, opts)) {
-          added++;
-        } else {
-          skipped++;
-        }
-      } else if (item.type === 'image' && item.url) {
-        if (addImage(item.url, null, item.url, opts)) {
-          added++;
-        } else {
-          skipped++;
-        }
+      if (item.type === 'video') {
+        if (addVideo(item.url, null, item.thumbnail, opts)) added++; else skipped++;
+      } else {
+        if (addImage(item.url, null, item.thumbnail || item.url, opts)) added++; else skipped++;
       }
     });
-    
-    // Log summary with running total
+
     const totalItems = state.images.length + state.videos.length;
-    console.log(`[IG Exporter] API: +${added} new, ${skipped} dupes | Total: ${state.images.length} imgs + ${state.videos.length} vids = ${totalItems}`);
-    
+    console.log(`[SBE] +${added} new, ${skipped} dupes, ${result.dropped} rejected | ` +
+      `Total: ${state.images.length} imgs + ${state.videos.length} vids = ${totalItems}`);
+
     if (added > 0) {
       saveToStorage();
     }
@@ -130,298 +277,23 @@
   // ============================================
   // STATE
   // ============================================
-  
+
   const state = {
     images: [],
     videos: [],
     seenUrls: new Set(),
-    capturedShortcodes: new Set(),  // Track which posts we've already captured
-    selectedShortcodes: new Set(),  // Track selected posts for capture
-    selectionMode: false            // Whether selection mode is active
+    capturedShortcodes: new Set()   // Track which posts we've already captured
   };
-  
-  // ============================================
-  // SELECTION MODE (iPhone-style checkboxes)
-  // ============================================
-  
-  function injectSelectionStyles() {
-    if (document.getElementById('ig-exporter-selection-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'ig-exporter-selection-styles';
-    style.textContent = `
-      .ig-exporter-checkbox {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        background: rgba(0,0,0,0.5);
-        border: 2px solid white;
-        cursor: pointer;
-        z-index: 100;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.15s ease;
-      }
-      .ig-exporter-checkbox:hover {
-        transform: scale(1.1);
-      }
-      .ig-exporter-checkbox.checked {
-        background: linear-gradient(135deg, #E1306C, #833ab4);
-        border-color: #E1306C;
-      }
-      .ig-exporter-checkbox.checked::after {
-        content: '✓';
-        color: white;
-        font-size: 14px;
-        font-weight: bold;
-      }
-      .ig-exporter-selection-active .ig-exporter-checkbox {
-        display: flex !important;
-      }
-      .ig-exporter-selection-bar {
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: linear-gradient(135deg, #1a1a2e, #16213e);
-        border: 1px solid #E1306C;
-        border-radius: 12px;
-        padding: 12px 20px;
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        z-index: 10000;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-      .ig-exporter-selection-bar button {
-        padding: 8px 16px;
-        border-radius: 8px;
-        border: none;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-        transition: all 0.15s ease;
-      }
-      .ig-exporter-selection-bar .primary {
-        background: linear-gradient(135deg, #E1306C, #833ab4);
-        color: white;
-      }
-      .ig-exporter-selection-bar .primary:hover {
-        opacity: 0.9;
-      }
-      .ig-exporter-selection-bar .secondary {
-        background: #2a2a4a;
-        color: white;
-        border: 1px solid #444;
-      }
-      .ig-exporter-selection-bar .secondary:hover {
-        border-color: #E1306C;
-      }
-      .ig-exporter-selection-bar .count {
-        color: #E1306C;
-        font-size: 14px;
-        font-weight: 600;
-        min-width: 80px;
-      }
-    `;
-    document.head.appendChild(style);
+
+  // Guard against unbounded growth. Both a storage-quota protection and a
+  // denial-of-service guard: without it a page that keeps emitting media could
+  // grow chrome.storage.local without limit.
+  function atRecordLimit() {
+    return state.images.length >= LIMITS.recordsPerBucket ||
+           state.videos.length >= LIMITS.recordsPerBucket;
   }
-  
-  function addCheckboxesToPosts() {
-    const links = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
-    const processed = new Set();
-    
-    links.forEach(link => {
-      const match = link.href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
-      if (!match) return;
-      
-      const shortcode = match[2];
-      if (processed.has(shortcode)) return;
-      processed.add(shortcode);
-      
-      // Find the container (usually the parent div with position relative)
-      let container = link;
-      while (container && container.tagName !== 'ARTICLE') {
-        const style = window.getComputedStyle(container);
-        if (style.position === 'relative' || style.position === 'absolute') {
-          break;
-        }
-        container = container.parentElement;
-      }
-      
-      if (!container) container = link;
-      
-      // Check if checkbox already exists
-      if (container.querySelector('.ig-exporter-checkbox')) return;
-      
-      // Make container relative if needed
-      const containerStyle = window.getComputedStyle(container);
-      if (containerStyle.position === 'static') {
-        container.style.position = 'relative';
-      }
-      
-      // Create checkbox
-      const checkbox = document.createElement('div');
-      checkbox.className = 'ig-exporter-checkbox';
-      checkbox.dataset.shortcode = shortcode;
-      
-      if (state.selectedShortcodes.has(shortcode)) {
-        checkbox.classList.add('checked');
-      }
-      
-      checkbox.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleSelection(shortcode, checkbox);
-      });
-      
-      container.appendChild(checkbox);
-    });
-  }
-  
-  function toggleSelection(shortcode, checkbox) {
-    if (state.selectedShortcodes.has(shortcode)) {
-      state.selectedShortcodes.delete(shortcode);
-      checkbox.classList.remove('checked');
-    } else {
-      state.selectedShortcodes.add(shortcode);
-      checkbox.classList.add('checked');
-    }
-    updateSelectionBar();
-  }
-  
-  function selectAll() {
-    const checkboxes = document.querySelectorAll('.ig-exporter-checkbox');
-    checkboxes.forEach(cb => {
-      const shortcode = cb.dataset.shortcode;
-      if (shortcode) {
-        state.selectedShortcodes.add(shortcode);
-        cb.classList.add('checked');
-      }
-    });
-    updateSelectionBar();
-    console.log('[IG Exporter] Selected all:', state.selectedShortcodes.size, 'posts');
-  }
-  
-  function deselectAll() {
-    state.selectedShortcodes.clear();
-    const checkboxes = document.querySelectorAll('.ig-exporter-checkbox');
-    checkboxes.forEach(cb => {
-      cb.classList.remove('checked');
-    });
-    updateSelectionBar();
-    console.log('[IG Exporter] Deselected all');
-  }
-  
-  let selectionBar = null;
-  
-  function createSelectionBar() {
-    if (selectionBar) return;
-    
-    selectionBar = document.createElement('div');
-    selectionBar.className = 'ig-exporter-selection-bar';
-    selectionBar.innerHTML = `
-      <span class="count"><span id="ig-sel-count">0</span> selected</span>
-      <button class="secondary" id="ig-select-all">Select All</button>
-      <button class="secondary" id="ig-deselect-all">Deselect All</button>
-      <button class="primary" id="ig-capture-selected">Capture Selected</button>
-      <button class="secondary" id="ig-exit-selection">Exit</button>
-    `;
-    document.body.appendChild(selectionBar);
-    
-    document.getElementById('ig-select-all').onclick = selectAll;
-    document.getElementById('ig-deselect-all').onclick = deselectAll;
-    document.getElementById('ig-capture-selected').onclick = captureSelected;
-    document.getElementById('ig-exit-selection').onclick = exitSelectionMode;
-  }
-  
-  function updateSelectionBar() {
-    const countEl = document.getElementById('ig-sel-count');
-    if (countEl) {
-      countEl.textContent = state.selectedShortcodes.size;
-    }
-  }
-  
-  function enterSelectionMode() {
-    state.selectionMode = true;
-    injectSelectionStyles();
-    document.body.classList.add('ig-exporter-selection-active');
-    addCheckboxesToPosts();
-    createSelectionBar();
-    updateSelectionBar();
-    
-    // Watch for new posts being loaded (infinite scroll)
-    startSelectionObserver();
-    
-    console.log('[IG Exporter] Selection mode activated');
-  }
-  
-  function exitSelectionMode() {
-    state.selectionMode = false;
-    document.body.classList.remove('ig-exporter-selection-active');
-    
-    if (selectionBar) {
-      selectionBar.remove();
-      selectionBar = null;
-    }
-    
-    stopSelectionObserver();
-    console.log('[IG Exporter] Selection mode deactivated');
-  }
-  
-  let selectionObserver = null;
-  
-  function startSelectionObserver() {
-    if (selectionObserver) return;
-    
-    selectionObserver = new MutationObserver(() => {
-      if (state.selectionMode) {
-        addCheckboxesToPosts();
-      }
-    });
-    
-    selectionObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  }
-  
-  function stopSelectionObserver() {
-    if (selectionObserver) {
-      selectionObserver.disconnect();
-      selectionObserver = null;
-    }
-  }
-  
-  async function captureSelected() {
-    console.log('[IG Exporter] captureSelected() called');
-    
-    if (state.selectedShortcodes.size === 0) {
-      alert('No posts selected. Tap on posts to select them.');
-      return;
-    }
-    
-    // IMPORTANT: Save selection to local variable BEFORE exiting selection mode
-    const selectedList = Array.from(state.selectedShortcodes);
-    console.log('[IG Exporter] === CAPTURE SELECTED MODE ===');
-    console.log('[IG Exporter] Selected count:', selectedList.length);
-    console.log('[IG Exporter] Selected shortcodes:', selectedList);
-    
-    exitSelectionMode();
-    
-    // Clear selection now (we have a copy)
-    state.selectedShortcodes.clear();
-    
-    // Start capture with ONLY selected shortcodes
-    console.log('[IG Exporter] Calling startAutoClickCapture with selection...');
-    await startAutoClickCapture(selectedList);
-  }
-  
+
+
   // ============================================
   // HELPER FUNCTIONS
   // ============================================
@@ -499,7 +371,7 @@
     state.seenUrls.add(normalizedUrl);
 
     state.images.push(buildItem('image', url, postUrl, thumbnail || url, options));
-    console.log('[IG Exporter] Added image:', url.substring(0, 60));
+    console.log('[SBE] Added image:', url.substring(0, 60));
     return true;
   }
 
@@ -519,7 +391,7 @@
     const video = buildItem('video', videoUrl, postUrl, thumbnail, options);
     state.videos.push(video);
 
-    console.log('[IG Exporter] Added video:', {
+    console.log('[SBE] Added video:', {
       hasDirectUrl: !!videoUrl,
       urlPreview: (videoUrl || postUrl || '').substring(0, 80),
       hasThumbnail: !!thumbnail
@@ -528,11 +400,14 @@
   }
 
   // ============================================
-  // AUTO-CLICK CAROUSEL CAPTURE
+  // CAPTURE LOOP
   // ============================================
+  // Scroll the page the user is already looking at, so Instagram loads the
+  // next slice of their own saved feed. The MAIN-world reader parses the
+  // responses that arrive as a result. Nothing here issues a request of its
+  // own and nothing here talks to a private API.
 
   let autoClickRunning = false;
-  let autoClickQueue = [];
   
   function randomDelay(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -542,150 +417,43 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   
-  async function closeModal() {
-    // Try different close button selectors
-    const closeSelectors = [
-      'svg[aria-label="Close"]',
-      '[aria-label="Close"]',
-      'button[type="button"] svg[aria-label="Close"]',
-      'div[role="dialog"] svg[aria-label="Close"]',
-      '[aria-label="Close dialog"]'
-    ];
-    
-    for (const selector of closeSelectors) {
-      const closeBtn = document.querySelector(selector);
-      if (closeBtn) {
-        const button = closeBtn.closest('button') || closeBtn.closest('[role="button"]') || closeBtn;
-        button.click();
-        console.log('[IG Exporter] Closed modal via button');
-        await sleep(randomDelay(200, 400));
-        return true;
-      }
-    }
-    
-    // Try pressing Escape
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
-    console.log('[IG Exporter] Sent Escape key');
-    await sleep(randomDelay(150, 300));
-    
-    // Check if we're on a post page (not the saved posts page)
-    // If so, go back
-    if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
-      console.log('[IG Exporter] On post page, going back to saved posts');
-      window.history.back();
-      await sleep(randomDelay(500, 800));
-    }
-    
-    return true;
-  }
-  
-  async function clickCarouselPost(link, shortcode) {
-    console.log('[IG Exporter] Auto-clicking carousel:', shortcode);
-    
-    // Scroll element into view naturally
-    link.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await sleep(randomDelay(150, 300));
-    
-    // Click the post - use a simulated click that should open modal
-    const clickEvent = new MouseEvent('click', {
-      bubbles: true,
-      cancelable: true,
-      view: window
+  // ============================================
+  // FIRST-RUN CONSENT
+  // ============================================
+  // The popup owns the disclosure UI, but the gate is enforced here too: this
+  // is the only place that can actually turn capture on, so this is where the
+  // check has to hold. Reading the flag from storage (rather than trusting a
+  // field on the incoming message) means a forged START_CAPTURE cannot bypass
+  // the disclosure.
+
+  const CONSENT_KEY = 'sbeConsentAcceptedAt';
+
+  function withConsent(cb) {
+    safeStorageGet([CONSENT_KEY], (result) => {
+      const stamp = result && result[CONSENT_KEY];
+      cb(typeof stamp === 'number' && stamp > 0);
     });
-    link.dispatchEvent(clickEvent);
-    
-    // Wait for modal to open
-    await sleep(randomDelay(600, 1000));
-    
-    // Wait for modal to appear - try multiple times
-    let modal = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      modal = document.querySelector('div[role="dialog"]') || 
-              document.querySelector('article[role="presentation"]') ||
-              document.querySelector('div[class*="Modal"]');
-      if (modal) break;
-      await sleep(150);
-    }
-    
-    if (!modal) {
-      console.log('[IG Exporter] Modal still not found after waiting, trying to continue anyway');
-    }
-    
-    // Navigate through carousel slides to trigger loading of all items
-    const nextBtnSelectors = [
-      'button[aria-label="Next"]',
-      'div[aria-label="Next"]',
-      '[aria-label="Next"]',
-      'button[aria-label="Go to next slide"]',
-      'button[aria-label="Go forward"]',
-      // SVG-based next buttons
-      'button svg[aria-label="Right chevron icon"]',
-      'div[role="button"] svg[aria-label="Right chevron icon"]'
-    ];
-    
-    let slideCount = 0;
-    const maxSlides = 10;
-    
-    while (slideCount < maxSlides) {
-      let foundNext = false;
-      for (const selector of nextBtnSelectors) {
-        const el = document.querySelector(selector);
-        if (el) {
-          // Find the clickable element
-          const clickable = el.closest('button') || el.closest('[role="button"]') || el.closest('div[tabindex]') || el;
-          
-          if (clickable && typeof clickable.click === 'function') {
-            try {
-              clickable.click();
-              await sleep(randomDelay(100, 200));
-              slideCount++;
-              foundNext = true;
-              
-              // Capture the current slide's image
-              captureModalImages(shortcode);
-              
-              console.log('[IG Exporter] Clicked next slide', slideCount);
-              break;
-            } catch (e) {
-              console.log('[IG Exporter] Click failed:', e.message);
-            }
-          }
-        }
-      }
-      if (!foundNext) break;
-    }
-    
-    console.log('[IG Exporter] Navigated through', slideCount, 'slides');
-    
-    // Wait a bit more for any final API calls
-    await sleep(randomDelay(200, 400));
-    
-    // Capture images from the modal DOM (fallback if API doesn't provide carousel_media)
-    const modalImages = captureModalImages(shortcode);
-    console.log('[IG Exporter] Captured', modalImages, 'images from modal');
-    
-    // Close the modal
-    await closeModal();
-    
-    // Random delay before next action (human-like)
-    await sleep(randomDelay(300, 600));
   }
-  
-  
-  async function startAutoClickCapture(selectedOnly = null) {
+
+  async function startCapture() {
     if (autoClickRunning) {
-      console.log('[IG Exporter] Already running');
+      console.log('[SBE] Already running');
       return;
     }
-    
+
     autoClickRunning = true;
-    
+    captureActive = true;
+    // Tell the MAIN-world reader to wrap fetch/XHR. Until this message the
+    // page's own networking is completely untouched.
+    sendCaptureControl('start');
+
+
     // SCROLL-ONLY MODE: Just scroll to trigger Instagram's API loading
     // The injector.js will capture media from API responses automatically
-    console.log('[IG Exporter] ========================================');
-    console.log('[IG Exporter] SCROLL-ONLY MODE');
-    console.log('[IG Exporter] Scrolling to load posts, API interception will capture media');
-    console.log('[IG Exporter] ========================================');
+    console.log('[SBE] ========================================');
+    console.log('[SBE] SCROLL-ONLY MODE');
+    console.log('[SBE] Scrolling to load posts, API interception will capture media');
+    console.log('[SBE] ========================================');
     
     const startImages = state.images.length;
     const startVideos = state.videos.length;
@@ -711,10 +479,10 @@
       if (nearBottom) {
         // We're at the bottom, wait for more content to load
         noNewContentCount++;
-        console.log('[IG Exporter] Near bottom, waiting for content... (attempt', noNewContentCount + '/' + maxNoNewContent + ')');
+        console.log('[SBE] Near bottom, waiting for content... (attempt', noNewContentCount + '/' + maxNoNewContent + ')');
         
         if (noNewContentCount >= maxNoNewContent) {
-          console.log('[IG Exporter] No more content loading, stopping');
+          console.log('[SBE] No more content loading, stopping');
           break;
         }
         
@@ -726,7 +494,7 @@
         const mediaAfterWait = state.images.length + state.videos.length;
         if (mediaAfterWait > mediaBeforeScroll) {
           noNewContentCount = 0; // Reset counter if we got new content
-          console.log('[IG Exporter] New media captured:', mediaAfterWait - mediaBeforeScroll);
+          console.log('[SBE] New media captured:', mediaAfterWait - mediaBeforeScroll);
         }
         
         continue;
@@ -736,7 +504,7 @@
       const scrollAmount = viewportHeight * 0.8;
       const targetScroll = currentScroll + scrollAmount;
       
-      console.log('[IG Exporter] Scroll #' + scrollCount + ' | Media so far:', state.images.length, 'imgs +', state.videos.length, 'vids');
+      console.log('[SBE] Scroll #' + scrollCount + ' | Media so far:', state.images.length, 'imgs +', state.videos.length, 'vids');
       
       window.scrollTo({ top: targetScroll, behavior: 'auto' });
       
@@ -750,23 +518,26 @@
       const mediaAfterScroll = state.images.length + state.videos.length;
       if (mediaAfterScroll > mediaBeforeScroll) {
         noNewContentCount = 0; // Reset counter
-        console.log('[IG Exporter] Captured', mediaAfterScroll - mediaBeforeScroll, 'new items');
+        console.log('[SBE] Captured', mediaAfterScroll - mediaBeforeScroll, 'new items');
       }
     }
     
-    autoClickRunning = false;
-    
+    // The scroll loop can also end on its own (nothing new left to load).
+    // Tear the reader down on that path too, so a self-terminating capture
+    // leaves the page exactly as unpatched as an explicit Stop does.
+    stopCapture();
+
     // Summary
     const newImages = state.images.length - startImages;
     const newVideos = state.videos.length - startVideos;
-    
-    console.log('[IG Exporter] ========================================');
-    console.log('[IG Exporter] SCROLL COMPLETE:');
-    console.log('[IG Exporter]   Scrolls:', scrollCount);
-    console.log('[IG Exporter]   Images captured:', newImages);
-    console.log('[IG Exporter]   Videos captured:', newVideos);
-    console.log('[IG Exporter]   Total:', state.images.length, 'imgs +', state.videos.length, 'vids');
-    console.log('[IG Exporter] ========================================');
+
+    console.log('[SBE] ========================================');
+    console.log('[SBE] SCROLL COMPLETE:');
+    console.log('[SBE]   Scrolls:', scrollCount);
+    console.log('[SBE]   Images captured:', newImages);
+    console.log('[SBE]   Videos captured:', newVideos);
+    console.log('[SBE]   Total:', state.images.length, 'imgs +', state.videos.length, 'vids');
+    console.log('[SBE] ========================================');
     
     saveToStorage();
   }
@@ -776,147 +547,16 @@
   // as part of item 10; the auto-scroll path is the only capture pipeline now.
   // If revival is needed, git blame this comment.
 
-  function stopAutoClickCapture() {
+  // Full teardown. Ordering matters: drop the gate first so any response
+  // already in flight is discarded, then unwrap the page's fetch/XHR, then
+  // stop the DOM observers. Safe to call when nothing is running.
+  function stopCapture() {
+    captureActive = false;
     autoClickRunning = false;
-    console.log('[IG Exporter] Auto-click stopped');
+    sendCaptureControl('stop');
+    console.log('[SBE] Capture stopped; page networking restored');
   }
   
-  // Capture images from currently open modal - only the centered carousel image
-  function captureModalImages(shortcode) {
-    let count = 0;
-    const postUrl = `https://www.instagram.com/p/${shortcode}/`;
-    const modalOpts = { postShortcode: shortcode };
-    
-    // Find the modal or post article
-    let modal = document.querySelector('div[role="dialog"]');
-    
-    // If no modal, we might be on the post page directly - look for the article
-    if (!modal) {
-      modal = document.querySelector('article[role="presentation"]') ||
-              document.querySelector('article') ||
-              document.querySelector('main');
-    }
-    
-    if (!modal) {
-      console.log('[IG Exporter] Modal/article not found!');
-      return 0;
-    }
-    
-    console.log('[IG Exporter] Found container:', modal.tagName, modal.getAttribute('role'));
-    
-    // Get modal center
-    const modalRect = modal.getBoundingClientRect();
-    const modalCenterX = modalRect.left + modalRect.width / 2;
-    const modalCenterY = modalRect.top + modalRect.height / 2;
-    console.log('[IG Exporter] Modal center:', Math.round(modalCenterX), Math.round(modalCenterY));
-    
-    // Look for images in the modal - try broader selector
-    let images = modal.querySelectorAll('img[src*="cdninstagram"], img[src*="fbcdn"]');
-    console.log('[IG Exporter] Images found with CDN selector:', images.length);
-    
-    // If no images found, try all images
-    if (images.length === 0) {
-      images = modal.querySelectorAll('img');
-      console.log('[IG Exporter] All images in modal:', images.length);
-    }
-    
-    // Find the image that is closest to the center of the modal AND large
-    let mainImage = null;
-    let minDistanceToCenter = Infinity;
-    
-    images.forEach(img => {
-      const src = img.src;
-      if (!src) return;
-      
-      // Skip profile pics, small thumbnails
-      if (src.includes('profile') || src.includes('44x44') || src.includes('150x150') || src.includes('240x240')) {
-        return;
-      }
-      
-      const rect = img.getBoundingClientRect();
-      console.log('[IG Exporter] Image:', rect.width, 'x', rect.height, 'src:', src.substring(0, 50));
-      
-      // Must be reasonably large (at least 100x100 - lowered threshold)
-      if (rect.width < 100 || rect.height < 100) {
-        console.log('[IG Exporter] Skipped - too small');
-        return;
-      }
-      
-      // Calculate distance from image center to modal center
-      const imgCenterX = rect.left + rect.width / 2;
-      const imgCenterY = rect.top + rect.height / 2;
-      const distance = Math.sqrt(
-        Math.pow(imgCenterX - modalCenterX, 2) + 
-        Math.pow(imgCenterY - modalCenterY, 2)
-      );
-      
-      console.log('[IG Exporter] Distance to center:', Math.round(distance));
-      
-      // Find the most centered large image
-      if (distance < minDistanceToCenter) {
-        minDistanceToCenter = distance;
-        mainImage = img;
-      }
-    });
-    
-    console.log('[IG Exporter] Main image found:', !!mainImage);
-    
-    // Capture the main centered image
-    if (mainImage) {
-      let bestUrl = mainImage.src;
-      
-      // Get best quality from srcset
-      if (mainImage.srcset) {
-        const parts = mainImage.srcset.split(',');
-        let maxWidth = 0;
-        parts.forEach(part => {
-          const match = part.trim().match(/^(\S+)\s+(\d+)w$/);
-          if (match && parseInt(match[2]) > maxWidth) {
-            maxWidth = parseInt(match[2]);
-            bestUrl = match[1];
-          }
-        });
-      }
-      
-      if (addImage(bestUrl, postUrl, bestUrl, modalOpts)) {
-        console.log('[IG Exporter] Captured modal image:', bestUrl.substring(0, 60));
-        count++;
-      }
-    }
-
-    // Also look for videos - capture ANY video with a valid src
-    const videos = modal.querySelectorAll('video');
-    console.log('[IG Exporter] Videos found in modal:', videos.length);
-
-    videos.forEach(video => {
-      const src = video.src;
-      const poster = video.poster;
-
-      // Skip blob URLs (they won't work in gallery)
-      if (src && src.startsWith('blob:')) {
-        console.log('[IG Exporter] Skipping blob video');
-        return;
-      }
-
-      // Need either a direct CDN URL or a poster
-      if (src && (src.includes('cdninstagram') || src.includes('fbcdn'))) {
-        if (addVideo(src, postUrl, poster, modalOpts)) {
-          console.log('[IG Exporter] Captured modal video:', src.substring(0, 60));
-          count++;
-        }
-      } else if (poster) {
-        // Video might not have loaded yet, but we have poster
-        console.log('[IG Exporter] Video without direct URL, checking poster');
-      }
-    });
-    
-    if (count > 0) {
-      saveToStorage();
-    }
-    
-    return count;
-  }
-
   // ============================================
   // STORAGE
   // ============================================
@@ -928,7 +568,7 @@
       videos: state.videos
     };
     safeStorageSet({ igExporterData: data }, function () {
-      console.log('[IG Exporter] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
+      console.log('[SBE] Saved:', state.images.length, 'images,', state.videos.length, 'videos');
     });
   }
 
@@ -947,7 +587,7 @@
           if (v.postUrl) state.seenUrls.add(normalizeUrl(v.postUrl));
         });
 
-        console.log('[IG Exporter] Loaded:', state.images.length, 'images,', state.videos.length, 'videos');
+        console.log('[SBE] Loaded:', state.images.length, 'images,', state.videos.length, 'videos');
       }
     });
   }
@@ -975,7 +615,7 @@
       state.videos = [];
       state.seenUrls.clear();
       state.capturedShortcodes.clear();
-      console.log('[IG Exporter] Storage cleared externally; in-memory state reset');
+      console.log('[SBE] Storage cleared externally; in-memory state reset');
     }
   });
 
@@ -988,7 +628,7 @@
       case 'PING':
         sendResponse({ ok: true });
         break;
-        
+
       case 'GET_STATS':
         sendResponse({
           images: state.images.length,
@@ -998,21 +638,30 @@
         });
         break;
 
-      case 'START_CAROUSELS':
-        startAutoClickCapture();
-        sendResponse({
-          images: state.images.length,
-          videos: state.videos.length
+      case 'START_CAPTURE':
+        // Async: the consent flag lives in storage, so the response has to
+        // wait for the read. Returning true keeps the channel open.
+        withConsent((granted) => {
+          if (!granted) {
+            sendResponse({ ok: false, reason: 'consent_required' });
+            return;
+          }
+          startCapture();
+          sendResponse({
+            ok: true,
+            images: state.images.length,
+            videos: state.videos.length
+          });
         });
-        break;
-        
-      case 'STOP_CAROUSELS':
-        stopAutoClickCapture();
+        return true;
+
+      case 'STOP_CAPTURE':
+        stopCapture();
         sendResponse({ ok: true });
         break;
-        
+
       case 'CLEAR':
-        console.log('[IG Exporter] CLEAR command received - clearing ALL data');
+        console.log('[SBE] CLEAR command received - clearing ALL data');
         state.images = [];
         state.videos = [];
         state.seenUrls.clear();
@@ -1023,27 +672,6 @@
         sendResponse({ ok: true });
         break;
         
-      case 'CAPTURE_CAROUSELS':
-        if (autoClickRunning) {
-          stopAutoClickCapture();
-        } else {
-          startAutoClickCapture();
-        }
-        sendResponse({ ok: true, running: autoClickRunning });
-        break;
-        
-      case 'TOGGLE_SELECTION_MODE':
-        if (state.selectionMode) {
-          exitSelectionMode();
-        } else {
-          enterSelectionMode();
-        }
-        sendResponse({ ok: true, selectionMode: state.selectionMode });
-        break;
-        
-      case 'GET_SELECTION_COUNT':
-        sendResponse({ count: state.selectedShortcodes.size, selectionMode: state.selectionMode });
-        break;
     }
     return true;
   });
@@ -1055,7 +683,7 @@
   function init() {
     // Load existing data from storage
     loadFromStorage();
-    console.log('[IG Exporter] Ready. Click extension icon to use.');
+    console.log('[SBE] Ready. Click extension icon to use.');
   }
 
   if (document.readyState === 'complete') {
@@ -1064,14 +692,20 @@
     window.addEventListener('load', init);
   }
 
-  // Test seam: only fires when tests set __IG_EXPORTER_TEST_HOOKS__ before
+  // Test seam: only fires when tests set __SBE_TEST_HOOKS__ before
   // loading the source. Has no effect in the browser.
-  if (typeof globalThis !== 'undefined' && globalThis.__IG_EXPORTER_TEST_HOOKS__) {
-    globalThis.__IG_EXPORTER_TEST_HOOKS__.content = {
+  if (typeof globalThis !== 'undefined' && globalThis.__SBE_TEST_HOOKS__) {
+    globalThis.__SBE_TEST_HOOKS__.content = {
       extractHashtags, contextToOptions, buildItem, normalizeUrl,
-      addImage, addVideo, state,
+      addImage, addVideo, state, atRecordLimit,
       isExtensionContextOk, safeStorageSet, safeStorageGet, safeSendMessage,
-      // expose the flag indirectly via a getter so tests can assert state
+      // capture gate + inbound validation (see the compliance tests)
+      validateMediaMessage, cleanContext, cleanOwner, cleanShortcode,
+      cleanTimestamp, cleanCount, cleanIndex, cleanString,
+      startCapture, stopCapture, withConsent,
+      LIMITS, CONSENT_KEY, CONTROL_TYPE, MEDIA_TYPE, ALLOWED_MESSAGE_ORIGINS,
+      // exposed via getters so tests observe live state, not a snapshot
+      get captureActive() { return captureActive; },
       get extensionContextLost() { return extensionContextLost; }
     };
   }

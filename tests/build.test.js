@@ -23,10 +23,9 @@ const SOURCE_FILES = [
   'manifest.json',
   'background.js',
   'content.js',
-  'content-styles.css',
-  'injector.js',
-  'autoplay.js',
-  'analytics.js',
+  'capture-hook.js',
+  'url-allowlist.js',
+  'legacy-cleanup.js',
   'popup.html',
   'popup.js',
   'gallery.html',
@@ -42,21 +41,44 @@ const REQUIRED_IN_ZIP = [
   'manifest.json',
   'background.js',
   'content.js',
-  'content-styles.css',  // listed in manifest content_scripts.css
-  'injector.js',         // listed in manifest content_scripts.js (MAIN world)
-  'autoplay.js',         // listed in manifest content_scripts.js (isolated world)
-  'analytics.js',        // <script> in popup.html and gallery.html
+  'capture-hook.js',     // manifest content_scripts.js (MAIN world)
+  'url-allowlist.js',    // manifest content_scripts.js (both worlds) + gallery
+  'legacy-cleanup.js',   // <script> in popup.html and gallery.html
   'popup.html',
   'popup.js',
   'gallery.html',
   'gallery.js',
   'tokens.css',          // shared design tokens linked from popup + gallery
-  'lib/jszip.min.js',    // <script> in gallery.html — per-album ZIP feature
+  'privacy-policy.html', // linked from popup About + gallery header
+  'lib/jszip.min.js',    // <script> in gallery.html — album/library ZIP
   'assets/icons/icon-16.png',
   'assets/icons/icon-32.png',
   'assets/icons/icon-48.png',
   'assets/icons/icon-128.png'
 ];
+
+// Files that must NEVER be in the zip. Removed features and developer-only
+// tooling: a regression here is a compliance regression, not just bloat.
+const FORBIDDEN_IN_ZIP = [
+  'analytics.js',        // Google Analytics client, removed in 4.4.1
+  'autoplay.js',         // unrelated autoplay feature, removed in 4.4.1
+  'injector.js',         // renamed to capture-hook.js in 4.4.1
+  'content-styles.css',  // dead stylesheet for the deleted in-page panel
+  'assets/icons/maker.png',
+  'assets/icons/icon-source.png',  // 512px master, build input not runtime asset
+  'compose_screenshots.py',
+  'tools/make-icons.py',
+  'package.json',
+  'index.html',
+  'README.md'
+];
+
+// The zip name is derived from manifest.version, so read it rather than
+// hardcoding — otherwise every version bump breaks this test.
+function zipName(dir) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+  return 'saved-posts-backup-export-' + manifest.version + '.zip';
+}
 
 function stage() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'igexporter-build-'));
@@ -95,7 +117,7 @@ test('build.sh: produces a zip', () => {
   const dir = stage();
   try {
     execSync('./build.sh', { cwd: dir, stdio: 'pipe' });
-    const zipPath = path.join(dir, 'instagram-saved-media-exporter.zip');
+    const zipPath = path.join(dir, zipName(dir));
     assert.ok(fs.existsSync(zipPath), 'expected zip at ' + zipPath);
     assert.ok(fs.statSync(zipPath).size > 1000, 'zip should be more than 1KB');
   } finally {
@@ -107,7 +129,7 @@ test('build.sh: zip contains every file referenced by manifest + HTML', () => {
   const dir = stage();
   try {
     execSync('./build.sh', { cwd: dir, stdio: 'pipe' });
-    const zipPath = path.join(dir, 'instagram-saved-media-exporter.zip');
+    const zipPath = path.join(dir, zipName(dir));
     const listing = execSync(`unzip -Z1 "${zipPath}"`, { encoding: 'utf8' });
     const filesInZip = new Set(listing.split('\n').map(l => l.trim()).filter(Boolean));
 
@@ -128,15 +150,33 @@ test('build.sh: zip does NOT include developer artifacts', () => {
   const dir = stage();
   try {
     execSync('./build.sh', { cwd: dir, stdio: 'pipe' });
-    const zipPath = path.join(dir, 'instagram-saved-media-exporter.zip');
+    const zipPath = path.join(dir, zipName(dir));
     const listing = execSync(`unzip -Z1 "${zipPath}"`, { encoding: 'utf8' });
     const files = listing.split('\n').map(l => l.trim()).filter(Boolean);
     const banned = files.filter(f =>
       f === '.DS_Store' || f.startsWith('.git/') || f.startsWith('.venv/') ||
       f.startsWith('node_modules/') || f.startsWith('tests/') ||
-      f.startsWith('.claude/') || f.endsWith('.zip')
+      f.startsWith('.claude/') || f.endsWith('.zip') ||
+      f.endsWith('.map') || f.startsWith('tools/') ||
+      f.startsWith('assets/screenshots/') ||
+      FORBIDDEN_IN_ZIP.includes(f)
     );
     assert.equal(banned.length, 0, 'zip contains files it should not: ' + banned.join(', '));
+  } finally {
+    rmrf(dir);
+  }
+});
+
+test('build.sh: manifest.json is at the zip root', () => {
+  const dir = stage();
+  try {
+    execSync('./build.sh', { cwd: dir, stdio: 'pipe' });
+    const listing = execSync(`unzip -Z1 "${path.join(dir, zipName(dir))}"`, { encoding: 'utf8' });
+    const files = listing.split('\n').map(l => l.trim()).filter(Boolean);
+    assert.ok(files.includes('manifest.json'),
+      'manifest.json must be at the zip root, not nested in a folder');
+    const nested = files.filter(f => f.endsWith('/manifest.json'));
+    assert.equal(nested.length, 0, 'unexpected nested manifest: ' + nested.join(', '));
   } finally {
     rmrf(dir);
   }

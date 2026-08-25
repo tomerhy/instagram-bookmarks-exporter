@@ -63,16 +63,6 @@ function makeElement() {
   return el;
 }
 
-function makeAnalyticsStub() {
-  return {
-    trackPageView: () => {},
-    trackButtonClick: () => {},
-    trackFeature: () => {},
-    trackDownload: () => {},
-    trackError: () => {}
-  };
-}
-
 function makeChromeStub() {
   // Listener registries are tracked so tests can simulate Chrome events
   // (storage changes, runtime install/startup). The _emit helpers are
@@ -156,6 +146,10 @@ function makeBrowserSandbox() {
       readyState: 'loading',
       hidden: false,
       head: { appendChild: () => {} },
+      // The capture loop reads scrollHeight to decide whether it has reached
+      // the end of the feed. A tiny value makes it conclude "at the bottom"
+      // immediately, so tests don't sit through the scroll driver.
+      documentElement: { scrollHeight: 100 },
       body: makeElement(),
       createElement: () => makeElement(),
       querySelector: () => null,
@@ -165,8 +159,7 @@ function makeBrowserSandbox() {
       removeEventListener: () => {},
       dispatchEvent: () => {}
     },
-    Analytics: makeAnalyticsStub(),
-    __IG_EXPORTER_TEST_HOOKS__: {}
+    __SBE_TEST_HOOKS__: {}
   };
 
   // XMLHttpRequest.prototype is monkey-patched by injector.js / content.js.
@@ -185,26 +178,58 @@ function makeBrowserSandbox() {
   sandbox.window.innerHeight = 800;
   sandbox.window.scrollTo = () => {};
   sandbox.window.getComputedStyle = () => ({ position: 'static' });
-  sandbox.window.postMessage = () => {};
-  sandbox.window.addEventListener = () => {};
+  // Recording postMessage + a real listener registry, so tests can drive the
+  // window 'message' channel and assert on what the code posts back.
+  sandbox.__posted = [];
+  sandbox.__messageListeners = [];
+  sandbox.window.postMessage = (data, origin) => {
+    sandbox.__posted.push({ data, origin });
+  };
+  sandbox.window.addEventListener = (type, fn) => {
+    if (type === 'message') sandbox.__messageListeners.push(fn);
+  };
   sandbox.window.dispatchEvent = () => {};
+  // Deliver a synthetic message event to every registered listener.
+  //
+  // `source` defaults to __window — the contextified global as the *sandboxed
+  // code* sees it. That is not the same object as this host-side `sandbox`, so
+  // a test that passed `sandbox.window` by hand would fail the production
+  // `event.source !== window` check for the wrong reason. __window is
+  // populated by loadIIFE / loadTopLevel once the context exists.
+  sandbox.__emitMessage = (event) => {
+    const ev = Object.assign({ source: sandbox.__window }, event);
+    if (ev.source === undefined) ev.source = sandbox.__window;
+    for (const fn of sandbox.__messageListeners) fn(ev);
+  };
+  sandbox.__window = null;
 
   return sandbox;
 }
 
-// Run an IIFE source file (injector.js, content.js) and return whatever its
-// test seam exposed.
-function loadIIFE(filename) {
-  const source = fs.readFileSync(path.join(REPO_ROOT, filename), 'utf8');
+// Run an IIFE source file (capture-hook.js, content.js) and return whatever
+// its test seam exposed.
+//
+// opts.deps    — source files to evaluate in the same context first. Both
+//                content scripts depend on url-allowlist.js being loaded
+//                ahead of them, exactly as the manifest declares.
+// opts.setup   — called with the sandbox before anything is evaluated.
+function loadIIFE(filename, opts) {
+  opts = opts || {};
   const sandbox = makeBrowserSandbox();
+  if (typeof opts.setup === 'function') opts.setup(sandbox);
   vm.createContext(sandbox);
+  sandbox.__window = vm.runInContext('globalThis', sandbox);
+  for (const dep of opts.deps || []) {
+    vm.runInContext(fs.readFileSync(path.join(REPO_ROOT, dep), 'utf8'), sandbox, { filename: dep });
+  }
+  const source = fs.readFileSync(path.join(REPO_ROOT, filename), 'utf8');
   vm.runInContext(source, sandbox, { filename });
   const seamKey = path.basename(filename, '.js');
-  const exposed = sandbox.__IG_EXPORTER_TEST_HOOKS__[seamKey];
+  const exposed = sandbox.__SBE_TEST_HOOKS__[seamKey];
   if (!exposed) {
     throw new Error(
       'Test seam not found for ' + filename + '. Did you forget to add the ' +
-      '__IG_EXPORTER_TEST_HOOKS__ block at the end of the IIFE?'
+      '__SBE_TEST_HOOKS__ block at the end of the IIFE?'
     );
   }
   return { exposed, sandbox };
@@ -212,18 +237,47 @@ function loadIIFE(filename) {
 
 // Run a top-level (non-IIFE) source file and return the sandbox so tests can
 // poke at any top-level binding.
-function loadTopLevel(filename, extraSetup) {
+//
+// deps are evaluated first, in order, in the same context — used to mirror the
+// <script> order a page actually declares.
+function loadTopLevel(filename, extraSetup, deps) {
   const source = fs.readFileSync(path.join(REPO_ROOT, filename), 'utf8');
   const sandbox = makeBrowserSandbox();
   if (typeof extraSetup === 'function') extraSetup(sandbox);
   vm.createContext(sandbox);
+  sandbox.__window = vm.runInContext('globalThis', sandbox);
+  for (const dep of deps || []) {
+    vm.runInContext(fs.readFileSync(path.join(REPO_ROOT, dep), 'utf8'), sandbox, { filename: dep });
+  }
   vm.runInContext(source, sandbox, { filename });
   return sandbox;
+}
+
+// content.js and capture-hook.js are both declared in the manifest with
+// url-allowlist.js ahead of them; mirror that here so tests exercise the same
+// wiring the browser does.
+const WITH_ALLOWLIST = { deps: ['url-allowlist.js'] };
+
+function loadContent(setup) {
+  return loadIIFE('content.js', { deps: WITH_ALLOWLIST.deps, setup });
+}
+
+function loadCaptureHook(setup) {
+  return loadIIFE('capture-hook.js', { deps: WITH_ALLOWLIST.deps, setup });
+}
+
+// gallery.html loads url-allowlist.js before gallery.js; the import sanitiser
+// depends on it, so tests must load it the same way.
+function loadGallery(setup) {
+  return loadTopLevel('gallery.js', setup, WITH_ALLOWLIST.deps);
 }
 
 module.exports = {
   makeBrowserSandbox,
   loadIIFE,
+  loadContent,
+  loadCaptureHook,
+  loadGallery,
   loadTopLevel,
   REPO_ROOT
 };

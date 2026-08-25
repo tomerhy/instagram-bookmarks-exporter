@@ -1,5 +1,11 @@
 /**
- * Instagram Saved Media Exporter - Popup Script
+ * Saved Posts Backup & Export - popup script
+ *
+ * The popup is the only place capture can be started. It owns the first-run
+ * disclosure: until the user has read it and pressed "Enable capture", the
+ * content script refuses to start (it re-checks the stored consent flag
+ * itself, so this UI is a disclosure surface rather than the enforcement
+ * point).
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -13,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
   
   let isCapturing = false;
   const captureBtn = document.getElementById('capture-btn');
-  const autoplayToggle = document.getElementById('autoplay-toggle');
   const supportBanner = document.getElementById('support-banner');
   const supportBtn = document.getElementById('support-btn');
   const dismissBtn = document.getElementById('dismiss-btn');
@@ -32,11 +37,6 @@ document.addEventListener('DOMContentLoaded', function() {
   try {
     versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
   } catch (e) {}
-  
-  // Track popup page view
-  if (window.Analytics) {
-    Analytics.trackPageView('popup', 'Extension Popup');
-  }
   
   // Support banner logic
   function checkSupportBanner() {
@@ -58,23 +58,16 @@ document.addEventListener('DOMContentLoaded', function() {
   
   function openCoffeeLink() {
     chrome.tabs.create({ url: COFFEE_URL });
-    if (window.Analytics) {
-      Analytics.trackButtonClick('buy_coffee', 'popup');
-    }
   }
   
   function dismissBanner() {
     chrome.storage.local.set({ supportDismissed: true });
     if (supportBanner) supportBanner.classList.remove('visible');
-    if (window.Analytics) {
-      Analytics.trackButtonClick('dismiss_support', 'popup');
-    }
   }
   
   // Support button handlers
   if (supportBtn) {
     supportBtn.addEventListener('click', function() {
-      if (window.Analytics) Analytics.trackButtonClick('support_banner', 'popup');
       openCoffeeLink();
       dismissBanner();
     });
@@ -105,10 +98,6 @@ document.addEventListener('DOMContentLoaded', function() {
     aboutOverlay.setAttribute('aria-hidden', 'false');
     // Focus the close button so Esc / Tab navigation is obvious.
     if (aboutClose) aboutClose.focus();
-    if (window.Analytics) {
-      Analytics.trackButtonClick('about_open', 'popup');
-      Analytics.trackFeature('about_opened', {});
-    }
   }
 
   function hideAbout(source) {
@@ -118,9 +107,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Keep `hidden` synced so the dialog is removed from the AT tree when closed.
     aboutOverlay.hidden = true;
     if (aboutToggle) aboutToggle.focus();
-    if (window.Analytics) {
-      Analytics.trackButtonClick('about_close_' + (source || 'button'), 'popup');
-    }
   }
 
   if (aboutToggle) aboutToggle.addEventListener('click', showAbout);
@@ -140,29 +126,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // Check if banner should show
   checkSupportBanner();
 
-  // Autoplay toggle: load current state, persist on change, push live to active tab.
-  if (autoplayToggle) {
-    chrome.storage.local.get(['igAutoplayEnabled'], function(result) {
-      const enabled = result.igAutoplayEnabled !== false;
-      autoplayToggle.checked = enabled;
-    });
-
-    autoplayToggle.addEventListener('change', function() {
-      const enabled = autoplayToggle.checked;
-      chrome.storage.local.set({ igAutoplayEnabled: enabled });
-      chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-        const tab = tabs[0];
-        if (!tab || !tab.id) return;
-        chrome.tabs.sendMessage(tab.id, { type: 'SET_AUTOPLAY_ENABLED', enabled: enabled }, function() {
-          void chrome.runtime.lastError;
-        });
-      });
-      if (window.Analytics) {
-        Analytics.trackButtonClick(enabled ? 'autoplay_on' : 'autoplay_off', 'popup');
-      }
-    });
-  }
-  
   function setStatus(msg, capturing = false) {
     if (statusEl) {
       statusEl.textContent = msg;
@@ -245,10 +208,10 @@ document.addEventListener('DOMContentLoaded', function() {
     isCapturing = capturing;
     if (captureBtn) {
       if (capturing) {
-        setBtnLabel(captureBtn, 'i-stop', 'Stop');
-        setStatus('Capturing...', true);
+        setBtnLabel(captureBtn, 'i-stop', 'Stop capture');
+        setStatus('Capturing your saved posts...', true);
       } else {
-        setBtnLabel(captureBtn, 'i-camera', 'Capture All');
+        setBtnLabel(captureBtn, 'i-camera', 'Start capture');
         setStatus('', false);
       }
     }
@@ -320,33 +283,96 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
-  // Capture All button
+  // ---------------------------------------------------------------------------
+  // First-run disclosure
+  // ---------------------------------------------------------------------------
+  // Shown once, before the first capture ever runs. The consent timestamp is
+  // stored in chrome.storage.local under CONSENT_KEY; content.js reads that
+  // same key and will not start without it.
+
+  const CONSENT_KEY = 'sbeConsentAcceptedAt';
+  const consentOverlay = document.getElementById('consent-overlay');
+  const consentAccept = document.getElementById('consent-accept');
+  const consentCancel = document.getElementById('consent-cancel');
+
+  function showConsent() {
+    if (!consentOverlay) return;
+    consentOverlay.hidden = false;
+    consentOverlay.classList.add('visible');
+    consentOverlay.setAttribute('aria-hidden', 'false');
+    if (consentAccept) consentAccept.focus();
+  }
+
+  function hideConsent() {
+    if (!consentOverlay) return;
+    consentOverlay.classList.remove('visible');
+    consentOverlay.setAttribute('aria-hidden', 'true');
+    consentOverlay.hidden = true;
+    if (captureBtn) captureBtn.focus();
+  }
+
+  if (consentCancel) {
+    consentCancel.addEventListener('click', function() {
+      hideConsent();
+      setStatus('Capture not started');
+    });
+  }
+
+  if (consentAccept) {
+    consentAccept.addEventListener('click', function() {
+      const stamp = {};
+      stamp[CONSENT_KEY] = Date.now();
+      chrome.storage.local.set(stamp, function() {
+        hideConsent();
+        beginCapture();
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Start / Stop capture
+  // ---------------------------------------------------------------------------
+
+  function beginCapture() {
+    incrementUseCount();
+    sendToContent({ type: 'START_CAPTURE' }, function(response) {
+      if (response && response.reason === 'consent_required') {
+        // Consent was revoked (data cleared) between the check and the start.
+        showConsent();
+        return;
+      }
+      if (!response || !response.ok) {
+        setStatus('Could not start — reload the page and try again');
+        return;
+      }
+      updateStats(response);
+      setBtnLabel(captureBtn, 'i-stop', 'Stop capture');
+      isCapturing = true;
+      setStatus('Capturing your saved posts...', true);
+    });
+  }
+
+  function endCapture() {
+    sendToContent({ type: 'STOP_CAPTURE' });
+    setBtnLabel(captureBtn, 'i-camera', 'Start capture');
+    isCapturing = false;
+    setStatus('Stopped', false);
+  }
+
   captureBtn.addEventListener('click', function() {
     if (isCapturing) {
-      if (window.Analytics) Analytics.trackButtonClick('stop_capture', 'popup');
-      sendToContent({ type: 'STOP_CAROUSELS' });
-      setBtnLabel(captureBtn, 'i-camera', 'Capture All');
-      isCapturing = false;
-      setStatus('Stopped', false);
-    } else {
-      if (window.Analytics) Analytics.trackButtonClick('start_capture', 'popup');
-      incrementUseCount();
-      sendToContent({ type: 'START_CAROUSELS' }, function(response) {
-        if (response) {
-          updateStats(response);
-          // Track capture feature usage with stats
-          if (window.Analytics) {
-            Analytics.trackFeature('capture_started', {
-              images_before: response.images || 0,
-              videos_before: response.videos || 0
-            });
-          }
-        }
-      });
-      setBtnLabel(captureBtn, 'i-stop', 'Stop');
-      isCapturing = true;
-      setStatus('Capturing all posts...', true);
+      endCapture();
+      return;
     }
+    // Never start before the disclosure has been accepted at least once.
+    chrome.storage.local.get([CONSENT_KEY], function(result) {
+      const accepted = result && typeof result[CONSENT_KEY] === 'number' && result[CONSENT_KEY] > 0;
+      if (accepted) {
+        beginCapture();
+      } else {
+        showConsent();
+      }
+    });
   });
   
   // Clear button — wipes all captured data from chrome.storage.local. Writes
@@ -359,22 +385,22 @@ document.addEventListener('DOMContentLoaded', function() {
   //   - this popup's own listener updates the visible counter
   document.getElementById('clear-btn').addEventListener('click', function() {
     // Destructive + irreversible — always confirm.
-    if (!confirm('Delete all captured images and videos? This cannot be undone.')) {
+    if (!confirm('Delete all captured data from this browser? This cannot be undone.')) {
       return;
     }
-    if (window.Analytics) Analytics.trackButtonClick('clear', 'popup');
+    // Clearing also revokes consent, so the next capture re-shows the
+    // disclosure rather than silently resuming.
     chrome.storage.local.set({
       igExporterData: { images: [], videos: [] }
     }, function() {
+      chrome.storage.local.remove([CONSENT_KEY]);
       updateStats({ images: 0, videos: 0 });
-      setStatus('Cleared!');
-      if (window.Analytics) Analytics.trackFeature('data_cleared', { source: 'popup' });
+      setStatus('All captured data deleted');
     });
   });
   
   // Gallery button
   document.getElementById('gallery-btn').addEventListener('click', function() {
-    if (window.Analytics) Analytics.trackButtonClick('open_gallery', 'popup');
     chrome.tabs.create({ url: chrome.runtime.getURL('gallery.html') });
   });
   

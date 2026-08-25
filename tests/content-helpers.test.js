@@ -9,9 +9,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadIIFE } = require('./_setup');
+const { loadContent } = require('./_setup');
 
-const { exposed: content } = loadIIFE('content.js');
+const { exposed: content } = loadContent();
 const { extractHashtags, contextToOptions, normalizeUrl } = content;
 
 // ---------- extractHashtags ----------

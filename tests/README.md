@@ -12,12 +12,12 @@ Requires Node 18+ (uses `node:test` and the WHATWG `URL`).
 
 ## How it works
 
-The extension source files (`injector.js`, `content.js`, `gallery.js`) are loaded into a sandboxed `vm` context with a stub-shaped browser environment (`document`, `chrome`, `window`, `Analytics`). For the IIFE files, a tiny test seam at the very tail of each file exposes internals only when `globalThis.__IG_EXPORTER_TEST_HOOKS__` is set — a no-op in the production browser.
+The extension source files (`injector.js`, `content.js`, `gallery.js`) are loaded into a sandboxed `vm` context with a stub-shaped browser environment (`document`, `chrome`, `window`, `Analytics`). For the IIFE files, a tiny test seam at the very tail of each file exposes internals only when `globalThis.__SBE_TEST_HOOKS__` is set — a no-op in the production browser.
 
 ```js
 // content.js, end of IIFE
-if (typeof globalThis !== 'undefined' && globalThis.__IG_EXPORTER_TEST_HOOKS__) {
-  globalThis.__IG_EXPORTER_TEST_HOOKS__.content = { addImage, addVideo, ... };
+if (typeof globalThis !== 'undefined' && globalThis.__SBE_TEST_HOOKS__) {
+  globalThis.__SBE_TEST_HOOKS__.content = { addImage, addVideo, ... };
 }
 ```
 

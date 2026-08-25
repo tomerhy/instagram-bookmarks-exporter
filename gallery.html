@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Instagram Media Gallery</title>
+  <title>Saved Posts Library</title>
   <!-- Shared design tokens, also imported by popup.html. -->
   <link rel="stylesheet" href="tokens.css">
   <style>
@@ -28,7 +28,7 @@
       --btn-h-lg: 48px;
 
       /* Glow effects for headline / hero moments */
-      --glow-pink: 0 0 30px rgba(225, 48, 108, 0.35);
+      --glow-pink: 0 0 30px rgba(15, 139, 141, 0.35);
       --glow-blue: 0 0 30px rgba(79, 157, 255, 0.35);
     }
     * {
@@ -54,7 +54,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", sans-serif;
       margin: 0;
       padding: var(--space-6) var(--space-5);
-      background: var(--ig-bg);
+      background: var(--app-bg);
       color: var(--text-primary);
       min-height: 100vh;
       position: relative;
@@ -80,14 +80,14 @@
       left: -200px;
       width: 600px;
       height: 600px;
-      background: radial-gradient(circle, var(--ig-pink) 0%, transparent 70%);
+      background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
     }
     body::after {
       bottom: -300px;
       right: -200px;
       width: 700px;
       height: 700px;
-      background: radial-gradient(circle, var(--ig-violet) 0%, transparent 70%);
+      background: radial-gradient(circle, var(--accent-bright) 0%, transparent 70%);
     }
     /* Everything else above the aurora */
     body > * { position: relative; z-index: 1; }
@@ -109,12 +109,12 @@
     #version {
       font-size: 11px;
       font-weight: 600;
-      color: var(--ig-pink);
+      color: var(--accent);
       padding: 4px 10px;
       border-radius: var(--radius-pill);
-      border: 1px solid rgba(225, 48, 108, 0.4);
-      background: rgba(225, 48, 108, 0.10);
-      -webkit-text-fill-color: var(--ig-pink);
+      border: 1px solid rgba(15, 139, 141, 0.4);
+      background: rgba(15, 139, 141, 0.10);
+      -webkit-text-fill-color: var(--accent);
       font-variant-numeric: tabular-nums;
       letter-spacing: 0.02em;
     }
@@ -160,19 +160,19 @@
       background-color: var(--surface-2);
     }
     .sort-select:focus-visible {
-      border-color: rgba(225, 48, 108, 0.40);
+      border-color: rgba(15, 139, 141, 0.40);
       background-color: var(--surface-2);
-      box-shadow: 0 0 0 3px rgba(225, 48, 108, 0.15);
+      box-shadow: 0 0 0 3px rgba(15, 139, 141, 0.15);
       outline: none;
     }
     /* When a non-default sort is active, hint that with a brand-pink edge */
     .sort-select.is-active {
-      border-color: rgba(225, 48, 108, 0.40);
-      color: var(--ig-pink);
+      border-color: rgba(15, 139, 141, 0.40);
+      color: var(--accent);
     }
     /* Native option styling — browsers vary, but ensures dark menus on macOS */
     .sort-select option {
-      background: var(--ig-card);
+      background: var(--surface-1);
       color: var(--text-primary);
     }
 
@@ -195,16 +195,16 @@
                   box-shadow var(--t-base);
     }
     .search-box:focus-within {
-      border-color: rgba(225, 48, 108, 0.40);
+      border-color: rgba(15, 139, 141, 0.40);
       background: var(--surface-2);
-      box-shadow: 0 0 0 3px rgba(225, 48, 108, 0.15);
+      box-shadow: 0 0 0 3px rgba(15, 139, 141, 0.15);
     }
     .search-icon {
       color: var(--text-muted);
       flex-shrink: 0;
     }
     .search-box:focus-within .search-icon {
-      color: var(--ig-pink);
+      color: var(--accent);
     }
     .search-input {
       flex: 1;
@@ -270,7 +270,7 @@
     .search-meta .search-meta-clear {
       background: transparent;
       border: none;
-      color: var(--ig-pink);
+      color: var(--accent);
       font: inherit;
       font-size: 12px;
       font-weight: 600;
@@ -309,8 +309,8 @@
     }
     .tab.active {
       color: var(--text-primary);
-      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
-      box-shadow: 0 4px 14px rgba(225, 48, 108, 0.30);
+      background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+      box-shadow: 0 4px 14px rgba(15, 139, 141, 0.30);
     }
     .tab-count {
       margin-left: var(--space-2);
@@ -405,7 +405,7 @@
       transition: background-color var(--t-fast);
     }
     #fullscreen-btn:hover {
-      background: var(--ig-pink);
+      background: var(--accent);
     }
     /* Show on hover OR when the button itself receives keyboard focus */
     #viewer-container:hover #fullscreen-btn,
@@ -468,9 +468,9 @@
       color: var(--text-primary) !important;
     }
     .fullscreen-btn.active {
-      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink)) !important;
+      background: linear-gradient(135deg, var(--accent-deep), var(--accent)) !important;
       color: #fff !important;
-      box-shadow: 0 2px 12px rgba(225, 48, 108, 0.40) !important;
+      box-shadow: 0 2px 12px rgba(15, 139, 141, 0.40) !important;
     }
     #fullscreen-counter {
       color: var(--text-muted) !important;
@@ -504,7 +504,7 @@
       transition: background-color var(--t-fast);
     }
     #fullscreen-close:hover {
-      background: var(--ig-pink);
+      background: var(--accent);
     }
     #fullscreen-controls {
       position: absolute;
@@ -525,7 +525,7 @@
       transition: background-color var(--t-fast);
     }
     .fullscreen-btn:hover {
-      background: var(--ig-pink);
+      background: var(--accent);
     }
     .fullscreen-btn.active {
       background: var(--selected);          /* "currently playing" = selected color */
@@ -640,17 +640,33 @@
     }
     /* The one true primary CTA — Download, with brand glow */
     #download-current {
-      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
+      background: linear-gradient(135deg, var(--accent-deep), var(--accent));
       border: none;
-      box-shadow: 0 4px 16px rgba(225, 48, 108, 0.30);
+      box-shadow: 0 4px 16px rgba(15, 139, 141, 0.30);
     }
     #download-current:hover {
-      box-shadow: 0 6px 22px rgba(225, 48, 108, 0.45);
+      box-shadow: 0 6px 22px rgba(15, 139, 141, 0.45);
       transform: translateY(-2px);
     }
     /* Donate — same brand gradient as primary but softer weight */
+    /* Required non-affiliation disclosure. Deliberately always visible
+       rather than tucked into a menu. */
+    .affiliation-notice {
+      margin: 0 0 var(--space-4);
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      max-width: 720px;
+    }
+    .affiliation-notice a {
+      color: var(--accent-text);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+    }
+    .affiliation-notice a:hover { border-bottom-color: var(--accent-text); }
+
     #donate {
-      background: linear-gradient(135deg, #f5af19, var(--ig-pink));
+      background: linear-gradient(135deg, #f5af19, var(--accent));
       border: none;
       box-shadow: 0 4px 14px rgba(245, 175, 25, 0.25);
     }
@@ -663,7 +679,7 @@
     #status {
       margin-top: var(--space-3);
       font-size: 12px;
-      color: var(--ig-pink);
+      color: var(--accent);
     }
     #progress {
       margin-top: var(--space-2);
@@ -675,7 +691,7 @@
     #progress-bar {
       height: 100%;
       width: 0%;
-      background: var(--ig-pink);
+      background: var(--accent);
       transition: width var(--t-base);
     }
 
@@ -719,11 +735,11 @@
     }
     .card:hover {
       transform: translateY(-3px) scale(1.02);
-      border-color: rgba(225, 48, 108, 0.40);
+      border-color: rgba(15, 139, 141, 0.40);
       box-shadow:
         0 12px 28px rgba(0, 0, 0, 0.40),
-        0 0 0 1px rgba(225, 48, 108, 0.30),
-        0 0 24px rgba(225, 48, 108, 0.20);
+        0 0 0 1px rgba(15, 139, 141, 0.30),
+        0 0 24px rgba(15, 139, 141, 0.20);
       z-index: 2;
     }
     .card:active {
@@ -768,7 +784,7 @@
       padding: 2px 6px;
       border-radius: var(--radius-sm);
     }
-    /* Carousel indicator — Instagram's own album glyph in a glassmorphic
+    /* Carousel indicator — neutral layered-sheets glyph in a glassmorphic
        chip. The chip blurs whatever's behind it so the icon reads on any
        photo (light/dark/busy) without looking like a flat sticker. */
     .carousel-indicator {
@@ -807,11 +823,11 @@
         box-shadow var(--t-base);
     }
     .carousel-indicator:hover {
-      background: rgba(225, 48, 108, 0.55);  /* brand-pink wash on hover */
+      background: rgba(15, 139, 141, 0.55);  /* brand-pink wash on hover */
       border-color: rgba(255, 255, 255, 0.22);
       transform: scale(1.06);
       box-shadow:
-        0 4px 14px rgba(225, 48, 108, 0.40),
+        0 4px 14px rgba(15, 139, 141, 0.40),
         0 1px 0 rgba(255, 255, 255, 0.12) inset;
     }
     .carousel-indicator:active {
@@ -852,7 +868,7 @@
       cursor: default;
       border-color: var(--glass-border);
       box-shadow:
-        0 0 0 1px rgba(225, 48, 108, 0.45),
+        0 0 0 1px rgba(15, 139, 141, 0.45),
         0 24px 60px rgba(0, 0, 0, 0.50);
       transform: none;
       transition:
@@ -930,18 +946,18 @@
       margin-right: var(--space-2);
       border-radius: var(--radius-pill);
       border: none;
-      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink));
+      background: linear-gradient(135deg, var(--accent-deep), var(--accent));
       color: #fff;
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.02em;
       cursor: pointer;
-      box-shadow: 0 2px 10px rgba(225, 48, 108, 0.30);
+      box-shadow: 0 2px 10px rgba(15, 139, 141, 0.30);
       transition: transform var(--t-spring), box-shadow var(--t-base);
     }
     .carousel-drawer-header .carousel-drawer-download:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 16px rgba(225, 48, 108, 0.45);
+      box-shadow: 0 4px 16px rgba(15, 139, 141, 0.45);
     }
     .carousel-drawer-close {
       width: 28px;
@@ -983,11 +999,11 @@
     .carousel-strip::-webkit-scrollbar { height: 6px; }
     .carousel-strip::-webkit-scrollbar-track { background: transparent; }
     .carousel-strip::-webkit-scrollbar-thumb {
-      background: rgba(225, 48, 108, 0.35);
+      background: rgba(15, 139, 141, 0.35);
       border-radius: var(--radius-pill);
     }
     .carousel-strip::-webkit-scrollbar-thumb:hover {
-      background: rgba(225, 48, 108, 0.55);
+      background: rgba(15, 139, 141, 0.55);
     }
     .carousel-strip-slide {
       flex: 0 0 auto;
@@ -1015,7 +1031,7 @@
     }
     .carousel-strip-slide:hover {
       transform: translateY(-2px) scale(1.04);
-      border-color: rgba(225, 48, 108, 0.45);
+      border-color: rgba(15, 139, 141, 0.45);
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
       z-index: 2;
     }
@@ -1070,7 +1086,7 @@
       gap: var(--space-1) 6px;
     }
     #viewer-meta .vm-owner {
-      color: var(--ig-pink);
+      color: var(--accent);
       font-weight: 600;
     }
     #viewer-meta .vm-album {
@@ -1085,7 +1101,7 @@
 
     .btn-link {
       display: inline-block;
-      background: linear-gradient(135deg, #833ab4, var(--ig-pink));
+      background: var(--accent);
       color: var(--text-primary);
       text-decoration: none;
       padding: 12px 24px;
@@ -1119,7 +1135,7 @@
       transition: border-color var(--t-fast), background-color var(--t-fast);
     }
     .page-btn:hover {
-      border-color: var(--ig-pink);
+      border-color: var(--accent);
     }
     .page-btn.active {
       background: var(--selected);
@@ -1188,10 +1204,10 @@
       border-color: var(--border-2) !important;
     }
     .page-btn.active {
-      background: linear-gradient(135deg, var(--ig-purple), var(--ig-pink)) !important;
+      background: linear-gradient(135deg, var(--accent-deep), var(--accent)) !important;
       border-color: transparent !important;
       color: #fff !important;
-      box-shadow: 0 4px 14px rgba(225, 48, 108, 0.35) !important;
+      box-shadow: 0 4px 14px rgba(15, 139, 141, 0.35) !important;
     }
     .page-info {
       font-size: 12px !important;
@@ -1238,10 +1254,13 @@
     <symbol id="i-play" viewBox="0 0 24 24">
       <path d="M5 3l14 9-14 9V3z" fill="currentColor"/>
     </symbol>
-    <!-- Two offset rounded squares — Instagram's own album glyph. -->
+    <!-- Neutral "multiple sheets" glyph for album/carousel counts. Chosen
+         over the two-offset-squares shape it replaced, which was a copy of
+         Instagram's album icon. -->
     <symbol id="i-stack" viewBox="0 0 24 24">
-      <rect x="7" y="3" width="14" height="14" rx="2.5"/>
-      <path d="M16 17v2.5A1.5 1.5 0 0 1 14.5 21h-11A1.5 1.5 0 0 1 2 19.5v-11A1.5 1.5 0 0 1 3.5 7H7"/>
+      <path d="M12 3l9 4.5-9 4.5L3 7.5 12 3z"/>
+      <path d="M3 12l9 4.5 9-4.5"/>
+      <path d="M3 16.5L12 21l9-4.5"/>
     </symbol>
     <symbol id="i-search" viewBox="0 0 24 24">
       <circle cx="11" cy="11" r="7"/>
@@ -1254,7 +1273,12 @@
     </symbol>
   </svg>
 
-  <h1>Gallery <span id="version"></span></h1>
+  <h1>Saved Posts Library <span id="version"></span></h1>
+  <p class="affiliation-notice">
+    Independent third-party extension. Not affiliated with, authorized by,
+    endorsed by, or sponsored by Instagram or Meta.
+    <a href="privacy-policy.html" target="_blank" rel="noopener">Privacy policy</a>
+  </p>
   
   <div class="toolbar">
     <div class="tabs">
@@ -1359,8 +1383,9 @@
     </div>
   </div>
 
+  <script src="legacy-cleanup.js"></script>
   <script src="lib/jszip.min.js"></script>
-  <script src="analytics.js"></script>
+  <script src="url-allowlist.js"></script>
   <script src="gallery.js"></script>
 </body>
 </html>

@@ -41,7 +41,7 @@ test('buildExportPayload: produces the v1 schema with both tabs', () => {
     [{ type: 'video', url: 'b.mp4' }],
     '4.3.6'
   );
-  assert.equal(payload.format, 'instagram-saved-media-exporter');
+  assert.equal(payload.format, 'saved-posts-backup-export');
   assert.equal(payload.formatVersion, 1);
   assert.equal(payload.extensionVersion, '4.3.6');
   assert.ok(payload.exportedAt && !isNaN(new Date(payload.exportedAt).getTime()),
@@ -112,7 +112,7 @@ test('buildExportPayload: result is JSON-serializable (no cycles, no exotic type
 test('parseImportPayload: parses a v1 JSON export', () => {
   const g = loadGallery();
   const json = JSON.stringify({
-    format: 'instagram-saved-media-exporter',
+    format: 'saved-posts-backup-export',
     formatVersion: 1,
     images: [{ type: 'image', url: 'a.jpg', metadata: { owner: 'u1' } }],
     videos: [{ type: 'video', url: 'b.mp4' }]

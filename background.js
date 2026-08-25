@@ -1,9 +1,9 @@
 /**
- * Instagram Saved Media Exporter - Background Script
+ * Saved Posts Backup & Export - background service worker
  * Handles data persistence, gallery navigation, and the toolbar badge counter.
  */
 
-const BADGE_COLOR = '#E1306C';
+const BADGE_COLOR = '#0F8B8D';  // neutral teal accent (see tokens.css)
 
 // Format the total for the toolbar badge. Chrome shows ~4 chars max so cap.
 function formatBadge(total) {
@@ -88,10 +88,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-// Test seam: only fires when tests set __IG_EXPORTER_TEST_HOOKS__ before
+// Test seam: only fires when tests set __SBE_TEST_HOOKS__ before
 // loading the source. No-op in the browser.
-if (typeof globalThis !== 'undefined' && globalThis.__IG_EXPORTER_TEST_HOOKS__) {
-  globalThis.__IG_EXPORTER_TEST_HOOKS__.background = {
+if (typeof globalThis !== 'undefined' && globalThis.__SBE_TEST_HOOKS__) {
+  globalThis.__SBE_TEST_HOOKS__.background = {
     formatBadge, countUnseen, setBadgeFromState, refreshBadgeFromStorage
   };
 }

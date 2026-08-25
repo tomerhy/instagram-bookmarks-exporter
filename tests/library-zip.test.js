@@ -190,7 +190,7 @@ test('_itemPathInOwnerFolder: unsafe characters in shortcode sanitized', () => {
 test('buildLibraryManifest: empty input → valid empty manifest', () => {
   const g = loadGallery();
   const m = g.buildLibraryManifest([], []);
-  assert.equal(m.format, 'instagram-saved-media-exporter-library');
+  assert.equal(m.format, 'saved-posts-backup-export-library');
   assert.equal(m.formatVersion, 1);
   assert.equal(m.totalItems, 0);
   assert.equal(m.totalOwners, 0);

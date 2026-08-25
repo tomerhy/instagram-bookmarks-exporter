@@ -10,7 +10,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadIIFE } = require('./_setup');
+const { loadContent } = require('./_setup');
 
 function emitStorageChange(sandbox, changes, area = 'local') {
   sandbox.chrome.storage.onChanged._emit(changes, area);
@@ -25,7 +25,7 @@ function seedItems(c) {
 }
 
 test('content.js: external clear (empty arrays) resets in-memory state', () => {
-  const { exposed: c, sandbox } = loadIIFE('content.js');
+  const { exposed: c, sandbox } = loadContent();
   seedItems(c);
   assert.equal(c.state.images.length, 1, 'precondition: state has an item');
   assert.equal(c.state.seenUrls.size, 1, 'precondition: seenUrls has an entry');
@@ -40,7 +40,7 @@ test('content.js: external clear (empty arrays) resets in-memory state', () => {
 });
 
 test('content.js: external clear (key removed entirely) also resets state', () => {
-  const { exposed: c, sandbox } = loadIIFE('content.js');
+  const { exposed: c, sandbox } = loadContent();
   seedItems(c);
 
   // chrome.storage.local.remove fires onChanged with newValue === undefined.
@@ -56,7 +56,7 @@ test('content.js: storage event with new items does NOT wipe state (no feedback 
   // Critical: the content script's own saveToStorage triggers onChanged. If
   // we wipe state on every change, the next save would reset whatever we just
   // captured. The fix's `isCleared && inMemoryHasItems` guard handles this.
-  const { exposed: c, sandbox } = loadIIFE('content.js');
+  const { exposed: c, sandbox } = loadContent();
   seedItems(c);
   const before = c.state.images.length;
 
@@ -69,7 +69,7 @@ test('content.js: storage event with new items does NOT wipe state (no feedback 
 });
 
 test('content.js: clear event when state is already empty is a no-op', () => {
-  const { exposed: c, sandbox } = loadIIFE('content.js');
+  const { exposed: c, sandbox } = loadContent();
   // Don't seed anything — state starts empty.
   emitStorageChange(sandbox, {
     igExporterData: { newValue: { images: [], videos: [] } }
@@ -79,7 +79,7 @@ test('content.js: clear event when state is already empty is a no-op', () => {
 });
 
 test('content.js: storage event for a different key is ignored', () => {
-  const { exposed: c, sandbox } = loadIIFE('content.js');
+  const { exposed: c, sandbox } = loadContent();
   seedItems(c);
   const before = c.state.images.length;
 
@@ -91,7 +91,7 @@ test('content.js: storage event for a different key is ignored', () => {
 });
 
 test('content.js: storage event for non-local area is ignored', () => {
-  const { exposed: c, sandbox } = loadIIFE('content.js');
+  const { exposed: c, sandbox } = loadContent();
   seedItems(c);
 
   emitStorageChange(sandbox, {

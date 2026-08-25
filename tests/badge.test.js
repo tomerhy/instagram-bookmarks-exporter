@@ -117,7 +117,7 @@ test('storage write with all-new items shows their delta on the badge', () => {
   }));
   emit(sandbox, { igExporterData: { newValue: sandbox.chrome.storage._store.igExporterData } });
   assert.equal(sandbox.chrome.action._badgeState.text, '3');
-  assert.equal(sandbox.chrome.action._badgeState.color, '#E1306C');
+  assert.equal(sandbox.chrome.action._badgeState.color, '#0F8B8D');
 });
 
 test('storage write where everything was already seen → no badge', () => {

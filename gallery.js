@@ -1,5 +1,13 @@
 /**
- * Instagram Media Gallery - Simplified & Reliable
+ * Saved Posts Backup & Export - gallery page
+ *
+ * Reads the captured library straight from chrome.storage.local (it never
+ * talks to the content script) and renders it. Two things here are security
+ * relevant:
+ *   - every string that reaches innerHTML goes through escapeHtml()
+ *   - every URL that is fetched, rendered or opened goes through the shared
+ *     allowlist in url-allowlist.js, including URLs arriving via Import,
+ *     which is the one place a user can hand us a file we did not write
  */
 
 // DOM Elements
@@ -61,30 +69,6 @@ function getPostUrl(item) {
   if (!item) return null;
   if (typeof item === 'string') return null;
   return item.postUrl || null;
-}
-
-// Send a GA4 'item_viewed' event when a user clicks a card.
-// `post_url` is the openable Instagram permalink (stable, ~36 chars) and is
-// the field to aggregate on. GA4 truncates custom param values at ~100 chars,
-// so the full signed CDN URL won't fit — we still send `media_path` (pathname
-// only) as a stable asset-level identifier for cases without a shortcode.
-function trackItemView(item) {
-  if (!item || !window.Analytics) return;
-  let url = getUrl(item);
-  if (!url) return;
-  let pathname = url;
-  try { pathname = new URL(url).pathname; } catch (e) { /* leave as-is */ }
-  let postUrl = item.postShortcode
-    ? 'https://www.instagram.com/p/' + item.postShortcode + '/'
-    : (item.postUrl || null);
-  Analytics.trackFeature('item_viewed', {
-    media_type: currentTab === 'videos' ? 'video' : 'image',
-    post_url: postUrl,
-    post_shortcode: item.postShortcode || null,
-    media_path: pathname,
-    carousel_index: typeof item.carouselIndex === 'number' ? item.carouselIndex : null,
-    carousel_size: item.carouselSize || 1
-  });
 }
 
 function setStatus(msg) {
@@ -305,10 +289,6 @@ function setSortBy(key) {
   // otherwise leave a drawer attached to a now-out-of-view card.
   if (typeof collapseCarousel === "function") collapseCarousel({ instant: true });
   renderGrid();
-  if (window.Analytics && next !== "default") {
-    Analytics.trackButtonClick("sort_" + next, "gallery");
-    Analytics.trackFeature("gallery_sort", { sort_key: next });
-  }
 }
 
 // Centralized setter. Resets to page 1 (otherwise we could be stuck on a
@@ -334,12 +314,6 @@ function setSearchQuery(value) {
   }
   collapseCarousel({ instant: true });
   renderGrid();
-  if (window.Analytics && next) {
-    Analytics.trackFeature('gallery_search', {
-      query_length: next.length,
-      has_token_modifier: /[@#]/.test(next) ? 1 : 0
-    });
-  }
 }
 
 // "Showing N of M results for '...'" row beneath the toolbar. Hidden when
@@ -364,7 +338,6 @@ function renderSearchMeta(filtered, total) {
     '<button class="search-meta-clear" type="button">Clear</button>';
   let clear = meta.querySelector(".search-meta-clear");
   if (clear) clear.onclick = function () {
-    if (window.Analytics) Analytics.trackButtonClick('search_clear_meta', 'gallery');
     setSearchQuery("");
   };
 }
@@ -552,7 +525,6 @@ function expandCarousel(card, item) {
   closeBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>';
   closeBtn.addEventListener("click", function (e) {
     e.stopPropagation();
-    if (window.Analytics) Analytics.trackButtonClick('carousel_collapse_x', 'gallery');
     collapseCarousel();
   });
   header.appendChild(closeBtn);
@@ -577,12 +549,6 @@ function expandCarousel(card, item) {
     let prev = strip.querySelector(".carousel-strip-slide.active");
     if (prev) prev.classList.remove("active");
     btn.classList.add("active");
-    if (window.Analytics) {
-      Analytics.trackFeature('carousel_slide_clicked', {
-        slide_index: idx,
-        total_slides: slides.length
-      });
-    }
   });
 
   card.appendChild(drawer);
@@ -716,7 +682,6 @@ function renderGrid() {
         '</div>';
       let clearBtn = document.getElementById("empty-clear-search");
       if (clearBtn) clearBtn.onclick = function () {
-        if (window.Analytics) Analytics.trackButtonClick('search_clear_empty', 'gallery');
         setSearchQuery("");
       };
     } else {
@@ -818,14 +783,6 @@ function renderGrid() {
         expandCarousel(card, item);
         carBadge.setAttribute("aria-expanded",
           card.classList.contains("carousel-expanded") ? "true" : "false");
-        if (window.Analytics) {
-          Analytics.trackButtonClick(wasExpanded ? 'carousel_collapse_badge' : 'carousel_expand', 'gallery');
-          if (!wasExpanded) {
-            Analytics.trackFeature('carousel_expanded', {
-              slide_count: item.carouselSize || (item._carouselSlides && item._carouselSlides.length) || 0
-            });
-          }
-        }
       });
       card.appendChild(carBadge);
     }
@@ -858,7 +815,6 @@ function renderGrid() {
         delete card.dataset.autoSelect;
         return;
       }
-      trackItemView(item);
     };
     // Enter or Space activates the card from the keyboard
     card.onkeydown = function(e) {
@@ -894,7 +850,6 @@ function renderPagination(totalPages) {
   prev.onclick = function() {
     if (currentPage > 1) {
       currentPage--;
-      if (window.Analytics) Analytics.trackButtonClick('pagination_prev', 'gallery');
       renderGrid();
     }
   };
@@ -908,10 +863,6 @@ function renderPagination(totalPages) {
         btn.textContent = page;
         btn.onclick = function() {
           currentPage = page;
-          if (window.Analytics) {
-            Analytics.trackButtonClick('pagination_page', 'gallery');
-            Analytics.trackFeature('pagination_jump', { page: page, total_pages: totalPages });
-          }
           renderGrid();
         };
         paginationEl.appendChild(btn);
@@ -931,7 +882,6 @@ function renderPagination(totalPages) {
   next.onclick = function() {
     if (currentPage < totalPages) {
       currentPage++;
-      if (window.Analytics) Analytics.trackButtonClick('pagination_next', 'gallery');
       renderGrid();
     }
   };
@@ -998,13 +948,103 @@ var EXPORT_FORMAT_VERSION = 1;
 // carried at capture time — so an export → import round-trip is lossless.
 function buildExportPayload(images, videos, extensionVersion) {
   return {
-    format: "instagram-saved-media-exporter",
+    format: "saved-posts-backup-export",
     formatVersion: EXPORT_FORMAT_VERSION,
     extensionVersion: extensionVersion || null,
     exportedAt: new Date().toISOString(),
     images: Array.isArray(images) ? images.slice() : [],
     videos: Array.isArray(videos) ? videos.slice() : []
   };
+}
+
+// ---------------------------------------------------------------------------
+// Import sanitisation
+// ---------------------------------------------------------------------------
+// Import is the only path by which data we did not capture ourselves can enter
+// storage — and those records are later fetched (ZIP download), rendered as
+// <img src>, and opened in new tabs. So an imported file gets the same URL
+// allowlist treatment as a live capture: anything whose url/thumbnail is not
+// an https Instagram/Meta CDN or permalink URL is dropped, not "cleaned".
+// javascript:, data:, blob:, file: and extension URLs all fail here.
+var IMPORT_MAX_RECORDS = 20000;
+var IMPORT_MAX_STRING = 2200;
+
+function _importAllowedUrl(value) {
+  var api = globalThis.SBE_URL;
+  if (!api || typeof api.isAllowedMediaUrl !== "function") return false;
+  try { return api.isAllowedMediaUrl(value); } catch (e) { return false; }
+}
+
+function _importString(value, max) {
+  if (typeof value !== "string") return null;
+  var out = value.slice(0, max || IMPORT_MAX_STRING);
+  return out.length ? out : null;
+}
+
+function _importNumber(value) {
+  if (typeof value !== "number" || !isFinite(value) || value < 0) return null;
+  return Math.floor(value);
+}
+
+// Rebuild each record field by field. Nothing is copied across wholesale, so
+// an imported object cannot smuggle in extra properties.
+function sanitizeImportedItem(raw, fallbackType) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  var url = _importAllowedUrl(raw.url) ? raw.url : null;
+  var thumbnail = _importAllowedUrl(raw.thumbnail) ? raw.thumbnail : null;
+  if (!url && !thumbnail) return null;
+
+  var type = (raw.type === "image" || raw.type === "video") ? raw.type : fallbackType;
+  var postUrl = null;
+  var api = globalThis.SBE_URL;
+  if (api && typeof api.isAllowedPostUrl === "function") {
+    try { if (api.isAllowedPostUrl(raw.postUrl)) postUrl = raw.postUrl; } catch (e) {}
+  }
+
+  var shortcode = _importString(raw.postShortcode, 64);
+  if (shortcode && !/^[A-Za-z0-9_-]+$/.test(shortcode)) shortcode = null;
+
+  var meta = null;
+  if (raw.metadata && typeof raw.metadata === "object" && !Array.isArray(raw.metadata)) {
+    var owner = _importString(raw.metadata.owner, 30);
+    if (owner && !/^[A-Za-z0-9._]+$/.test(owner)) owner = null;
+    var tags = [];
+    if (Array.isArray(raw.metadata.hashtags)) {
+      tags = raw.metadata.hashtags
+        .filter(function(t) { return typeof t === "string" && t.length <= 140; })
+        .slice(0, 60);
+    }
+    meta = {
+      caption: _importString(raw.metadata.caption, IMPORT_MAX_STRING),
+      owner: owner,
+      takenAt: _importString(raw.metadata.takenAt, 40),
+      likeCount: _importNumber(raw.metadata.likeCount),
+      hashtags: tags
+    };
+  }
+
+  return {
+    type: type,
+    url: url || thumbnail,
+    thumbnail: thumbnail || url,
+    postUrl: postUrl,
+    postShortcode: shortcode,
+    carouselIndex: _importNumber(raw.carouselIndex),
+    carouselSize: _importNumber(raw.carouselSize) || 1,
+    metadata: meta,
+    scrapedAt: _importString(raw.scrapedAt, 40)
+  };
+}
+
+function sanitizeImportedList(list, fallbackType) {
+  if (!Array.isArray(list)) return { items: [], dropped: 0 };
+  var capped = list.slice(0, IMPORT_MAX_RECORDS);
+  var items = [];
+  for (var i = 0; i < capped.length; i++) {
+    var clean = sanitizeImportedItem(capped[i], fallbackType);
+    if (clean) items.push(clean);
+  }
+  return { items: items, dropped: list.length - items.length };
 }
 
 // Parse imported file text. Returns one of:
@@ -1088,7 +1128,7 @@ function buildAlbumManifest(item, extensionVersion) {
   let slides = Array.isArray(item._carouselSlides) ? item._carouselSlides : [item];
   let meta = item.metadata || {};
   return {
-    format: "instagram-saved-media-exporter-album",
+    format: "saved-posts-backup-export-album",
     formatVersion: 1,
     extensionVersion: extensionVersion || null,
     exportedAt: new Date().toISOString(),
@@ -1163,7 +1203,7 @@ function groupItemsByOwner(items) {
 // can map files back to original posts without scraping filenames.
 function buildLibraryManifest(items, ownerGroups, extensionVersion) {
   return {
-    format: "instagram-saved-media-exporter-library",
+    format: "saved-posts-backup-export-library",
     formatVersion: 1,
     extensionVersion: extensionVersion || null,
     exportedAt: new Date().toISOString(),
@@ -1223,7 +1263,6 @@ function _itemPathInOwnerFolder(item, slide, slideIdx, totalSlides, fallbackIdx)
 async function downloadLibrary() {
   if (typeof JSZip === "undefined") {
     setStatus("Library download not available — JSZip failed to load");
-    if (window.Analytics) Analytics.trackError('library_zip_no_jszip', {});
     return;
   }
   let items = getFilteredItems();
@@ -1252,14 +1291,6 @@ async function downloadLibrary() {
   let groups = groupItemsByOwner(items);
   let manifest = buildLibraryManifest(items, groups, extVersion);
   setStatus("Preparing library (" + items.length + " items, " + slideTotal + " files)...", true);
-  if (window.Analytics) {
-    Analytics.trackButtonClick('library_download', 'gallery');
-    Analytics.trackFeature('library_download_started', {
-      item_count: items.length,
-      slide_count: slideTotal,
-      owner_count: groups.length
-    });
-  }
 
   let zip = new JSZip();
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
@@ -1279,6 +1310,7 @@ async function downloadLibrary() {
         let url = slide && (slide.url || slide.thumbnail);
         done++;
         if (!url) { failures++; continue; }
+        if (!_importAllowedUrl(url)) { failures++; continue; }
         setStatus("Fetching " + done + " / " + slideTotal + " — " + ownerKey, true);
         try {
           let res = await fetch(url);
@@ -1296,9 +1328,6 @@ async function downloadLibrary() {
 
   if (failures === slideTotal) {
     setStatus("Library download failed — every slide errored");
-    if (window.Analytics) {
-      Analytics.trackError('library_zip_all_failed', { slide_count: slideTotal });
-    }
     return;
   }
 
@@ -1308,23 +1337,14 @@ async function downloadLibrary() {
     let a = document.createElement("a");
     a.href = URL.createObjectURL(content);
     let stamp = new Date().toISOString().slice(0, 10);
-    a.download = "instagram-library-" + currentTab + "-" + stamp + ".zip";
+    a.download = "saved-posts-library-" + currentTab + "-" + stamp + ".zip";
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
     let msg = "Downloaded " + slideTotal + " files across " + groups.length + " owners";
     if (failures > 0) msg += " (" + failures + " failed)";
     setStatus(msg);
-    if (window.Analytics) {
-      Analytics.trackFeature('library_download_completed', {
-        item_count: items.length,
-        slide_count: slideTotal,
-        owner_count: groups.length,
-        failure_count: failures
-      });
-    }
   } catch (e) {
     setStatus("Library zip failed: " + e.message);
-    if (window.Analytics) Analytics.trackError('library_zip_failed', { error_message: e.message });
   }
 }
 
@@ -1334,7 +1354,6 @@ async function downloadLibrary() {
 async function downloadAlbum(item) {
   if (typeof JSZip === "undefined") {
     setStatus("Album download not available — JSZip failed to load");
-    if (window.Analytics) Analytics.trackError('album_zip_no_jszip', {});
     return;
   }
   let slides = Array.isArray(item && item._carouselSlides) ? item._carouselSlides : [];
@@ -1347,13 +1366,6 @@ async function downloadAlbum(item) {
   try { extVersion = chrome.runtime.getManifest().version; } catch (_) {}
 
   setStatus("Preparing album (" + slides.length + " slides)...", true);
-  if (window.Analytics) {
-    Analytics.trackButtonClick('album_download', 'gallery');
-    Analytics.trackFeature('album_download_started', {
-      slide_count: slides.length,
-      shortcode: item.postShortcode || null
-    });
-  }
 
   let zip = new JSZip();
   let manifest = buildAlbumManifest(item, extVersion);
@@ -1363,7 +1375,7 @@ async function downloadAlbum(item) {
   for (var i = 0; i < slides.length; i++) {
     let slide = slides[i];
     let url = slide && (slide.url || slide.thumbnail);
-    if (!url) { failures++; continue; }
+    if (!url || !_importAllowedUrl(url)) { failures++; continue; }
     setStatus("Fetching " + (i + 1) + " / " + slides.length + "...", true);
     try {
       let res = await fetch(url);
@@ -1378,9 +1390,6 @@ async function downloadAlbum(item) {
 
   if (failures === slides.length) {
     setStatus("Album download failed — all slides errored");
-    if (window.Analytics) {
-      Analytics.trackError('album_zip_all_failed', { slide_count: slides.length });
-    }
     return;
   }
 
@@ -1395,15 +1404,8 @@ async function downloadAlbum(item) {
     let msg = "Downloaded " + slides.length + " slides";
     if (failures > 0) msg += " (" + failures + " failed)";
     setStatus(msg);
-    if (window.Analytics) {
-      Analytics.trackFeature('album_download_completed', {
-        slide_count: slides.length,
-        failure_count: failures
-      });
-    }
   } catch (e) {
     setStatus("Album zip failed: " + e.message);
-    if (window.Analytics) Analytics.trackError('album_zip_failed', { error_message: e.message });
   }
 }
 
@@ -1482,10 +1484,6 @@ document.querySelectorAll(".tab").forEach(function(tab) {
       slideshowControls.style.display = currentTab === "videos" ? "none" : "flex";
     }
     
-    // Track tab switch
-    if (window.Analytics) {
-      Analytics.trackButtonClick('tab_' + currentTab, 'gallery');
-    }
   };
 });
 
@@ -1494,21 +1492,24 @@ updateButtonLabels();
 
 // Button handlers
 document.getElementById("download-current")?.addEventListener("click", async function() {
-  if (window.Analytics) Analytics.trackButtonClick('download', 'gallery');
   if (!currentItem) { setStatus("Select an item first"); return; }
   let url = getUrl(currentItem);
   let isVideo = currentTab === "videos";
-  
+
+  // Never fetch or navigate to a URL that is not on the allowlist. Stored
+  // records are validated on the way in, but a record could predate that
+  // validation (captured by an older version, or imported before 4.4.1).
+  if (url && !_importAllowedUrl(url)) {
+    setStatus("Blocked: this item's URL is not an Instagram/Meta media URL");
+    return;
+  }
+
   if (url) {
     if (isVideo) {
-      // Videos have CORS restrictions - open in new tab for manual save
+      // Videos are usually served without permissive CORS headers, so a blob
+      // fetch fails; open in a new tab so the browser can save it directly.
       setStatus("Opening video - right-click to save");
-      window.open(url, '_blank');
-      
-      // Track download
-      if (window.Analytics) {
-        Analytics.trackDownload('single', 'video', 1);
-      }
+      window.open(url, '_blank', 'noopener');
     } else {
       // Images can be fetched as blob
       setStatus("Downloading...");
@@ -1519,18 +1520,13 @@ document.getElementById("download-current")?.addEventListener("click", async fun
         
         let a = document.createElement("a");
         a.href = blobUrl;
-        a.download = "instagram_" + Date.now() + ".jpg";
+        a.download = "saved-post_" + Date.now() + ".jpg";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(blobUrl);
         
         setStatus("Download complete!");
-        
-        // Track download
-        if (window.Analytics) {
-          Analytics.trackDownload('single', 'image', 1);
-        }
       } catch (err) {
         console.error("Download failed:", err);
         setStatus("Download failed - try right-click > Save As");
@@ -1544,11 +1540,6 @@ document.getElementById("copy")?.addEventListener("click", function() {
   navigator.clipboard.writeText(urls.join("\n")).then(function() {
     setStatus("Copied " + urls.length + " URLs");
     
-    // Track copy
-    if (window.Analytics) {
-      Analytics.trackButtonClick('copy_urls', 'gallery');
-      Analytics.trackFeature('copy_urls', { count: urls.length, type: currentTab });
-    }
   });
 });
 
@@ -1562,20 +1553,13 @@ document.getElementById("export")?.addEventListener("click", function() {
   a.href = URL.createObjectURL(blob);
   // Date stamp so successive exports don't overwrite each other.
   let stamp = new Date().toISOString().slice(0, 10);
-  a.download = "instagram-export-" + stamp + ".json";
+  a.download = "saved-posts-export-" + stamp + ".json";
   a.click();
 
   let total = payload.images.length + payload.videos.length;
   setStatus("Exported " + total + " items (" +
     payload.images.length + " images, " + payload.videos.length + " videos)");
 
-  if (window.Analytics) {
-    Analytics.trackButtonClick('export_all', 'gallery');
-    Analytics.trackFeature('export_all', {
-      images: payload.images.length,
-      videos: payload.videos.length
-    });
-  }
 });
 
 document.getElementById("clear")?.addEventListener("click", function() {
@@ -1584,14 +1568,6 @@ document.getElementById("clear")?.addEventListener("click", function() {
     return;
   }
 
-  // Track before clearing
-  if (window.Analytics) {
-    Analytics.trackButtonClick('clear_all', 'gallery');
-    Analytics.trackFeature('clear_data', {
-      images_cleared: allMedia.images.length,
-      videos_cleared: allMedia.videos.length
-    });
-  }
 
   allMedia.images = [];
   allMedia.videos = [];
@@ -1629,18 +1605,13 @@ document.getElementById("export-csv")?.addEventListener("click", function () {
   let a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   let stamp = new Date().toISOString().slice(0, 10);
-  a.download = "instagram-" + currentTab + "-" + stamp + ".csv";
+  a.download = "saved-posts-" + currentTab + "-" + stamp + ".csv";
   a.click();
 
   setStatus("Exported " + items.length + " rows to CSV");
-  if (window.Analytics) {
-    Analytics.trackButtonClick('export_csv', 'gallery');
-    Analytics.trackFeature('export_csv', { count: items.length, type: currentTab });
-  }
 });
 
 document.getElementById("import")?.addEventListener("click", function() {
-  if (window.Analytics) Analytics.trackButtonClick('import', 'gallery');
   document.getElementById("file-input")?.click();
 });
 
@@ -1656,40 +1627,36 @@ document.getElementById("file-input")?.addEventListener("change", function() {
       parsed = parseImportPayload(reader.result);
     } catch (e) {
       setStatus("Import failed: " + e.message);
-      if (window.Analytics) {
-        Analytics.trackError('import_parse_failed', { error_message: e.message });
-      }
       fileInput.value = "";
       return;
     }
 
     if (parsed.format === "json") {
-      // Full-fidelity backup: replace both tabs, preserve all metadata.
-      allMedia.images = parsed.images;
-      allMedia.videos = parsed.videos;
-      let total = parsed.images.length + parsed.videos.length;
+      // Full-fidelity backup: replace both tabs, preserve all metadata that
+      // survives sanitisation.
+      let imgs = sanitizeImportedList(parsed.images, "image");
+      let vids = sanitizeImportedList(parsed.videos, "video");
+      allMedia.images = imgs.items;
+      allMedia.videos = vids.items;
+      let total = imgs.items.length + vids.items.length;
+      let dropped = imgs.dropped + vids.dropped;
       setStatus("Imported " + total + " items (" +
-        parsed.images.length + " images, " + parsed.videos.length + " videos)");
-      if (window.Analytics) {
-        Analytics.trackFeature('imported_json', {
-          images: parsed.images.length,
-          videos: parsed.videos.length
-        });
-      }
+        imgs.items.length + " images, " + vids.items.length + " videos)" +
+        (dropped ? " — " + dropped + " rejected" : ""));
     } else {
       // Legacy URL list: drop into the current tab only, no metadata.
-      let items = parsed.urls.map(function(url) {
-        return { type: currentTab === 'images' ? 'image' : 'video', url: url, thumbnail: url };
+      let fallbackType = currentTab === "images" ? "image" : "video";
+      let raw = parsed.urls.map(function(url) {
+        return { type: fallbackType, url: url, thumbnail: url };
       });
+      let clean = sanitizeImportedList(raw, fallbackType);
       if (currentTab === "images") {
-        allMedia.images = items;
+        allMedia.images = clean.items;
       } else {
-        allMedia.videos = items;
+        allMedia.videos = clean.items;
       }
-      setStatus("Imported " + items.length + " URLs (legacy format, metadata not included)");
-      if (window.Analytics) {
-        Analytics.trackFeature('imported_txt', { count: items.length, type: currentTab });
-      }
+      setStatus("Imported " + clean.items.length + " URLs (legacy format, metadata not included)" +
+        (clean.dropped ? " — " + clean.dropped + " rejected" : ""));
     }
 
     chrome.storage.local.set({
@@ -1704,7 +1671,6 @@ document.getElementById("file-input")?.addEventListener("change", function() {
 });
 
 document.getElementById("donate")?.addEventListener("click", function() {
-  if (window.Analytics) Analytics.trackButtonClick('donate', 'gallery');
   window.open("https://www.patreon.com/join/THYProduction", "_blank");
 });
 
@@ -1758,7 +1724,6 @@ if (versionEl) {
     if (e.key === "Escape" && input.value) {
       e.stopPropagation();
       if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
-      if (window.Analytics) Analytics.trackButtonClick('search_clear_esc', 'gallery');
       setSearchQuery("");
       input.focus();
     }
@@ -1767,7 +1732,6 @@ if (versionEl) {
   if (clearBtn) {
     clearBtn.addEventListener("click", function () {
       if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
-      if (window.Analytics) Analytics.trackButtonClick('search_clear_btn', 'gallery');
       setSearchQuery("");
       input.focus();
     });
@@ -1791,10 +1755,6 @@ window.addEventListener('focus', function() {
   loadData();
 });
 
-// Track page view
-if (window.Analytics) {
-  Analytics.trackPageView('gallery', 'Instagram Media Gallery');
-}
 
 // ============================================
 // FULLSCREEN & SLIDESHOW
@@ -1919,16 +1879,10 @@ function openFullscreen() {
     fullscreenOverlay.classList.add("visible");
   }
   
-  // Track fullscreen usage
-  if (window.Analytics) {
-    Analytics.trackButtonClick('fullscreen', 'gallery');
-    Analytics.trackFeature('fullscreen_opened', { type: currentTab });
-  }
 }
 
 // Close fullscreen
 function closeFullscreen() {
-  if (window.Analytics) Analytics.trackButtonClick('fullscreen_close', 'gallery');
   if (fullscreenOverlay) {
     fullscreenOverlay.classList.remove("visible");
   }
@@ -1943,12 +1897,10 @@ function closeFullscreen() {
 // Next/Prev in fullscreen. Both buttons and keyboard arrows funnel here so
 // the single event covers both interaction modes.
 function fullscreenNextItem(source) {
-  if (window.Analytics) Analytics.trackButtonClick('fullscreen_next_' + (source || 'button'), 'gallery');
   showFullscreenItem(currentFullscreenIndex + 1);
 }
 
 function fullscreenPrevItem(source) {
-  if (window.Analytics) Analytics.trackButtonClick('fullscreen_prev_' + (source || 'button'), 'gallery');
   showFullscreenItem(currentFullscreenIndex - 1);
 }
 
@@ -1987,14 +1939,9 @@ function startSlideshow(intervalMs) {
   if (stopBtn) stopBtn.style.display = "inline-block";
   setSlideshowActiveSpeed(intervalMs);
 
-  if (window.Analytics) {
-    Analytics.trackButtonClick('slideshow_start', 'gallery');
-    Analytics.trackFeature('slideshow_started', { interval_seconds: intervalMs / 1000 });
-  }
 }
 
 function stopSlideshow() {
-  if (window.Analytics) Analytics.trackButtonClick('slideshow_stop', 'gallery');
   if (slideshowInterval) {
     clearInterval(slideshowInterval);
     slideshowInterval = null;
@@ -2034,17 +1981,14 @@ if (fullscreenVideo) {
 
 // Slideshow buttons in fullscreen
 document.getElementById("fs-slide-2")?.addEventListener("click", function() {
-  if (window.Analytics) Analytics.trackButtonClick('slideshow_speed_2s', 'gallery');
   startSlideshow(2000);
 });
 
 document.getElementById("fs-slide-3")?.addEventListener("click", function() {
-  if (window.Analytics) Analytics.trackButtonClick('slideshow_speed_3s', 'gallery');
   startSlideshow(3000);
 });
 
 document.getElementById("fs-slide-5")?.addEventListener("click", function() {
-  if (window.Analytics) Analytics.trackButtonClick('slideshow_speed_5s', 'gallery');
   startSlideshow(5000);
 });
 
@@ -2093,9 +2037,6 @@ document.querySelectorAll(".slideshow-btn[data-interval]").forEach(function(btn)
   btn.addEventListener("click", function() {
     let interval = parseInt(btn.getAttribute("data-interval"));
     if (interval) {
-      if (window.Analytics) {
-        Analytics.trackButtonClick('slideshow_speed_' + (interval / 1000) + 's_viewer', 'gallery');
-      }
       openFullscreen();
       setTimeout(function() {
         startSlideshow(interval);

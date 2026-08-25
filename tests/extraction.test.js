@@ -1,4 +1,4 @@
-// Tests for injector.js metadata extraction across the API shapes Instagram
+// Tests for capture-hook.js metadata extraction across the API shapes Instagram
 // actually serves: REST v1 (saved-posts feed), GraphQL (legacy + sidecar
 // carousels), and XDT (the newer connection format used by /api/v1/feed).
 //
@@ -9,13 +9,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadIIFE } = require('./_setup');
+const { loadCaptureHook } = require('./_setup');
 
-const { exposed: injector } = loadIIFE('injector.js');
+const { exposed: hook } = loadCaptureHook();
 const {
   extractCaption, extractOwner, extractTakenAt, extractLikeCount,
   buildContext, extractMediaFromData
-} = injector;
+} = hook;
 
 test('extractCaption: REST v1 shape ({ text })', () => {
   assert.equal(extractCaption({ caption: { text: 'hello world #love' } }), 'hello world #love');
@@ -119,11 +119,11 @@ test('extractMediaFromData: single image with metadata', () => {
     media_type: 1,
     user: { username: 'imgowner' },
     taken_at: 1704067200,
-    image_versions2: { candidates: [{ url: 'https://cdn/img.jpg' }] }
+    image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/img.jpg' }] }
   });
   assert.equal(result.length, 1);
   assert.equal(result[0].type, 'image');
-  assert.equal(result[0].url, 'https://cdn/img.jpg');
+  assert.equal(result[0].url, 'https://scontent.cdninstagram.com/img.jpg');
   assert.equal(result[0].context.postShortcode, 'Cimg1');
   assert.equal(result[0].context.owner, 'imgowner');
 });
@@ -133,13 +133,13 @@ test('extractMediaFromData: single video with metadata', () => {
     code: 'Cvid1',
     media_type: 2,
     caption: { text: 'a video' },
-    video_versions: [{ url: 'https://cdn/v.mp4' }],
-    image_versions2: { candidates: [{ url: 'https://cdn/poster.jpg' }] }
+    video_versions: [{ url: 'https://scontent.cdninstagram.com/v.mp4' }],
+    image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/poster.jpg' }] }
   });
   assert.equal(result.length, 1);
   assert.equal(result[0].type, 'video');
-  assert.equal(result[0].url, 'https://cdn/v.mp4');
-  assert.equal(result[0].thumbnail, 'https://cdn/poster.jpg');
+  assert.equal(result[0].url, 'https://scontent.cdninstagram.com/v.mp4');
+  assert.equal(result[0].thumbnail, 'https://scontent.cdninstagram.com/poster.jpg');
   assert.equal(result[0].context.caption, 'a video');
 });
 
@@ -150,9 +150,9 @@ test('extractMediaFromData: REST carousel propagates parent metadata + per-slide
     user: { username: 'creator' },
     caption: { text: 'album time' },
     carousel_media: [
-      { media_type: 1, image_versions2: { candidates: [{ url: 'https://cdn/1.jpg' }] } },
-      { media_type: 1, image_versions2: { candidates: [{ url: 'https://cdn/2.jpg' }] } },
-      { media_type: 2, video_versions: [{ url: 'https://cdn/3.mp4' }], image_versions2: { candidates: [{ url: 'https://cdn/3.jpg' }] } }
+      { media_type: 1, image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/1.jpg' }] } },
+      { media_type: 1, image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/2.jpg' }] } },
+      { media_type: 2, video_versions: [{ url: 'https://scontent.cdninstagram.com/3.mp4' }], image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/3.jpg' }] } }
     ]
   });
   assert.equal(result.length, 3);
@@ -179,8 +179,8 @@ test('extractMediaFromData: GraphQL sidecar carousel propagates context + index'
     user: { username: 'g' },
     edge_sidecar_to_children: {
       edges: [
-        { node: { media_type: 1, image_versions2: { candidates: [{ url: 'https://cdn/a.jpg' }] } } },
-        { node: { media_type: 1, image_versions2: { candidates: [{ url: 'https://cdn/b.jpg' }] } } }
+        { node: { media_type: 1, image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }] } } },
+        { node: { media_type: 1, image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/b.jpg' }] } } }
       ]
     }
   });
@@ -193,8 +193,8 @@ test('extractMediaFromData: GraphQL sidecar carousel propagates context + index'
 test('extractMediaFromData: feed.items[] yields one entry per post with own context', () => {
   const result = extractMediaFromData({
     items: [
-      { code: 'C1', media_type: 1, image_versions2: { candidates: [{ url: 'https://cdn/1.jpg' }] }, user: { username: 'u1' } },
-      { code: 'C2', media_type: 1, image_versions2: { candidates: [{ url: 'https://cdn/2.jpg' }] }, user: { username: 'u2' } }
+      { code: 'C1', media_type: 1, image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/1.jpg' }] }, user: { username: 'u1' } },
+      { code: 'C2', media_type: 1, image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/2.jpg' }] }, user: { username: 'u2' } }
     ]
   });
   assert.equal(result.length, 2);
@@ -226,7 +226,7 @@ test('extractMediaFromData: context survives a level of irrelevant nesting', () 
       shortcode_media: {
         shortcode: 'Cnested',
         media_type: 1,
-        image_versions2: { candidates: [{ url: 'https://cdn/n.jpg' }] },
+        image_versions2: { candidates: [{ url: 'https://scontent.cdninstagram.com/n.jpg' }] },
         owner: { username: 'nestedowner' }
       }
     }

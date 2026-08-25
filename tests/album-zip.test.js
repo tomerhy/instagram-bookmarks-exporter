@@ -123,7 +123,7 @@ test('buildAlbumManifest: minimal item with no carousel yields a single-slide ma
     postShortcode: 'ABC'
   };
   const manifest = g.buildAlbumManifest(item, '4.4.0');
-  assert.equal(manifest.format, 'instagram-saved-media-exporter-album');
+  assert.equal(manifest.format, 'saved-posts-backup-export-album');
   assert.equal(manifest.formatVersion, 1);
   assert.equal(manifest.extensionVersion, '4.4.0');
   assert.equal(manifest.shortcode, 'ABC');
