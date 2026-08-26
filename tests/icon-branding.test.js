@@ -143,31 +143,60 @@ test('the generator declares no warm/Instagram-like colour', () => {
 // Pixel assertions on the plate and ring only
 // ---------------------------------------------------------------------------
 
-test('the plate corners are neutral slate, not a warm gradient', (t) => {
+test('the plate frame is flat neutral slate, not a gradient', (t) => {
   if (!pillowAvailable()) return t.skip('Pillow not installed');
-  // Four corner samples per icon, just inside the rounded plate. The portrait
-  // never reaches these points, so a warm reading here means a gradient
-  // background has come back.
+  // Samples the MID-EDGES of the plate, not the corners. The icon is an
+  // aspect-fit portrait inset by 4 design units inside a rounded square, so the
+  // plate is a thin frame and the rounded corners themselves are transparent.
+  // An earlier version of this test sampled 10% in from each corner on the
+  // assumption that "the portrait never reaches these points" — true of the old
+  // circular crop, false once the photo became a rounded square that nearly
+  // fills the plate. It was then reading the teal border and the photograph
+  // rather than the plate, so it failed for a reason that had nothing to do
+  // with branding.
+  //
+  // At 128px the frame is 4px wide and samples cleanly. At 48px it is 2px, so a
+  // mid-edge pixel necessarily blends with the teal border; there we assert only
+  // the property that matters — no warm cast — and leave the exact colour to the
+  // size that can actually be measured.
   const res = probe([
     'import json',
     'from PIL import Image',
     'out={}',
     'for s in [48,128]:',
     '    im=Image.open("assets/icons/icon-%d.png"%s).convert("RGBA")',
-    '    n=im.size[0]; k=max(2,int(n*0.10))',
-    '    pts=[(k,k),(n-1-k,k),(k,n-1-k),(n-1-k,n-1-k)]',
+    '    n=im.size[0]; pad=max(1,round(4*(n/128.0))); k=max(1,pad//2)',
+    '    pts=[(n//2,k),(n//2,n-1-k),(k,n//2),(n-1-k,n//2)]',
     '    out[str(s)]=[list(im.getpixel(p)) for p in pts]',
     'print(json.dumps(out))'
   ].join('\n'));
+
+  // No warm cast anywhere on the plate frame, at either size. A pink, magenta
+  // or orange plate would show red clearly above blue.
   for (const [size, pts] of Object.entries(res)) {
     for (const [r, g, b, a] of pts) {
-      if (a < 32) continue;                       // rounded-corner transparency
-      assert.ok(r < 90 && g < 90 && b < 110,
-        'icon-' + size + ' corner is not dark slate: ' + [r, g, b]);
-      // A warm cast would show red clearly above blue.
+      if (a < 32) continue;
       assert.ok(r <= b + 24,
-        'icon-' + size + ' corner has a warm cast (r=' + r + ', b=' + b + ')');
+        'icon-' + size + ' plate edge has a warm cast (r=' + r + ', b=' + b + ')');
     }
+  }
+
+  // At 128px the frame is thick enough to read the plate colour directly: it
+  // must be the flat slate the generator declares, and all four edges must
+  // match, which is what rules out a gradient.
+  const SLATE = [19, 26, 34];
+  const edges = res['128'];
+  for (const [r, g, b] of edges) {
+    for (const [i, want] of SLATE.entries()) {
+      assert.ok(Math.abs([r, g, b][i] - want) <= 8,
+        'icon-128 plate edge ' + [r, g, b] + ' is not flat slate ' + SLATE);
+    }
+  }
+  const spread = (i) => Math.max(...edges.map(e => e[i])) - Math.min(...edges.map(e => e[i]));
+  for (const i of [0, 1, 2]) {
+    assert.ok(spread(i) <= 6,
+      'icon-128 plate varies across its edges (channel ' + i + ' spread ' +
+      spread(i) + ') — that is a gradient, not a flat plate');
   }
 });
 
