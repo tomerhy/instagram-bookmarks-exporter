@@ -42,8 +42,28 @@ shot() {           # shot <out-name> <url-path> [width] [height]
 }
 
 echo "capturing to $OUT/"
-shot "01-popup-idle.png"          "/popup.html"                      440 720
-shot "02-first-run-disclosure.png" "/popup.html?consent=0&act=disclosure" 440 720
+# The popup is 320px wide (popup.html sets width: 320px) and ~400px tall.
+# Capture it at exactly that so the page is not left-aligned inside a bigger
+# window with dead space beside and below it, then centre each frame on a
+# 1280x800 ground — which is also what the Chrome Web Store requires of a
+# listing screenshot. Heights measured from the rendered page: idle content ends
+# at 385px, the consent overlay at 401px.
+# Heights differ per state, and they are measured rather than guessed.
+#   idle       content ends at 385px, so 410 leaves a small even margin.
+#   disclosure the consent card needs ~401px. .about-overlay is
+#              `position:absolute; inset:0` with `align-items:center`, so a card
+#              taller than its flex container overflows in BOTH directions and
+#              the top is what gets clipped — which is exactly what a 410px
+#              canvas did to the "Before you start" heading. 440 still clips it;
+#              455 is the smallest height that fits the whole card.
+POPUP_W=320
+shot "raw-01-popup-idle.png"           "/popup.html"                          "$POPUP_W" 410
+shot "raw-02-first-run-disclosure.png" "/popup.html?consent=0&act=disclosure" "$POPUP_W" 455
+for n in 01-popup-idle 02-first-run-disclosure; do
+  python3 tools/screenshot-harness/frame-popup.py "$OUT/raw-$n.png" "$OUT/$n.png" \
+    | sed 's/^/  /'
+  rm -f "$OUT/raw-$n.png"
+done
 shot "03-library.png"             "/gallery.html"
 shot "04-search.png"              "/gallery.html?act=search"
 shot "05-album-expanded.png"      "/gallery.html?act=album"
@@ -51,5 +71,4 @@ shot "06-videos-and-export.png"   "/gallery.html?act=videos"
 
 rm -rf "$PROFILE"
 echo
-echo "Popup frames 01/02 are captured at their natural popup width. Frame them"
-echo "to 1280x800 with:  python3 compose_screenshots.py"
+echo "All six frames are 1280x800, the Chrome Web Store listing size."
