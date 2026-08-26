@@ -19,7 +19,7 @@ function emitStorageChange(sandbox, changes, area = 'local') {
 function seedItems(c) {
   // Reach into the exposed buildItem to construct realistic items, then push
   // them onto the live state and seenUrls.
-  const item = c.buildItem('image', 'https://cdn/x.jpg', null, null, null);
+  const item = c.buildItem('image', 'https://scontent.cdninstagram.com/x.jpg', null, null, null);
   c.state.images.push(item);
   c.state.seenUrls.add(c.normalizeUrl(item.url));
 }

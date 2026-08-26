@@ -256,20 +256,23 @@ function loadTopLevel(filename, extraSetup, deps) {
 // content.js and capture-hook.js are both declared in the manifest with
 // url-allowlist.js ahead of them; mirror that here so tests exercise the same
 // wiring the browser does.
-const WITH_ALLOWLIST = { deps: ['url-allowlist.js'] };
+// Mirror the manifest / page <script> order exactly:
+//   MAIN world      : url-allowlist.js, capture-hook.js
+//   isolated world  : url-allowlist.js, library-sanitize.js, content.js
+//   gallery.html    : url-allowlist.js, library-sanitize.js, gallery.js
+const ALLOWLIST_ONLY = ['url-allowlist.js'];
+const ALLOWLIST_AND_SANITIZER = ['url-allowlist.js', 'library-sanitize.js'];
 
 function loadContent(setup) {
-  return loadIIFE('content.js', { deps: WITH_ALLOWLIST.deps, setup });
+  return loadIIFE('content.js', { deps: ALLOWLIST_AND_SANITIZER, setup });
 }
 
 function loadCaptureHook(setup) {
-  return loadIIFE('capture-hook.js', { deps: WITH_ALLOWLIST.deps, setup });
+  return loadIIFE('capture-hook.js', { deps: ALLOWLIST_ONLY, setup });
 }
 
-// gallery.html loads url-allowlist.js before gallery.js; the import sanitiser
-// depends on it, so tests must load it the same way.
 function loadGallery(setup) {
-  return loadTopLevel('gallery.js', setup, WITH_ALLOWLIST.deps);
+  return loadTopLevel('gallery.js', setup, ALLOWLIST_AND_SANITIZER);
 }
 
 module.exports = {

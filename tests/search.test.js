@@ -14,14 +14,18 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
+// Uses the shared loader so url-allowlist.js and library-sanitize.js are
+// evaluated first, exactly as gallery.html declares them. Without them
+// SBE_URL is absent, every URL fails closed, and these tests would be
+// measuring the fail-closed path instead of their actual subject.
 function loadGallery() {
-  return loadTopLevel('gallery.js');
+  return sharedLoadGallery();
 }
 
 function item(meta) {
-  return { type: 'image', url: 'x.jpg', metadata: meta || null };
+  return { type: 'image', url: 'https://scontent.cdninstagram.com/x.jpg', metadata: meta || null };
 }
 
 // ---------- Empty queries ----------
@@ -37,7 +41,7 @@ test('matchesQuery: empty / whitespace query matches every item', () => {
 
 test('matchesQuery: items without metadata never match a non-empty query', () => {
   const g = loadGallery();
-  assert.equal(g.matchesQuery({ type: 'image', url: 'x.jpg' }, 'anything'), false,
+  assert.equal(g.matchesQuery({ type: 'image', url: 'https://scontent.cdninstagram.com/x.jpg' }, 'anything'), false,
     'item without metadata must be filtered out when a query is active');
   assert.equal(g.matchesQuery(null, 'x'), false);
   assert.equal(g.matchesQuery(undefined, 'x'), false);
@@ -184,8 +188,8 @@ test('matchesQuery: hashtags array of non-strings does not crash', () => {
 test('getFilteredItems: returns the full grouped list when query is empty', () => {
   const g = loadGallery();
   g.allMedia.images = [
-    { type: 'image', url: 'a.jpg', metadata: { owner: 'a' } },
-    { type: 'image', url: 'b.jpg', metadata: { owner: 'b' } }
+    { type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg', metadata: { owner: 'a' } },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/b.jpg', metadata: { owner: 'b' } }
   ];
   g.currentTab = 'images';
   g.searchQuery = '';
@@ -195,9 +199,9 @@ test('getFilteredItems: returns the full grouped list when query is empty', () =
 test('getFilteredItems: filters by the active searchQuery', () => {
   const g = loadGallery();
   g.allMedia.images = [
-    { type: 'image', url: 'a.jpg', metadata: { owner: 'alice', caption: 'beach' } },
-    { type: 'image', url: 'b.jpg', metadata: { owner: 'bob',   caption: 'forest' } },
-    { type: 'image', url: 'c.jpg', metadata: { owner: 'alice', caption: 'forest' } }
+    { type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg', metadata: { owner: 'alice', caption: 'beach' } },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/b.jpg', metadata: { owner: 'bob',   caption: 'forest' } },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/c.jpg', metadata: { owner: 'alice', caption: 'forest' } }
   ];
   g.currentTab = 'images';
   g.searchQuery = 'alice';

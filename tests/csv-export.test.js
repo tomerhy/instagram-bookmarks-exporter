@@ -11,10 +11,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
+// Uses the shared loader so url-allowlist.js and library-sanitize.js are
+// evaluated first, exactly as gallery.html declares them. Without them
+// SBE_URL is absent, every URL fails closed, and these tests would be
+// measuring the fail-closed path instead of their actual subject.
 function loadGallery() {
-  return loadTopLevel('gallery.js');
+  return sharedLoadGallery();
 }
 
 // ---------- csvEscape ----------
@@ -91,8 +95,8 @@ test('buildCsv: one row per item with all fields populated', () => {
   const g = loadGallery();
   const item = {
     type: 'image',
-    url: 'https://cdn/x.jpg',
-    thumbnail: 'https://cdn/x_t.jpg',
+    url: 'https://scontent.cdninstagram.com/x.jpg',
+    thumbnail: 'https://scontent.cdninstagram.com/x_t.jpg',
     postUrl: 'https://instagram.com/p/ABC',
     postShortcode: 'ABC',
     carouselIndex: 2,
@@ -111,24 +115,24 @@ test('buildCsv: one row per item with all fields populated', () => {
   // Expected: hashtags joined by space, numbers as-is, dates as ISO strings.
   assert.equal(
     dataRow,
-    'image,https://cdn/x.jpg,https://cdn/x_t.jpg,https://instagram.com/p/ABC,ABC,2,5,photog,A sunny day,2026-05-20T09:00:00.000Z,1234,travel beach,2026-05-22T10:00:00.000Z'
+    'image,https://scontent.cdninstagram.com/x.jpg,https://scontent.cdninstagram.com/x_t.jpg,https://instagram.com/p/ABC,ABC,2,5,photog,A sunny day,2026-05-20T09:00:00.000Z,1234,travel beach,2026-05-22T10:00:00.000Z'
   );
 });
 
 test('buildCsv: items with no metadata leave the metadata columns empty', () => {
   const g = loadGallery();
-  const item = { type: 'image', url: 'https://cdn/x.jpg' };
+  const item = { type: 'image', url: 'https://scontent.cdninstagram.com/x.jpg' };
   const csv = g.buildCsv([item]);
   const dataRow = csv.split('\r\n')[1];
   // type,url,(thumbnail),(postUrl),(postShortcode),(carouselIndex),(carouselSize),(owner),(caption),(takenAt),(likeCount),(hashtags),(scrapedAt)
-  assert.equal(dataRow, 'image,https://cdn/x.jpg,,,,,,,,,,,');
+  assert.equal(dataRow, 'image,https://scontent.cdninstagram.com/x.jpg,,,,,,,,,,,');
 });
 
 test('buildCsv: caption with commas is wrapped in quotes (the original CSV escape bug)', () => {
   const g = loadGallery();
   const item = {
     type: 'image',
-    url: 'x.jpg',
+    url: 'https://scontent.cdninstagram.com/x.jpg',
     metadata: { caption: 'apples, oranges, and bananas' }
   };
   const csv = g.buildCsv([item]);
@@ -140,7 +144,7 @@ test('buildCsv: caption with embedded newlines stays inside one CSV record', () 
   const g = loadGallery();
   const item = {
     type: 'image',
-    url: 'x.jpg',
+    url: 'https://scontent.cdninstagram.com/x.jpg',
     metadata: { caption: 'line one\nline two\nline three' }
   };
   const csv = g.buildCsv([item]);
@@ -156,7 +160,7 @@ test('buildCsv: caption with embedded double quotes gets each quote doubled', ()
   const g = loadGallery();
   const item = {
     type: 'image',
-    url: 'x.jpg',
+    url: 'https://scontent.cdninstagram.com/x.jpg',
     metadata: { caption: 'she said "hi" then left' }
   };
   const csv = g.buildCsv([item]);
@@ -165,9 +169,9 @@ test('buildCsv: caption with embedded double quotes gets each quote doubled', ()
 
 test('buildCsv: non-numeric likeCount drops to empty (not "null", not "NaN")', () => {
   const g = loadGallery();
-  const a = { type: 'image', url: 'a.jpg', metadata: { likeCount: 42 } };
-  const b = { type: 'image', url: 'b.jpg', metadata: { likeCount: '50' } }; // string
-  const c = { type: 'image', url: 'c.jpg', metadata: { likeCount: null } };
+  const a = { type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg', metadata: { likeCount: 42 } };
+  const b = { type: 'image', url: 'https://scontent.cdninstagram.com/b.jpg', metadata: { likeCount: '50' } }; // string
+  const c = { type: 'image', url: 'https://scontent.cdninstagram.com/c.jpg', metadata: { likeCount: null } };
   const csv = g.buildCsv([a, b, c]);
   const lines = csv.split('\r\n');
   // likeCount is the 11th column (index 10).
@@ -180,7 +184,7 @@ test('buildCsv: hashtags array becomes a space-separated string', () => {
   const g = loadGallery();
   const item = {
     type: 'image',
-    url: 'x.jpg',
+    url: 'https://scontent.cdninstagram.com/x.jpg',
     metadata: { hashtags: ['travel', 'beach', 'sunset'] }
   };
   const csv = g.buildCsv([item]);
@@ -190,8 +194,8 @@ test('buildCsv: hashtags array becomes a space-separated string', () => {
 test('buildCsv: lines are joined with CRLF (RFC 4180 mandates it)', () => {
   const g = loadGallery();
   const items = [
-    { type: 'image', url: 'a.jpg' },
-    { type: 'image', url: 'b.jpg' }
+    { type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg' },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/b.jpg' }
   ];
   const csv = g.buildCsv(items);
   // Header + 2 rows = 3 segments, joined by exactly 2 CRLFs.

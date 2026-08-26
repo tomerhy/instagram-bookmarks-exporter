@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - Saved Posts Backup &amp; Export</title>
+  <title>Privacy Policy - Saved Posts Library &amp; Export</title>
   <style>
     :root {
       --ink: #1b2430;
@@ -62,8 +62,8 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="subtitle">Saved Posts Backup &amp; Export (Chrome extension)</p>
-  <p class="updated">Last updated: 25 August 2026 &middot; Applies to version 4.4.1 and later</p>
+  <p class="subtitle">Saved Posts Library &amp; Export (Chrome extension)</p>
+  <p class="updated">Last updated: 25 August 2026 &middot; Applies to version 4.4.3 and later</p>
 
   <div class="disclaimer">
     <strong>Independent third-party extension.</strong> Not affiliated with,
@@ -75,11 +75,20 @@
   <h2>Summary</h2>
   <ul>
     <li>The extension captures nothing until you press <strong>Start capture</strong>, and stops when you press Stop or reload the page.</li>
-    <li>Everything it captures is stored <strong>only on your own computer</strong>, in <code>chrome.storage.local</code>.</li>
-    <li><strong>Nothing is transmitted</strong> to the developer, to any server the developer controls, or to any analytics service.</li>
+    <li>What it captures is <strong>links and post details</strong> &mdash; not the media files. That record is stored only on your own computer, in <code>chrome.storage.local</code>.</li>
+    <li>The extension <strong>does not transmit your captured library</strong> to the developer, to analytics services, to advertising services, or to unrelated third parties. There is no server the developer controls.</li>
+    <li>When the library <strong>displays a preview or downloads media</strong>, your browser requests that media from Instagram/Meta's CDN. That is normal, expected, and the only outbound traffic the extension causes &mdash; but it is traffic, so it is disclosed here rather than described as "nothing".</li>
     <li>It never requests, reads, or stores your password, cookies, session tokens, authentication headers, or two-factor codes.</li>
     <li>There is <strong>no analytics and no behavioural tracking</strong> of any kind. Versions up to and including 4.4.0 did contain Google Analytics; see <a href="#history">Change history</a>.</li>
   </ul>
+
+  <div class="disclaimer">
+    <strong>Capturing a link is not the same as saving a file.</strong> Capture
+    records a media URL. Instagram's media URLs expire, and a deleted post stops
+    resolving. Your captured library is therefore not, by itself, a permanent
+    offline copy of the media &mdash; only media you explicitly download becomes
+    a file on your computer that keeps working.
+  </div>
 
   <h2>What the extension processes</h2>
   <p>
@@ -99,14 +108,30 @@
     <tr><td>Hashtags</td><td><code>#example</code></td><td>Derived from the caption; used for search</td></tr>
     <tr><td>Carousel metadata</td><td>slide index, album size</td><td>To reassemble multi-image albums</td></tr>
     <tr><td>Capture timestamps</td><td>when <em>you</em> captured the item</td><td>Powers the "new since last visit" badge</td></tr>
-    <tr><td>Extension preferences</td><td>consent timestamp, sort order, usage counter, donation-banner dismissal</td><td>To remember your settings between sessions</td></tr>
+    <tr><td>Consent timestamp</td><td><code>sbeConsentAcceptedAt</code></td><td>Records that you accepted the first-run disclosure, so capture cannot start without it</td></tr>
+    <tr><td>Last-seen timestamp</td><td><code>igExporterLastSeenAt</code></td><td>Drives the &ldquo;new since you last looked&rdquo; toolbar badge</td></tr>
+    <tr><td>Maintenance markers</td><td><code>sbeLegacyCleanupAt</code>, <code>sbeLibrarySanitizedAt</code></td><td>Timestamps recording when leftover analytics identifiers were deleted, and when the library was last rebuilt by the safety pass. Neither contains post data.</td></tr>
   </table>
   </div>
   <p>
     All of the above is content that is already visible to you, as the
-    signed-in user, on the pages you visit. The extension does not reach
-    content you could not otherwise see, and does not access other accounts,
-    other users' private posts, or anything behind a restriction.
+    signed-in user, on the pages you visit. <strong>The extension does not
+    access content that you are not authorized to view.</strong> It gains you no
+    access you did not already have, and it does not bypass any login, paywall
+    or restriction.
+  </p>
+  <p>
+    To be precise rather than reassuring: if you follow a private account and
+    have saved a post from it, that post is visible to you, and the extension
+    can therefore process it &mdash; because you are already authorized to see
+    it. Earlier versions of this policy said the extension "does not access
+    other users' private posts", which was misleading. What is true is the
+    narrower statement above.
+  </p>
+  <p>
+    The content itself belongs to whoever posted it. Keeping a copy for your own
+    reference is not the same as owning it, and anything you do with it beyond
+    that is your responsibility.
   </p>
 
   <h2>What the extension never touches</h2>
@@ -115,10 +140,28 @@
     <li>Cookies &mdash; the extension does not request the <code>cookies</code> permission and never reads <code>document.cookie</code>.</li>
     <li>Session tokens, CSRF tokens, and <code>Authorization</code> headers &mdash; never read, stored, or transmitted.</li>
     <li>Two-factor / one-time codes.</li>
-    <li>Browsing history, bookmarks, or downloads &mdash; the corresponding permissions are not requested.</li>
+    <li>Browsing history and bookmarks &mdash; the corresponding permissions are not requested.</li>
     <li>Web pages other than <code>instagram.com</code> &mdash; the extension has no access to any other site.</li>
-    <li>Your keystrokes, clipboard, camera, microphone, or location.</li>
+    <li>Your keystrokes, camera, microphone, or location.</li>
   </ul>
+
+  <h3>Two things worth stating precisely rather than sweepingly</h3>
+  <p>
+    <strong>Clipboard.</strong> The extension <em>never reads</em> your
+    clipboard. It <em>writes</em> to it in exactly one situation: when you press
+    <strong>Copy URLs</strong>, it puts the selected allowlisted media links on
+    the clipboard. That is the entire point of the button, it happens only on
+    that click, and nothing is written at any other time. An earlier version of
+    this policy asserted no clipboard involvement at all, which was wrong.
+  </p>
+  <p>
+    <strong>Downloads.</strong> The extension does not request the downloads
+    permission (<code>downloads</code>) and cannot read your Chrome download
+    history. It does, of course, <em>create</em> downloads &mdash; that is what
+    the Download and ZIP buttons do &mdash; using an ordinary link the browser
+    saves. An earlier version of this policy implied no download involvement at
+    all, which would have been misleading.
+  </p>
 
   <h2>Capture happens only when you start it</h2>
   <p>
@@ -148,6 +191,13 @@
     <li>You clear the extension's data through Chrome's own settings.</li>
   </ul>
   <p>
+    Two small housekeeping values are also stored: <code>sbeLegacyCleanupAt</code>,
+    recording when leftover analytics identifiers from older versions were
+    deleted, and <code>sbeLibrarySanitizedAt</code>, recording when the library
+    was last rebuilt by the 4.4.2 safety pass. Both are timestamps and neither
+    contains post data.
+  </p>
+  <p>
     There is no server-side copy, so there is nothing to request deletion of
     and no account to close.
   </p>
@@ -171,34 +221,81 @@
   </table>
   </div>
   <p>
+    Those are three separate things &mdash; two API permissions and one host
+    access grant. Describing them as "two permissions", as an earlier version of
+    this policy did, undercounted.
+  </p>
+  <p>
+    The Instagram/Meta CDN hosts are deliberately <strong>not</strong> requested
+    as permissions. When the library shows a preview or downloads a file, the
+    browser makes an ordinary cross-origin request that works only because the
+    CDN allows it. The extension holds no special access to those hosts; the
+    Content Security Policy simply bounds which addresses it may contact at all.
+  </p>
+  <p>
     The extension does <strong>not</strong> request <code>cookies</code>,
     <code>webRequest</code>, <code>history</code>, <code>identity</code>,
     <code>debugger</code>, <code>management</code>, <code>nativeMessaging</code>,
-    <code>tabs</code>, <code>scripting</code>, <code>downloads</code>, or
-    <code>&lt;all_urls&gt;</code>.
+    <code>tabs</code>, <code>scripting</code>, <code>activeTab</code>,
+    <code>downloads</code>, or <code>&lt;all_urls&gt;</code>.
   </p>
 
   <h2>Network connections</h2>
-  <p>The extension itself initiates network requests only in these cases:</p>
+  <p>
+    Being specific here matters more than sounding reassuring. There are two
+    tiers, and the difference is the part earlier versions of this policy got
+    wrong:
+  </p>
+  <div class="disclaimer">
+    <strong>Automatic:</strong> opening the library, or opening a preview or
+    fullscreen view, causes your browser to request the corresponding
+    thumbnail or media file from Instagram/Meta CDN hosts. No click on
+    Download is involved &mdash; displaying a stored image URL means fetching
+    it.<br>
+    <strong>Explicit:</strong> Download and ZIP actions fetch media so it can
+    be saved to your computer, and happen only when you press those buttons.
+  </div>
+  <p>The full list of requests the extension causes:</p>
   <ul>
     <li>
-      <strong>Downloading your own media.</strong> When you use Download or a
-      ZIP export, the gallery fetches the image and video files from
-      Instagram's own CDN hosts (<code>*.cdninstagram.com</code>,
-      <code>*.fbcdn.net</code>) so it can save them to your computer. Requests
-      go only to hosts on a fixed allowlist; any other address is refused.
+      <strong>Opening the library can load thumbnails and previews.</strong>
+      The library stores media <em>URLs</em>, so when it shows you a grid of
+      thumbnails or a preview, your browser requests those images from
+      Instagram's CDN hosts (<code>*.cdninstagram.com</code>,
+      <code>*.fbcdn.net</code>). This happens as a normal consequence of
+      displaying the page. It is not a background upload and nothing about you
+      is sent &mdash; it is your browser fetching the picture so it can draw it.
     </li>
     <li>
-      <strong>Links you click.</strong> The optional support links open
-      <code>buymeacoffee.com</code> or <code>patreon.com</code> in a new tab.
-      These are ordinary links: nothing is sent unless you click, and no
-      information about you or your library is attached.
+      <strong>Displaying or downloading media from posts you saved.</strong>
+      When you use Download, or build a ZIP, the gallery requests those image
+      and video files from the same CDN hosts so it can save them to your
+      computer. Requests go only to hosts on a fixed allowlist; any other
+      address is refused, and the refusal is enforced in three independent
+      places (the stored record, the code path, and the extension's Content
+      Security Policy).
+    </li>
+    <li>
+      <strong>Links you click.</strong> The support links
+      (<code>buymeacoffee.com</code>, <code>patreon.com</code>), the privacy
+      policy link, and the GitHub link all navigate <em>only</em> after you
+      click them. The extension appends no library data, no query parameter and
+      no tracking identifier to any of them. To be exact rather than
+      reassuring: once you click, your browser makes a normal web request to
+      that site, which necessarily includes standard navigation metadata such
+      as your IP address and user agent &mdash; as it would for any link you
+      click anywhere. The extension adds nothing to it, and receives nothing
+      back.
     </li>
   </ul>
   <p>
-    There is no developer-operated server, no telemetry endpoint, no
-    advertising network, and no remotely loaded code. All extension code is
-    contained in the package you install, as required by Manifest V3.
+    <strong>What does not happen:</strong> there is no developer-operated
+    server, no telemetry endpoint, no advertising network, and no remotely
+    loaded code. Your captured library &mdash; the URLs, usernames, captions and
+    everything else &mdash; is never sent anywhere. All extension code is
+    contained in the package you install, as required by Manifest V3, and the
+    extension's own pages run under a Content Security Policy that permits
+    connections only to the two CDN hosts named above.
   </p>
 
   <h2>No analytics</h2>
@@ -206,6 +303,30 @@
     This extension contains no analytics, no measurement SDK, no pixel, no
     fingerprinting, and no behavioural profiling. No persistent identifier is
     generated for you.
+  </p>
+
+  <h2>Security fix in 4.4.2 &mdash; older stored records</h2>
+  <p>
+    An independent review of version 4.4.1 found that records saved by version
+    4.4.0 or earlier were loaded from local storage <em>without</em> being
+    validated. Validation had been added for newly captured and newly imported
+    data, but not for data that was already there. A crafted record already
+    present in storage could therefore reach the library's display and download
+    paths.
+  </p>
+  <p>
+    Version 4.4.2 fixes this. The library is now rebuilt field by field whenever
+    it is loaded &mdash; from storage, from a storage change, or from an import
+    &mdash; every URL is re-checked at the moment it is displayed, fetched,
+    opened, copied or exported, and the cleaned library is written back so
+    unsafe values are removed from your browser permanently rather than merely
+    hidden. If anything is removed, the library tells you how many records or
+    fields were affected.
+  </p>
+  <p>
+    <strong>No data was transmitted anywhere as a result of this defect.</strong>
+    It was a local rendering-safety problem, not a leak. It is described here
+    because you are entitled to know what changed in your browser and why.
   </p>
 
   <h2 id="history">Change history &mdash; analytics removal</h2>
@@ -237,8 +358,15 @@
     including the Limited Use requirements:
   </p>
   <ul>
-    <li>Data is handled only to provide the single user-facing feature described in the store listing &mdash; backing up and exporting your own saved posts.</li>
-    <li>No data is transferred to third parties, because no data leaves your device.</li>
+    <li>Data is handled only to provide the single user-facing feature described in the store listing &mdash; keeping a local library of the posts you saved and downloading media you select.</li>
+    <li>
+      The extension does not transmit the captured library to the developer,
+      analytics services, advertising services or unrelated third parties.
+      When the gallery displays or downloads media, the browser requests the
+      corresponding allowlisted media URL from Instagram/Meta's CDN &mdash; the
+      content returning to your browser from the service it came from, not a
+      transfer of your data to a third party.
+    </li>
     <li>No data is sold, and none is used for advertising, credit assessment, lending, or any purpose unrelated to the extension's stated function.</li>
     <li>No human reads your data &mdash; there is no server on which to read it.</li>
   </ul>

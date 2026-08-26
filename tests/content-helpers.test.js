@@ -98,21 +98,21 @@ test('normalizeUrl: same path + cache key → same normalized form', () => {
 });
 
 test('normalizeUrl: different ig_cache_key → different normalized form', () => {
-  const a = 'https://cdn/x.jpg?ig_cache_key=A&stp=p';
-  const b = 'https://cdn/x.jpg?ig_cache_key=B&stp=p';
+  const a = 'https://scontent.cdninstagram.com/x.jpg?ig_cache_key=A&stp=p';
+  const b = 'https://scontent.cdninstagram.com/x.jpg?ig_cache_key=B&stp=p';
   assert.notEqual(normalizeUrl(a), normalizeUrl(b));
 });
 
 test('normalizeUrl: different stp → different normalized form', () => {
   // stp is a transform descriptor — different transforms = different rendered output
-  const a = 'https://cdn/x.jpg?stp=p640x640&ig_cache_key=K';
-  const b = 'https://cdn/x.jpg?stp=p1080x1080&ig_cache_key=K';
+  const a = 'https://scontent.cdninstagram.com/x.jpg?stp=p640x640&ig_cache_key=K';
+  const b = 'https://scontent.cdninstagram.com/x.jpg?stp=p1080x1080&ig_cache_key=K';
   assert.notEqual(normalizeUrl(a), normalizeUrl(b));
 });
 
 test('normalizeUrl: missing ig_cache_key + stp still normalizes consistently', () => {
-  const a = 'https://cdn/x.jpg?_nc_ht=a';
-  const b = 'https://cdn/x.jpg?_nc_ht=b';
+  const a = 'https://scontent.cdninstagram.com/x.jpg?_nc_ht=a';
+  const b = 'https://scontent.cdninstagram.com/x.jpg?_nc_ht=b';
   assert.equal(normalizeUrl(a), normalizeUrl(b));
 });
 

@@ -7,9 +7,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
-const g = loadTopLevel('gallery.js');
+const g = sharedLoadGallery();
 const { escapeHtml } = g;
 
 test('escapeHtml: basic safe input passes through', () => {

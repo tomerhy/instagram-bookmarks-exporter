@@ -43,32 +43,81 @@ function logDebug(msg) {
   console.log('[Gallery]', msg);
 }
 
+// ---------------------------------------------------------------------------
+// URL SINK GUARDS
+// ---------------------------------------------------------------------------
+// Defence in depth. library-sanitize.js already rebuilds every record that
+// enters the process, but these are applied AGAIN at each sink, so that a
+// single missed sanitisation path cannot re-expose img.src, video.src,
+// window.open, fetch, the clipboard or the exports.
+//
+// Deliberately NOT written as "storage was sanitised, so this is fine".
+// Every one of these returns null rather than a raw value, so a caller that
+// forgets to check gets an empty sink instead of a hostile URL.
+
+function safeMediaUrl(value) {
+  var a = globalThis.SBE_URL;
+  if (!a || typeof a.isAllowedMediaUrl !== 'function') return null;
+  try { return a.isAllowedMediaUrl(value) ? value : null; } catch (e) { return null; }
+}
+
+function safePostUrl(value) {
+  var a = globalThis.SBE_URL;
+  if (!a || typeof a.isAllowedPostUrl !== 'function') return null;
+  try { return a.isAllowedPostUrl(value) ? value : null; } catch (e) { return null; }
+}
+
+// Anything the user is navigated to in a new tab. Only permalinks qualify —
+// never a raw media URL, which is why this is separate from safeMediaUrl.
+function safeExternalNavigationUrl(value) {
+  return safePostUrl(value);
+}
+
+// Same guard, for the URL lists that leave the extension via the clipboard or
+// an export file. An unsafe URL must not be handed to another application.
+function safeExportUrl(value) {
+  return safeMediaUrl(value) || safePostUrl(value);
+}
+
 // Check if URL is a playable video URL (CDN URL, not Instagram post URL)
 function isPlayableVideoUrl(url) {
-  if (!url) return false;
-  // Must be CDN URL with video indicators
-  return (url.includes('cdninstagram') || url.includes('fbcdn')) && 
-         (url.includes('.mp4') || url.includes('/v/') || url.includes('video'));
+  // Allowlist FIRST. The substring checks below only distinguish a video asset
+  // from a still image; they are not a security boundary and never were —
+  // "cdninstagram" matches evilcdninstagram.com too.
+  if (!safeMediaUrl(url)) return false;
+  return (url.includes('.mp4') || url.includes('/v/') || url.includes('video'));
 }
 
 
 // Helper functions
+// The accessors are themselves guarded, so every caller gets a validated value
+// or null. This is the cheapest place to close the whole class of bug: most
+// sinks read through one of these three.
 function getUrl(item) {
   if (!item) return null;
-  if (typeof item === 'string') return item;
-  return item.url || item.thumbnail || item.postUrl || null;
+  if (typeof item === 'string') return safeMediaUrl(item);
+  return safeMediaUrl(item.url) || safeMediaUrl(item.thumbnail) || safePostUrl(item.postUrl);
 }
 
 function getThumbnail(item) {
   if (!item) return null;
-  if (typeof item === 'string') return item;
-  return item.thumbnail || item.url || null;
+  if (typeof item === 'string') return safeMediaUrl(item);
+  return safeMediaUrl(item.thumbnail) || safeMediaUrl(item.url);
 }
 
 function getPostUrl(item) {
   if (!item) return null;
   if (typeof item === 'string') return null;
-  return item.postUrl || null;
+  return safePostUrl(item.postUrl);
+}
+
+// Media bytes only — never a permalink. Used where the value goes into
+// player.src / <img src> / fetch(), which must not receive an instagram.com
+// page URL.
+function getMediaUrl(item) {
+  if (!item) return null;
+  if (typeof item === 'string') return safeMediaUrl(item);
+  return safeMediaUrl(item.url) || safeMediaUrl(item.thumbnail);
 }
 
 function setStatus(msg) {
@@ -81,6 +130,18 @@ function setProgress(val) {
 
 // Escape user-supplied strings before injecting into innerHTML.
 // Captions and usernames come from Instagram and may contain HTML special chars.
+// Small DOM builder used by the render paths that previously concatenated
+// HTML strings. textContent means a caption or username is never parsed as
+// markup, so no escaping step can be forgotten.
+function el(tag, className, text) {
+  let node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = String(text);
+  return node;
+}
+
+// escapeHtml is retained for the remaining static-template call sites and as a
+// belt-and-braces helper. New code should prefer el() + textContent.
 function escapeHtml(str) {
   if (str == null) return "";
   return String(str)
@@ -327,55 +388,76 @@ function renderSearchMeta(filtered, total) {
     return;
   }
   meta.hidden = false;
-  let label = (filtered === total)
-    ? '<strong>' + filtered + '</strong> ' + (filtered === 1 ? 'result' : 'results') +
-      ' for <strong>' + escapeHtml(searchQuery) + '</strong>'
-    : 'Showing <strong>' + filtered + '</strong> of <strong>' + total +
-      '</strong> ' + (total === 1 ? 'item' : 'items') +
-      ' for <strong>' + escapeHtml(searchQuery) + '</strong>';
-  meta.innerHTML =
-    '<span>' + label + '</span>' +
-    '<button class="search-meta-clear" type="button">Clear</button>';
-  let clear = meta.querySelector(".search-meta-clear");
-  if (clear) clear.onclick = function () {
-    setSearchQuery("");
-  };
+  let span = document.createElement("span");
+  if (filtered === total) {
+    span.appendChild(el("strong", null, filtered));
+    span.appendChild(document.createTextNode(
+      " " + (filtered === 1 ? "result" : "results") + " for "));
+  } else {
+    span.appendChild(document.createTextNode("Showing "));
+    span.appendChild(el("strong", null, filtered));
+    span.appendChild(document.createTextNode(" of "));
+    span.appendChild(el("strong", null, total));
+    span.appendChild(document.createTextNode(
+      " " + (total === 1 ? "item" : "items") + " for "));
+  }
+  // The query is the user's own input, but it goes in as text, not markup.
+  span.appendChild(el("strong", null, searchQuery));
+
+  let clear = document.createElement("button");
+  clear.className = "search-meta-clear";
+  clear.type = "button";
+  clear.textContent = "Clear";
+  clear.onclick = function () { setSearchQuery(""); };
+
+  meta.replaceChildren(span, clear);
 }
 
 // Render the metadata block under the viewer (caption, owner, date, album size).
 // No-op when the item has no metadata (legacy items pre-v4.3).
 function renderViewerMeta(item) {
-  let el = document.getElementById("viewer-meta");
-  if (!el) return;
+  // Named `target`, not `el`: `el` is the DOM-builder helper above, and
+  // shadowing it here would silently break every el(...) call in this function.
+  let target = document.getElementById("viewer-meta");
+  if (!target) return;
 
   let meta = item && item.metadata;
   let hasAlbum = item && item.carouselSize && item.carouselSize > 1;
 
   if (!meta && !hasAlbum) {
-    el.classList.remove("visible");
-    el.innerHTML = "";
+    target.classList.remove("visible");
+    target.replaceChildren();
     return;
   }
 
-  let headParts = [];
-  if (meta && meta.owner) headParts.push('<span class="vm-owner">@' + escapeHtml(meta.owner) + '</span>');
+  // Built as DOM nodes. The owner and caption are untrusted strings from a
+  // captured post, and they enter as textContent — never as markup.
+  let parts = [];
+  if (meta && meta.owner) parts.push(el("span", "vm-owner", "@" + meta.owner));
   if (meta && meta.takenAt) {
     let d = new Date(meta.takenAt);
-    if (!isNaN(d.getTime())) headParts.push('<span class="vm-date">' + d.toLocaleDateString() + '</span>');
+    if (!isNaN(d.getTime())) parts.push(el("span", "vm-date", d.toLocaleDateString()));
   }
   if (hasAlbum) {
-    headParts.push('<span class="vm-album">📷 ' + item.carouselSize + ' slides</span>');
+    parts.push(el("span", "vm-album", "\u{1F4F7} " + item.carouselSize + " slides"));
   }
 
-  let headHtml = headParts.length ? '<div class="vm-head">' + headParts.join(' · ') + '</div>' : '';
-  let captionHtml = '';
+  let children = [];
+  if (parts.length) {
+    let head = el("div", "vm-head");
+    parts.forEach(function (node, i) {
+      if (i) head.appendChild(document.createTextNode(" \u00B7 "));
+      head.appendChild(node);
+    });
+    children.push(head);
+  }
   if (meta && meta.caption) {
-    let c = meta.caption.length > 280 ? meta.caption.slice(0, 280) + '…' : meta.caption;
-    captionHtml = '<div class="vm-caption">' + escapeHtml(c) + '</div>';
+    let c = meta.caption.length > 280 ? meta.caption.slice(0, 280) + "\u2026" : meta.caption;
+    children.push(el("div", "vm-caption", c));
   }
 
-  el.innerHTML = headHtml + captionHtml;
-  el.classList.add("visible");
+  target.replaceChildren.apply(target, children);
+  target.classList.add("visible");
 }
 
 // Update counts
@@ -433,7 +515,7 @@ function buildCarouselStrip(slides) {
     // doesn't take 2.5 seconds to settle).
     if (slideEl.style) slideEl.style.setProperty("--i", String(Math.min(i, 10)));
     let img = document.createElement("img");
-    img.src = thumbUrl;
+    img.src = safeMediaUrl(thumbUrl) || "";
     img.loading = "lazy";
     img.alt = "";
     slideEl.appendChild(img);
@@ -591,14 +673,21 @@ function resetViewer() {
 
 // Show image in viewer
 function showImage(item) {
-  let url = getUrl(item);
-  if (!url) return;
+  let url = safeMediaUrl(getMediaUrl(item));
+  if (!url) {
+    // An image record whose media URL did not survive validation shows the
+    // post-link fallback rather than a broken or hostile <img>.
+    showVideoFallback(getPostUrl(item), null);
+    currentItem = item;
+    renderViewerMeta(item);
+    return;
+  }
 
   if (player) { player.pause(); player.style.display = "none"; }
   if (viewerPlaceholder) viewerPlaceholder.style.display = "none";
   if (imageViewer) {
     imageViewer.style.display = "block";
-    imageViewer.src = url;
+    imageViewer.src = safeMediaUrl(url) || "";
   }
   currentItem = item;
   renderViewerMeta(item);
@@ -606,7 +695,9 @@ function showImage(item) {
 
 // Show video in viewer
 function showVideo(item) {
-  let url = getUrl(item);
+  // getMediaUrl, not getUrl: getUrl can fall back to a permalink, which must
+  // never be assigned to player.src.
+  let url = getMediaUrl(item);
   let postUrl = getPostUrl(item);
   let thumb = getThumbnail(item);
   
@@ -623,7 +714,7 @@ function showVideo(item) {
     if (viewerPlaceholder) viewerPlaceholder.style.display = "none";
     if (player) {
       player.style.display = "block";
-      player.src = url;
+      player.src = safeMediaUrl(url) || "";
       player.load();
       player.play().catch(function(e) {
         logDebug("Play error: " + e.message);
@@ -640,20 +731,69 @@ function showVideo(item) {
   renderViewerMeta(item);
 }
 
+// Built with DOM APIs, not string concatenation. Nothing here interpolates a
+// URL into markup, so there is no attribute to break out of and no way for a
+// stored value to become HTML. Both URLs are re-validated at this sink even
+// though the record was sanitised on load.
 function showVideoFallback(linkUrl, thumbnailUrl) {
   if (player) player.style.display = "none";
-  if (viewerPlaceholder) {
-    viewerPlaceholder.style.display = "flex";
-    let thumbHtml = thumbnailUrl ? 
-      '<img src="' + thumbnailUrl + '" style="max-width:200px;max-height:200px;border-radius:8px;margin-bottom:15px;">' : 
-      '<div style="font-size:60px;margin-bottom:15px;">🎬</div>';
-    
-    viewerPlaceholder.innerHTML = '<div style="text-align:center;padding:20px;">' +
-      thumbHtml +
-      '<p style="margin-bottom:15px;color:#aaa;">Direct video URL not available</p>' +
-      (linkUrl ? '<a href="' + linkUrl + '" target="_blank" class="btn-link">▶ Open on Instagram</a>' : '') +
-      '</div>';
+  if (!viewerPlaceholder) return;
+  viewerPlaceholder.style.display = "flex";
+
+  let safeThumb = safeMediaUrl(thumbnailUrl);
+  let safeLink = safeExternalNavigationUrl(linkUrl);
+
+  let box = document.createElement("div");
+  box.className = "video-fallback";
+
+  // Thumbnail only when it is a genuine allowlisted media URL. Otherwise a
+  // static glyph — never the rejected value, in any form.
+  if (safeThumb) {
+    let img = document.createElement("img");
+    img.className = "video-fallback-thumb";
+    img.alt = "";
+    img.src = safeMediaUrl(thumbnailUrl) || "";
+    // A thumbnail that fails to load falls back to the glyph rather than
+    // leaving a broken-image icon.
+    img.addEventListener("error", function () {
+      let glyph = document.createElement("div");
+      glyph.className = "video-fallback-glyph";
+      glyph.textContent = "\u{1F3AC}";
+      if (img.parentNode) img.parentNode.replaceChild(glyph, img);
+    });
+    box.appendChild(img);
+  } else {
+    let glyph = document.createElement("div");
+    glyph.className = "video-fallback-glyph";
+    glyph.textContent = "\u{1F3AC}";
+    box.appendChild(glyph);
   }
+
+  let msg = document.createElement("p");
+  msg.className = "video-fallback-msg";
+  msg.textContent = "The direct video file is not available. This can happen "
+    + "when a captured link has expired.";
+  box.appendChild(msg);
+
+  // "Open original post" only for a real permalink. A raw media URL is
+  // explicitly NOT offered here: it is not a post, and offering it would
+  // navigate the user to a bare CDN asset.
+  if (safeLink) {
+    let a = document.createElement("a");
+    a.className = "btn-link";
+    a.href = safeExternalNavigationUrl(linkUrl) || "";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "Open original post";
+    box.appendChild(a);
+  } else {
+    let note = document.createElement("p");
+    note.className = "video-fallback-note";
+    note.textContent = "No original post link was captured for this item.";
+    box.appendChild(note);
+  }
+
+  viewerPlaceholder.replaceChildren(box);
 }
 
 // Render grid
@@ -672,15 +812,21 @@ function renderGrid() {
   if (items.length === 0) {
     if (searchQuery) {
       // Distinct empty state for "no matches" vs "no captures yet"
-      grid.innerHTML =
-        '<div class="empty-state">' +
-          '<div class="es-icon" aria-hidden="true">🔎</div>' +
-          '<h3>No matches</h3>' +
-          '<p>No ' + currentTab + ' match <strong>' + escapeHtml(searchQuery) + '</strong>. ' +
-          'Try different keywords, or use <code>@user</code> / <code>#tag</code> to narrow the field.</p>' +
-          '<button class="btn-link" id="empty-clear-search">Clear search</button>' +
-        '</div>';
-      let clearBtn = document.getElementById("empty-clear-search");
+      let box = el("div", "empty-state");
+      let icon = el("div", "es-icon", "\u{1F50E}");
+      icon.setAttribute("aria-hidden", "true");
+      box.appendChild(icon);
+      box.appendChild(el("h3", null, "No matches"));
+      let p = el("p");
+      p.appendChild(document.createTextNode("No " + currentTab + " match "));
+      p.appendChild(el("strong", null, searchQuery));
+      p.appendChild(document.createTextNode(
+        ". Try different keywords, or use @user / #tag to narrow the field."));
+      box.appendChild(p);
+      let clearBtn = el("button", "btn-link", "Clear search");
+      clearBtn.id = "empty-clear-search";
+      box.appendChild(clearBtn);
+      grid.replaceChildren(box);
       if (clearBtn) clearBtn.onclick = function () {
         setSearchQuery("");
       };
@@ -734,7 +880,7 @@ function renderGrid() {
       if (thumbUrl && thumbUrl.indexOf(".mp4") === -1) {
         let img = document.createElement("img");
         img.className = "thumb";
-        img.src = thumbUrl;
+        img.src = safeMediaUrl(thumbUrl) || "";
         img.loading = "lazy";
         img.onerror = function() {
           this.outerHTML = '<div class="thumb" style="display:flex;align-items:center;justify-content:center;background:#222;"><span style="font-size:40px;">▶</span></div>';
@@ -756,7 +902,7 @@ function renderGrid() {
       // Image thumbnail
       let img = document.createElement("img");
       img.className = "thumb";
-      img.src = thumbUrl;
+      img.src = safeMediaUrl(thumbUrl) || "";
       img.loading = "lazy";
       img.onerror = function() {
         this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23333' width='100' height='100'/%3E%3C/svg%3E";
@@ -897,6 +1043,64 @@ function markSeen() {
   } catch (e) { /* storage might be unavailable in some preview contexts */ }
 }
 
+// ---------------------------------------------------------------------------
+// THE library entry point
+// ---------------------------------------------------------------------------
+// Every path that sets allMedia.images / allMedia.videos goes through here:
+// initial storage load, storage.onChanged, imported JSON, imported URL lists,
+// and clear-all. Nothing else may assign to allMedia directly.
+//
+// `persist` asks for the cleaned library to be written back, so unsafe legacy
+// values are removed from chrome.storage.local permanently rather than merely
+// filtered at render time. The write happens ONLY when sanitisation actually
+// changed something — which is what stops a storage.onChanged feedback loop,
+// because a second pass over already-clean data reports no change and writes
+// nothing.
+function adoptLibrary(data, opts) {
+  opts = opts || {};
+  let lib = globalThis.SBE_LIB;
+  if (!lib || typeof lib.sanitizeLibrary !== "function") {
+    // Fail closed: with no sanitiser we show nothing, rather than showing
+    // unvalidated records.
+    logDebug("SBE_LIB unavailable - refusing to load library");
+    allMedia.images = [];
+    allMedia.videos = [];
+    setStatus("Internal error: sanitiser unavailable, library not loaded");
+    return { images: [], videos: [], removedRecords: 0, removedFields: 0, changed: false };
+  }
+
+  let result = lib.sanitizeLibrary(data);
+  allMedia.images = result.images;
+  allMedia.videos = result.videos;
+
+  if (result.changed) {
+    logDebug("Sanitised library: removed " + result.removedRecords +
+             " record(s), " + result.removedFields + " field(s)");
+  }
+
+  if (opts.persist && result.changed) {
+    // Suppress our own echo so the listener does not re-render mid-write.
+    _suppressStorageEcho = true;
+    chrome.storage.local.set({
+      igExporterData: { images: result.images, videos: result.videos },
+      sbeLibrarySanitizedAt: Date.now()
+    }, function () {
+      _suppressStorageEcho = false;
+      logDebug("Sanitised library persisted; unsafe legacy values removed from storage");
+    });
+  }
+
+  if (opts.report && result.changed) {
+    let msg = lib.describeRemoval(result);
+    if (msg) setStatus(msg);
+  }
+  return result;
+}
+
+// Set while adoptLibrary writes its own sanitised output, so the
+// storage.onChanged listener ignores the echo of that write.
+var _suppressStorageEcho = false;
+
 // Load data from storage
 function loadData() {
   logDebug("Loading fresh data from storage...");
@@ -906,20 +1110,14 @@ function loadData() {
   chrome.storage.local.get(null, function(result) {
     logDebug("Storage keys: " + Object.keys(result).join(", "));
     
-    // Try rich data first
+    // Records written by 4.4.0 or earlier were never URL-validated, so this is
+    // where they are cleaned AND the cleaned version is written back.
     if (result.igExporterData) {
-      allMedia.images = result.igExporterData.images || [];
-      allMedia.videos = result.igExporterData.videos || [];
+      adoptLibrary(result.igExporterData, { persist: true, report: true });
       logDebug("Loaded: " + allMedia.images.length + " images, " + allMedia.videos.length + " videos");
-
-      // Show newest items first
-      if (allMedia.images.length > 0) {
-        logDebug("Newest image: " + (allMedia.images[allMedia.images.length - 1]?.url || "none").substring(0, 60));
-      }
     } else {
       logDebug("No data found in storage");
-      allMedia.images = [];
-      allMedia.videos = [];
+      adoptLibrary(null, {});
     }
     
     updateCounts();
@@ -947,6 +1145,11 @@ var EXPORT_FORMAT_VERSION = 1;
 // Preserves metadata, carouselSize, postUrl, scrapedAt — everything an item
 // carried at capture time — so an export → import round-trip is lossless.
 function buildExportPayload(images, videos, extensionVersion) {
+  // Guarded on the way OUT as well as in. An export file is consumed by other
+  // software and may be re-imported later, so it must not carry a URL we would
+  // refuse to render.
+  images = _exportSafeList(images);
+  videos = _exportSafeList(videos);
   return {
     format: "saved-posts-backup-export",
     formatVersion: EXPORT_FORMAT_VERSION,
@@ -957,94 +1160,51 @@ function buildExportPayload(images, videos, extensionVersion) {
   };
 }
 
+// Strip any URL field that would not pass the sink guards, keeping the record
+// itself. Used by both the JSON and the CSV export paths.
+function _exportSafeList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(function (it) {
+    if (!it || typeof it !== "object") return null;
+    let out = {};
+    for (let k in it) {
+      if (Object.prototype.hasOwnProperty.call(it, k)) out[k] = it[k];
+    }
+    out.url = safeMediaUrl(it.url);
+    out.thumbnail = safeMediaUrl(it.thumbnail);
+    out.postUrl = safePostUrl(it.postUrl);
+    if (!out.url && !out.thumbnail && !out.postUrl) return null;
+    return out;
+  }).filter(Boolean);
+}
+
 // ---------------------------------------------------------------------------
 // Import sanitisation
 // ---------------------------------------------------------------------------
-// Import is the only path by which data we did not capture ourselves can enter
-// storage — and those records are later fetched (ZIP download), rendered as
-// <img src>, and opened in new tabs. So an imported file gets the same URL
-// allowlist treatment as a live capture: anything whose url/thumbnail is not
-// an https Instagram/Meta CDN or permalink URL is dropped, not "cleaned".
-// javascript:, data:, blob:, file: and extension URLs all fail here.
-var IMPORT_MAX_RECORDS = 20000;
-var IMPORT_MAX_STRING = 2200;
+// There used to be a second, import-only sanitiser here. It has been replaced
+// by the single authoritative implementation in library-sanitize.js
+// (globalThis.SBE_LIB), because having two meant an imported record and a
+// legacy stored record could be treated with different strictness — and in
+// 4.4.1 they were: imports were validated, stored legacy records were not.
+//
+// These remain as thin delegates so the import call sites and the tests keep a
+// stable name. They add no logic of their own.
 
-function _importAllowedUrl(value) {
-  var api = globalThis.SBE_URL;
-  if (!api || typeof api.isAllowedMediaUrl !== "function") return false;
-  try { return api.isAllowedMediaUrl(value); } catch (e) { return false; }
-}
-
-function _importString(value, max) {
-  if (typeof value !== "string") return null;
-  var out = value.slice(0, max || IMPORT_MAX_STRING);
-  return out.length ? out : null;
-}
-
-function _importNumber(value) {
-  if (typeof value !== "number" || !isFinite(value) || value < 0) return null;
-  return Math.floor(value);
-}
-
-// Rebuild each record field by field. Nothing is copied across wholesale, so
-// an imported object cannot smuggle in extra properties.
 function sanitizeImportedItem(raw, fallbackType) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  var url = _importAllowedUrl(raw.url) ? raw.url : null;
-  var thumbnail = _importAllowedUrl(raw.thumbnail) ? raw.thumbnail : null;
-  if (!url && !thumbnail) return null;
-
-  var type = (raw.type === "image" || raw.type === "video") ? raw.type : fallbackType;
-  var postUrl = null;
-  var api = globalThis.SBE_URL;
-  if (api && typeof api.isAllowedPostUrl === "function") {
-    try { if (api.isAllowedPostUrl(raw.postUrl)) postUrl = raw.postUrl; } catch (e) {}
-  }
-
-  var shortcode = _importString(raw.postShortcode, 64);
-  if (shortcode && !/^[A-Za-z0-9_-]+$/.test(shortcode)) shortcode = null;
-
-  var meta = null;
-  if (raw.metadata && typeof raw.metadata === "object" && !Array.isArray(raw.metadata)) {
-    var owner = _importString(raw.metadata.owner, 30);
-    if (owner && !/^[A-Za-z0-9._]+$/.test(owner)) owner = null;
-    var tags = [];
-    if (Array.isArray(raw.metadata.hashtags)) {
-      tags = raw.metadata.hashtags
-        .filter(function(t) { return typeof t === "string" && t.length <= 140; })
-        .slice(0, 60);
-    }
-    meta = {
-      caption: _importString(raw.metadata.caption, IMPORT_MAX_STRING),
-      owner: owner,
-      takenAt: _importString(raw.metadata.takenAt, 40),
-      likeCount: _importNumber(raw.metadata.likeCount),
-      hashtags: tags
-    };
-  }
-
-  return {
-    type: type,
-    url: url || thumbnail,
-    thumbnail: thumbnail || url,
-    postUrl: postUrl,
-    postShortcode: shortcode,
-    carouselIndex: _importNumber(raw.carouselIndex),
-    carouselSize: _importNumber(raw.carouselSize) || 1,
-    metadata: meta,
-    scrapedAt: _importString(raw.scrapedAt, 40)
-  };
+  let lib = globalThis.SBE_LIB;
+  if (!lib) return null;
+  return lib.sanitizeRecord(raw, fallbackType, { records: 0, fields: 0 });
 }
 
 function sanitizeImportedList(list, fallbackType) {
-  if (!Array.isArray(list)) return { items: [], dropped: 0 };
-  var capped = list.slice(0, IMPORT_MAX_RECORDS);
-  var items = [];
-  for (var i = 0; i < capped.length; i++) {
-    var clean = sanitizeImportedItem(capped[i], fallbackType);
-    if (clean) items.push(clean);
-  }
-  return { items: items, dropped: list.length - items.length };
+  let lib = globalThis.SBE_LIB;
+  if (!lib) return { items: [], dropped: Array.isArray(list) ? list.length : 0 };
+  let tally = { records: 0, fields: 0 };
+  let items = lib.sanitizeList(list, fallbackType, tally);
+  return {
+    items: items,
+    dropped: (Array.isArray(list) ? list.length : 0) - items.length
+  };
 }
 
 // Parse imported file text. Returns one of:
@@ -1310,10 +1470,10 @@ async function downloadLibrary() {
         let url = slide && (slide.url || slide.thumbnail);
         done++;
         if (!url) { failures++; continue; }
-        if (!_importAllowedUrl(url)) { failures++; continue; }
+        if (!safeMediaUrl(url)) { failures++; continue; }
         setStatus("Fetching " + done + " / " + slideTotal + " — " + ownerKey, true);
         try {
-          let res = await fetch(url);
+          let res = await fetch(safeMediaUrl(url));
           if (!res.ok) throw new Error("HTTP " + res.status);
           let blob = await res.blob();
           let path = folder + "/" + _itemPathInOwnerFolder(it, slide, s, slides.length, i);
@@ -1375,10 +1535,10 @@ async function downloadAlbum(item) {
   for (var i = 0; i < slides.length; i++) {
     let slide = slides[i];
     let url = slide && (slide.url || slide.thumbnail);
-    if (!url || !_importAllowedUrl(url)) { failures++; continue; }
+    if (!safeMediaUrl(url)) { failures++; continue; }
     setStatus("Fetching " + (i + 1) + " / " + slides.length + "...", true);
     try {
-      let res = await fetch(url);
+      let res = await fetch(safeMediaUrl(url));
       if (!res.ok) throw new Error("HTTP " + res.status);
       let blob = await res.blob();
       zip.file(albumFilename(slide, i, slides.length), blob);
@@ -1439,6 +1599,7 @@ function csvEscape(val) {
 // Pure: given a flat list of items, produce a CSV string. Items lacking
 // metadata fields write empty cells, not "null" or "undefined".
 function buildCsv(items) {
+  items = _exportSafeList(items);
   let lines = [CSV_COLUMNS.join(",")];
   if (!Array.isArray(items)) return lines.join("\r\n");
   for (var i = 0; i < items.length; i++) {
@@ -1493,28 +1654,26 @@ updateButtonLabels();
 // Button handlers
 document.getElementById("download-current")?.addEventListener("click", async function() {
   if (!currentItem) { setStatus("Select an item first"); return; }
-  let url = getUrl(currentItem);
+  // Media-only: a permalink must never be fetched as if it were media.
+  let url = safeMediaUrl(getMediaUrl(currentItem));
   let isVideo = currentTab === "videos";
 
-  // Never fetch or navigate to a URL that is not on the allowlist. Stored
-  // records are validated on the way in, but a record could predate that
-  // validation (captured by an older version, or imported before 4.4.1).
-  if (url && !_importAllowedUrl(url)) {
-    setStatus("Blocked: this item's URL is not an Instagram/Meta media URL");
+  if (!url) {
+    setStatus("This item has no downloadable media URL on the allowlist");
     return;
   }
 
-  if (url) {
+  {
     if (isVideo) {
       // Videos are usually served without permissive CORS headers, so a blob
       // fetch fails; open in a new tab so the browser can save it directly.
       setStatus("Opening video - right-click to save");
-      window.open(url, '_blank', 'noopener');
+      window.open(safeMediaUrl(url), '_blank', 'noopener,noreferrer');
     } else {
       // Images can be fetched as blob
       setStatus("Downloading...");
       try {
-        let response = await fetch(url);
+        let response = await fetch(safeMediaUrl(url));
         let blob = await response.blob();
         let blobUrl = URL.createObjectURL(blob);
         
@@ -1536,9 +1695,18 @@ document.getElementById("download-current")?.addEventListener("click", async fun
 });
 
 document.getElementById("copy")?.addEventListener("click", function() {
-  let urls = getCurrentItems().map(getUrl).filter(Boolean);
-  navigator.clipboard.writeText(urls.join("\n")).then(function() {
-    setStatus("Copied " + urls.length + " URLs");
+  // Guarded again on the way OUT: an unsafe URL must not be handed to another
+  // application via the clipboard.
+  let all = getCurrentItems();
+  let skipped = 0;
+  navigator.clipboard.writeText(
+    all.map(function (it) { return safeExportUrl(getUrl(it)); })
+       .filter(function (u) { if (!u) { skipped++; } return !!u; })
+       .join("\n")
+  ).then(function() {
+    let urls = all.map(function (it) { return safeExportUrl(getUrl(it)); }).filter(Boolean);
+    setStatus("Copied " + urls.length + " URLs" +
+      (skipped ? " (" + skipped + " skipped: not allowlisted)" : ""));
     
   });
 });
@@ -1569,8 +1737,7 @@ document.getElementById("clear")?.addEventListener("click", function() {
   }
 
 
-  allMedia.images = [];
-  allMedia.videos = [];
+  adoptLibrary(null, {});
 
   // Stop any in-flight playback/slideshow and unwire the viewer from the
   // about-to-be-deleted item before storage commits.
@@ -1615,63 +1782,126 @@ document.getElementById("import")?.addEventListener("click", function() {
   document.getElementById("file-input")?.click();
 });
 
+// ---------------------------------------------------------------------------
+// Import application path
+// ---------------------------------------------------------------------------
+// Extracted from the file-input handler so it can be tested end to end. It was
+// NOT testable before, and that is precisely how a ReferenceError shipped
+// through 368 passing tests: `parseImportPayload` and `sanitizeImportedList`
+// were both covered, but nothing executed the code that joins them, so a
+// reference to two variables that no longer existed went unnoticed. The bug
+// threw after adoptLibrary() and before chrome.storage.local.set(), leaving the
+// library updated in memory and never persisted.
+//
+// Returns { ok, status, accepted, rejected, format } so a test can assert on
+// the outcome instead of scraping the DOM.
+function applyParsedImport(parsed, deps) {
+  deps = deps || {};
+  var adopt = deps.adoptLibrary || adoptLibrary;
+  var tab = deps.currentTab || currentTab;
+
+  if (!parsed || typeof parsed !== "object") {
+    return { ok: false, status: "Import failed: nothing to import",
+             accepted: 0, rejected: 0, format: null };
+  }
+
+  if (parsed.format === "json") {
+    // Full-fidelity backup: replaces both tabs. Routed through the same
+    // authoritative sanitiser as a storage load.
+    var before = (Array.isArray(parsed.images) ? parsed.images.length : 0) +
+                 (Array.isArray(parsed.videos) ? parsed.videos.length : 0);
+    var res = adopt({ images: parsed.images, videos: parsed.videos }, {});
+    var accepted = res.images.length + res.videos.length;
+    var rejected = before - accepted;
+    return {
+      ok: true,
+      format: "json",
+      accepted: accepted,
+      rejected: rejected,
+      images: res.images.length,
+      videos: res.videos.length,
+      status: "Imported " + accepted + " items (" +
+        res.images.length + " images, " + res.videos.length + " videos)" +
+        (rejected ? " \u2014 " + rejected + " rejected" : "")
+    };
+  }
+
+  // Legacy URL list: drops into the current tab only, no metadata.
+  var intoImages = tab === "images";
+  var fallbackType = intoImages ? "image" : "video";
+  var raw = (parsed.urls || []).map(function (url) {
+    return { type: fallbackType, url: url, thumbnail: url };
+  });
+  var out = adopt(
+    intoImages ? { images: raw, videos: allMedia.videos }
+               : { images: allMedia.images, videos: raw }, {});
+  var kept = intoImages ? out.images.length : out.videos.length;
+  var dropped = raw.length - kept;
+  return {
+    ok: true,
+    format: "txt",
+    accepted: kept,
+    rejected: dropped,
+    images: out.images.length,
+    videos: out.videos.length,
+    status: "Imported " + kept + " URLs (legacy format, metadata not included)" +
+      (dropped ? " \u2014 " + dropped + " rejected" : "")
+  };
+}
+
+// Persist whatever the library currently holds. Separate function so the
+// import path and the tests agree on exactly what gets written.
+function persistCurrentLibrary() {
+  chrome.storage.local.set({
+    igExporterData: { images: allMedia.images, videos: allMedia.videos }
+  });
+}
+
+// The whole import flow, from raw file text to persisted library. Anything that
+// throws here is reported to the user and does NOT leave a half-applied state.
+function runImport(text, fileInput) {
+  var parsed;
+  try {
+    parsed = parseImportPayload(text);
+  } catch (e) {
+    setStatus("Import failed: " + e.message);
+    if (fileInput) fileInput.value = "";
+    return { ok: false, status: "Import failed: " + e.message };
+  }
+
+  var result;
+  try {
+    result = applyParsedImport(parsed);
+    persistCurrentLibrary();
+    updateCounts();
+    renderGrid();
+  } catch (e) {
+    // Belt and braces: an unexpected throw must not silently skip the
+    // persist/render steps and leave the UI disagreeing with storage.
+    console.error("[Gallery] Import failed after parsing:", e);
+    setStatus("Import failed while applying: " + e.message);
+    if (fileInput) fileInput.value = "";
+    return { ok: false, status: "Import failed while applying: " + e.message };
+  }
+
+  setStatus(result.status);
+  if (fileInput) fileInput.value = "";  // allow re-importing the same file
+  return result;
+}
+
 document.getElementById("file-input")?.addEventListener("change", function() {
   let file = this.files[0];
   if (!file) return;
-
   let fileInput = this;
   let reader = new FileReader();
   reader.onload = function() {
-    let parsed;
-    try {
-      parsed = parseImportPayload(reader.result);
-    } catch (e) {
-      setStatus("Import failed: " + e.message);
-      fileInput.value = "";
-      return;
-    }
-
-    if (parsed.format === "json") {
-      // Full-fidelity backup: replace both tabs, preserve all metadata that
-      // survives sanitisation.
-      let imgs = sanitizeImportedList(parsed.images, "image");
-      let vids = sanitizeImportedList(parsed.videos, "video");
-      allMedia.images = imgs.items;
-      allMedia.videos = vids.items;
-      let total = imgs.items.length + vids.items.length;
-      let dropped = imgs.dropped + vids.dropped;
-      setStatus("Imported " + total + " items (" +
-        imgs.items.length + " images, " + vids.items.length + " videos)" +
-        (dropped ? " — " + dropped + " rejected" : ""));
-    } else {
-      // Legacy URL list: drop into the current tab only, no metadata.
-      let fallbackType = currentTab === "images" ? "image" : "video";
-      let raw = parsed.urls.map(function(url) {
-        return { type: fallbackType, url: url, thumbnail: url };
-      });
-      let clean = sanitizeImportedList(raw, fallbackType);
-      if (currentTab === "images") {
-        allMedia.images = clean.items;
-      } else {
-        allMedia.videos = clean.items;
-      }
-      setStatus("Imported " + clean.items.length + " URLs (legacy format, metadata not included)" +
-        (clean.dropped ? " — " + clean.dropped + " rejected" : ""));
-    }
-
-    chrome.storage.local.set({
-      igExporterData: { images: allMedia.images, videos: allMedia.videos }
-    });
-
-    updateCounts();
-    renderGrid();
-    fileInput.value = "";  // allow re-importing the same file
+    runImport(reader.result, fileInput);
   };
   reader.readAsText(file);
 });
 
 document.getElementById("donate")?.addEventListener("click", function() {
-  window.open("https://www.patreon.com/join/THYProduction", "_blank");
+  window.open("https://www.patreon.com/join/THYProduction", "_blank", "noopener,noreferrer");
 });
 
 
@@ -1682,8 +1912,13 @@ chrome.storage.onChanged.addListener(function(changes, area) {
   logDebug("Storage changed: " + Object.keys(changes).join(", "));
   
   if (changes.igExporterData && changes.igExporterData.newValue) {
-    allMedia.images = changes.igExporterData.newValue.images || [];
-    allMedia.videos = changes.igExporterData.newValue.videos || [];
+    if (_suppressStorageEcho) {
+      logDebug("Ignoring echo of our own sanitised write");
+      return;
+    }
+    // A capture in progress writes here too, so this payload gets exactly the
+    // same treatment as the initial load.
+    adoptLibrary(changes.igExporterData.newValue, { persist: true });
     markSeen();
     updateCounts();
     renderGrid();
@@ -1842,7 +2077,7 @@ function showFullscreenItem(index) {
     if (fullscreenImage) fullscreenImage.style.display = 'none';
     if (fullscreenVideo) {
       fullscreenVideo.style.display = 'block';
-      fullscreenVideo.src = item.videoUrl || item.url || url;
+      fullscreenVideo.src = safeMediaUrl(getMediaUrl(item)) || safeMediaUrl(url) || '';
       fullscreenVideo.load();
     }
   } else {
@@ -1850,7 +2085,7 @@ function showFullscreenItem(index) {
     if (fullscreenVideo) fullscreenVideo.style.display = 'none';
     if (fullscreenImage) {
       fullscreenImage.style.display = 'block';
-      fullscreenImage.src = url;
+      fullscreenImage.src = safeMediaUrl(url) || '';
     }
   }
   updateFullscreenCounter();

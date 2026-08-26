@@ -1,0 +1,283 @@
+{
+  "_comment": "Synthetic seed for tools/screenshot-harness. Invented accounts, invented captions, locally generated abstract tiles. Contains no real user, post, caption or photograph.",
+  "format": "saved-posts-backup-export",
+  "formatVersion": 1,
+  "images": [
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-00.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-00.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample001/",
+      "postShortcode": "Cx0Sample001",
+      "metadata": {
+        "caption": "Sample caption for the screenshot \u2014 not a real post.",
+        "owner": "example_account",
+        "takenAt": "2026-04-29T00:00:00.000Z",
+        "likeCount": 128,
+        "hashtags": [
+          "sample",
+          "placeholder"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:58:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-01.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-01.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample002/",
+      "postShortcode": "Cx0Sample002",
+      "metadata": {
+        "caption": "Placeholder text. Every account and caption here is invented.",
+        "owner": "placeholder_user",
+        "takenAt": "2026-04-27T00:00:00.000Z",
+        "likeCount": 64,
+        "hashtags": [
+          "placeholder",
+          "demo"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:56:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-02.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-02.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample003/",
+      "postShortcode": "Cx0Sample003",
+      "metadata": {
+        "caption": "Demo entry used only to illustrate the library layout.",
+        "owner": "demo_photos",
+        "takenAt": "2026-04-25T00:00:00.000Z",
+        "likeCount": 341,
+        "hashtags": [
+          "demo"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:54:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-03.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-03.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample004/",
+      "postShortcode": "Cx0Sample004",
+      "metadata": {
+        "caption": "Synthetic sample \u2014 abstract tile, no photograph of anyone.",
+        "owner": "sample_studio",
+        "takenAt": "2026-04-22T00:00:00.000Z",
+        "likeCount": 27,
+        "hashtags": [
+          "sample",
+          "abstract"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:51:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-04.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-04.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample005/",
+      "postShortcode": "Cx0Sample005",
+      "metadata": {
+        "caption": "Second sample from the same placeholder account.",
+        "owner": "example_account",
+        "takenAt": "2026-04-20T00:00:00.000Z",
+        "likeCount": 512,
+        "hashtags": [
+          "sample"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:49:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-05.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-05.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample006/",
+      "postShortcode": "Cx0Sample006",
+      "metadata": {
+        "caption": "Placeholder caption with a #demo tag so search can be shown.",
+        "owner": "demo_photos",
+        "takenAt": "2026-04-18T00:00:00.000Z",
+        "likeCount": 88,
+        "hashtags": [
+          "demo",
+          "search"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:47:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-06.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-06.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Album777/",
+      "postShortcode": "Cx0Album777",
+      "carouselIndex": 0,
+      "carouselSize": 4,
+      "metadata": {
+        "caption": "Sample album \u2014 four synthetic slides, kept in order.",
+        "owner": "placeholder_user",
+        "takenAt": "2026-04-15T00:00:00.000Z",
+        "likeCount": 203,
+        "hashtags": [
+          "sample",
+          "album"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:44:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-07.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-07.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Album777/",
+      "postShortcode": "Cx0Album777",
+      "carouselIndex": 1,
+      "carouselSize": 4,
+      "metadata": {
+        "caption": "Sample album \u2014 four synthetic slides, kept in order.",
+        "owner": "placeholder_user",
+        "takenAt": "2026-04-15T00:00:00.000Z",
+        "likeCount": 203,
+        "hashtags": [
+          "sample",
+          "album"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:44:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-08.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-08.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Album777/",
+      "postShortcode": "Cx0Album777",
+      "carouselIndex": 2,
+      "carouselSize": 4,
+      "metadata": {
+        "caption": "Sample album \u2014 four synthetic slides, kept in order.",
+        "owner": "placeholder_user",
+        "takenAt": "2026-04-15T00:00:00.000Z",
+        "likeCount": 203,
+        "hashtags": [
+          "sample",
+          "album"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:44:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-09.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-09.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Album777/",
+      "postShortcode": "Cx0Album777",
+      "carouselIndex": 3,
+      "carouselSize": 4,
+      "metadata": {
+        "caption": "Sample album \u2014 four synthetic slides, kept in order.",
+        "owner": "placeholder_user",
+        "takenAt": "2026-04-15T00:00:00.000Z",
+        "likeCount": 203,
+        "hashtags": [
+          "sample",
+          "album"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:44:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-10.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-10.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample010/",
+      "postShortcode": "Cx0Sample010",
+      "metadata": {
+        "caption": "Placeholder text \u2014 not a real post.",
+        "owner": "sample_studio",
+        "takenAt": "2026-04-12T00:00:00.000Z",
+        "likeCount": 12,
+        "hashtags": [
+          "placeholder"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:41:00.000Z"
+    },
+    {
+      "type": "image",
+      "url": "PLACEHOLDER_ORIGIN/media/tile-11.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/tile-11.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Sample011/",
+      "postShortcode": "Cx0Sample011",
+      "metadata": {
+        "caption": "Final sample image in the seeded library.",
+        "owner": "example_account",
+        "takenAt": "2026-04-09T00:00:00.000Z",
+        "likeCount": 156,
+        "hashtags": [
+          "sample"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:38:00.000Z"
+    }
+  ],
+  "videos": [
+    {
+      "type": "video",
+      "url": "PLACEHOLDER_ORIGIN/media/wide-00.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/wide-00.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Video001/",
+      "postShortcode": "Cx0Video001",
+      "metadata": {
+        "caption": "Sample video entry. The preview frame is a generated tile.",
+        "owner": "demo_photos",
+        "takenAt": "2026-04-28T00:00:00.000Z",
+        "likeCount": 74,
+        "hashtags": [
+          "sample",
+          "video"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:57:00.000Z"
+    },
+    {
+      "type": "video",
+      "url": "PLACEHOLDER_ORIGIN/media/wide-01.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/wide-01.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Video002/",
+      "postShortcode": "Cx0Video002",
+      "metadata": {
+        "caption": "Placeholder clip \u2014 no real footage is included.",
+        "owner": "example_account",
+        "takenAt": "2026-04-23T00:00:00.000Z",
+        "likeCount": 231,
+        "hashtags": [
+          "placeholder",
+          "video"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:52:00.000Z"
+    },
+    {
+      "type": "video",
+      "url": "PLACEHOLDER_ORIGIN/media/wide-02.jpg",
+      "thumbnail": "PLACEHOLDER_ORIGIN/media/wide-02.jpg",
+      "postUrl": "https://www.instagram.com/p/Cx0Video003/",
+      "postShortcode": "Cx0Video003",
+      "metadata": {
+        "caption": "Third synthetic video record, for the Videos tab.",
+        "owner": "sample_studio",
+        "takenAt": "2026-04-16T00:00:00.000Z",
+        "likeCount": 45,
+        "hashtags": [
+          "demo",
+          "video"
+        ]
+      },
+      "scrapedAt": "2026-05-01T00:45:00.000Z"
+    }
+  ]
+}

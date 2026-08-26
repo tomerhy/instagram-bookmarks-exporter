@@ -575,8 +575,29 @@
   function loadFromStorage() {
     safeStorageGet(['igExporterData'], (result) => {
       if (result.igExporterData) {
-        state.images = result.igExporterData.images || [];
-        state.videos = result.igExporterData.videos || [];
+        // Sanitise on the way IN, through the same authoritative path the
+        // gallery uses. Without this, a legacy record written by 4.4.0 or
+        // earlier would be read into memory unvalidated and then written
+        // straight back out by the next saveToStorage() — re-persisting the
+        // very values 4.4.2 exists to remove.
+        const lib = globalThis.SBE_LIB;
+        if (lib && typeof lib.sanitizeLibrary === 'function') {
+          const clean = lib.sanitizeLibrary(result.igExporterData);
+          state.images = clean.images;
+          state.videos = clean.videos;
+          if (clean.changed) {
+            console.log('[SBE] Sanitised legacy library on load: removed ' +
+              clean.removedRecords + ' record(s), ' + clean.removedFields + ' field(s)');
+            // Persist immediately so the unsafe values are gone from storage
+            // even if the user never opens the gallery.
+            saveToStorage();
+          }
+        } else {
+          // Fail closed rather than loading unvalidated records.
+          console.warn('[SBE] SBE_LIB unavailable; starting with an empty library');
+          state.images = [];
+          state.videos = [];
+        }
 
         // Rebuild seenUrls from loaded data (using normalized URLs)
         state.images.forEach(i => { 
@@ -698,6 +719,7 @@
     globalThis.__SBE_TEST_HOOKS__.content = {
       extractHashtags, contextToOptions, buildItem, normalizeUrl,
       addImage, addVideo, state, atRecordLimit,
+      loadFromStorage, saveToStorage,
       isExtensionContextOk, safeStorageSet, safeStorageGet, safeSendMessage,
       // capture gate + inbound validation (see the compliance tests)
       validateMediaMessage, cleanContext, cleanOwner, cleanShortcode,

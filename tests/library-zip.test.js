@@ -12,15 +12,19 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
+// Uses the shared loader so url-allowlist.js and library-sanitize.js are
+// evaluated first, exactly as gallery.html declares them. Without them
+// SBE_URL is absent, every URL fails closed, and these tests would be
+// measuring the fail-closed path instead of their actual subject.
 function loadGallery() {
-  return loadTopLevel('gallery.js');
+  return sharedLoadGallery();
 }
 
 function img(owner, shortcode, extra) {
   return Object.assign(
-    { type: 'image', url: 'https://cdn/' + (shortcode || 'x') + '.jpg' },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/' + (shortcode || 'x') + '.jpg' },
     extra || {},
     {
       postShortcode: shortcode || null,
@@ -165,7 +169,7 @@ test('_itemPathInOwnerFolder: extension follows the slide, not the parent (mixed
   const g = loadGallery();
   const item = { postShortcode: 'XYZ' };
   assert.equal(
-    g._itemPathInOwnerFolder(item, { url: 'a.mp4', type: 'video' }, 0, 2, 0),
+    g._itemPathInOwnerFolder(item, { url: 'https://scontent.cdninstagram.com/a.mp4', type: 'video' }, 0, 2, 0),
     'XYZ/1.mp4',
     'video slide inside a mixed album keeps its mp4 extension'
   );

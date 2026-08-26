@@ -14,10 +14,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
+// Uses the shared loader so url-allowlist.js and library-sanitize.js are
+// evaluated first, exactly as gallery.html declares them. Without them
+// SBE_URL is absent, every URL fails closed, and these tests would be
+// measuring the fail-closed path instead of their actual subject.
 function loadGallery() {
-  return loadTopLevel('gallery.js');
+  return sharedLoadGallery();
 }
 
 // Cross-realm deep-equal. gallery.js runs in a vm sandbox so its arrays have
@@ -37,8 +41,8 @@ function deepEq(actual, expected, msg) {
 test('buildExportPayload: produces the v1 schema with both tabs', () => {
   const g = loadGallery();
   const payload = g.buildExportPayload(
-    [{ type: 'image', url: 'a.jpg' }],
-    [{ type: 'video', url: 'b.mp4' }],
+    [{ type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg' }],
+    [{ type: 'video', url: 'https://scontent.cdninstagram.com/b.mp4' }],
     '4.3.6'
   );
   assert.equal(payload.format, 'saved-posts-backup-export');
@@ -46,16 +50,31 @@ test('buildExportPayload: produces the v1 schema with both tabs', () => {
   assert.equal(payload.extensionVersion, '4.3.6');
   assert.ok(payload.exportedAt && !isNaN(new Date(payload.exportedAt).getTime()),
     'exportedAt should be a valid ISO timestamp');
-  deepEq(payload.images, [{ type: 'image', url: 'a.jpg' }]);
-  deepEq(payload.videos, [{ type: 'video', url: 'b.mp4' }]);
+  // 4.4.2: buildExportPayload runs every record through the export sink guard,
+  // which re-validates url/thumbnail/postUrl and writes them explicitly. A
+  // field that was absent therefore appears as null rather than missing —
+  // deliberate, so an export file never carries an unvalidated URL and never
+  // leaves a reader guessing whether a field was checked.
+  deepEq(payload.images, [{
+    type: 'image',
+    url: 'https://scontent.cdninstagram.com/a.jpg',
+    thumbnail: null,
+    postUrl: null
+  }]);
+  deepEq(payload.videos, [{
+    type: 'video',
+    url: 'https://scontent.cdninstagram.com/b.mp4',
+    thumbnail: null,
+    postUrl: null
+  }]);
 });
 
 test('buildExportPayload: preserves metadata, carouselSize, postUrl, scrapedAt', () => {
   const g = loadGallery();
   const rich = {
     type: 'image',
-    url: 'https://cdn/x.jpg',
-    thumbnail: 'https://cdn/x_thumb.jpg',
+    url: 'https://scontent.cdninstagram.com/x.jpg',
+    thumbnail: 'https://scontent.cdninstagram.com/x_thumb.jpg',
     postUrl: 'https://instagram.com/p/ABC',
     postShortcode: 'ABC',
     carouselSize: 5,
@@ -90,16 +109,16 @@ test('buildExportPayload: non-array inputs are normalized to []', () => {
 
 test('buildExportPayload: returned arrays are shallow copies (mutating result does not poison state)', () => {
   const g = loadGallery();
-  const images = [{ type: 'image', url: 'a.jpg' }];
+  const images = [{ type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg' }];
   const payload = g.buildExportPayload(images, []);
-  payload.images.push({ type: 'image', url: 'rogue.jpg' });
+  payload.images.push({ type: 'image', url: 'https://scontent.cdninstagram.com/rogue.jpg' });
   assert.equal(images.length, 1, 'original input array should not have been mutated');
 });
 
 test('buildExportPayload: result is JSON-serializable (no cycles, no exotic types)', () => {
   const g = loadGallery();
   const payload = g.buildExportPayload(
-    [{ type: 'image', url: 'a.jpg', metadata: { caption: 'with "quotes"' } }],
+    [{ type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg', metadata: { caption: 'with "quotes"' } }],
     []
   );
   assert.doesNotThrow(() => JSON.stringify(payload));
@@ -114,8 +133,8 @@ test('parseImportPayload: parses a v1 JSON export', () => {
   const json = JSON.stringify({
     format: 'saved-posts-backup-export',
     formatVersion: 1,
-    images: [{ type: 'image', url: 'a.jpg', metadata: { owner: 'u1' } }],
-    videos: [{ type: 'video', url: 'b.mp4' }]
+    images: [{ type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg', metadata: { owner: 'u1' } }],
+    videos: [{ type: 'video', url: 'https://scontent.cdninstagram.com/b.mp4' }]
   });
   const result = g.parseImportPayload(json);
   assert.equal(result.format, 'json');
@@ -133,7 +152,7 @@ test('parseImportPayload: JSON missing both images and videos throws', () => {
 
 test('parseImportPayload: JSON with only images (no videos key) still works', () => {
   const g = loadGallery();
-  const result = g.parseImportPayload('{"images":[{"url":"a.jpg"}]}');
+  const result = g.parseImportPayload('{"images":[{"url":"https://scontent.cdninstagram.com/a.jpg"}]}');
   assert.equal(result.format, 'json');
   assert.equal(result.images.length, 1);
   assert.equal(result.videos.length, 0);
@@ -147,17 +166,17 @@ test('parseImportPayload: malformed JSON throws with a parse message', () => {
 
 test('parseImportPayload: falls back to txt URL-list (legacy .txt exports)', () => {
   const g = loadGallery();
-  const text = 'https://cdn/a.jpg\nhttps://cdn/b.jpg\nhttps://cdn/c.jpg';
+  const text = 'https://scontent.cdninstagram.com/a.jpg\nhttps://scontent.cdninstagram.com/b.jpg\nhttps://scontent.cdninstagram.com/c.jpg';
   const result = g.parseImportPayload(text);
   assert.equal(result.format, 'txt');
-  deepEq(result.urls, ['https://cdn/a.jpg', 'https://cdn/b.jpg', 'https://cdn/c.jpg']);
+  deepEq(result.urls, ['https://scontent.cdninstagram.com/a.jpg', 'https://scontent.cdninstagram.com/b.jpg', 'https://scontent.cdninstagram.com/c.jpg']);
 });
 
 test('parseImportPayload: txt strips blank lines and whitespace', () => {
   const g = loadGallery();
-  const text = '\n  https://cdn/a.jpg  \n\nhttps://cdn/b.jpg\n   \n';
+  const text = '\n  https://scontent.cdninstagram.com/a.jpg  \n\nhttps://scontent.cdninstagram.com/b.jpg\n   \n';
   const result = g.parseImportPayload(text);
-  deepEq(result.urls, ['https://cdn/a.jpg', 'https://cdn/b.jpg']);
+  deepEq(result.urls, ['https://scontent.cdninstagram.com/a.jpg', 'https://scontent.cdninstagram.com/b.jpg']);
 });
 
 test('parseImportPayload: empty input throws', () => {
@@ -176,10 +195,14 @@ test('parseImportPayload: whitespace-only-around-JSON is fine', () => {
 
 test('round-trip: export → JSON → parse → identical data', () => {
   const g = loadGallery();
+  // Every URL field is spelled out, because the 4.4.2 export guard normalises
+  // url/thumbnail/postUrl on every record — a round-trip is only lossless if
+  // the input already states them.
   const originalImages = [
     {
       type: 'image',
-      url: 'https://cdn/photo.jpg',
+      url: 'https://scontent.cdninstagram.com/photo.jpg',
+      thumbnail: null,
       postUrl: 'https://instagram.com/p/SHORT',
       postShortcode: 'SHORT',
       carouselSize: 3,
@@ -191,8 +214,9 @@ test('round-trip: export → JSON → parse → identical data', () => {
   const originalVideos = [
     {
       type: 'video',
-      url: 'https://cdn/clip.mp4',
-      thumbnail: 'https://cdn/clip_thumb.jpg',
+      url: 'https://scontent.cdninstagram.com/clip.mp4',
+      thumbnail: 'https://scontent.cdninstagram.com/clip_thumb.jpg',
+      postUrl: null,
       scrapedAt: '2026-04-02T08:30:00.000Z'
     }
   ];

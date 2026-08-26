@@ -15,10 +15,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
+// Uses the shared loader so url-allowlist.js and library-sanitize.js are
+// evaluated first, exactly as gallery.html declares them. Without them
+// SBE_URL is absent, every URL fails closed, and these tests would be
+// measuring the fail-closed path instead of their actual subject.
 function loadGallery() {
-  return loadTopLevel('gallery.js');
+  return sharedLoadGallery();
 }
 
 function img(meta, idx) {
@@ -210,9 +214,9 @@ test('applySort: does not mutate the input array', () => {
 test('getFilteredItems: applies sort after the search filter', () => {
   const g = loadGallery();
   g.allMedia.images = [
-    { type: 'image', url: 'a.jpg', metadata: { owner: 'alice', likeCount: 50 } },
-    { type: 'image', url: 'b.jpg', metadata: { owner: 'bob',   likeCount: 1000 } },
-    { type: 'image', url: 'c.jpg', metadata: { owner: 'alice', likeCount: 200 } },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/a.jpg', metadata: { owner: 'alice', likeCount: 50 } },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/b.jpg', metadata: { owner: 'bob',   likeCount: 1000 } },
+    { type: 'image', url: 'https://scontent.cdninstagram.com/c.jpg', metadata: { owner: 'alice', likeCount: 200 } },
   ];
   g.currentTab = 'images';
   g.searchQuery = 'alice';
@@ -220,6 +224,6 @@ test('getFilteredItems: applies sort after the search filter', () => {
 
   const result = g.getFilteredItems();
   assert.equal(result.length, 2, 'search filters to two alice items');
-  assert.equal(result[0].url, 'c.jpg', '200 likes ranks first');
-  assert.equal(result[1].url, 'a.jpg', '50 likes ranks second');
+  assert.equal(result[0].url, 'https://scontent.cdninstagram.com/c.jpg', '200 likes ranks first');
+  assert.equal(result[1].url, 'https://scontent.cdninstagram.com/a.jpg', '50 likes ranks second');
 });

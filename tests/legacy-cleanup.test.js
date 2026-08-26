@@ -63,7 +63,25 @@ test('removes the GA session ID from sessionStorage', () => {
 
 test('removes the autoplay preferences from extension storage', () => {
   const r = run();
-  assert.deepEqual(r.extRemoved.sort(), ['igAutoplayEnabled', 'igAutoplayMuted']);
+  assert.ok(r.extRemoved.includes('igAutoplayEnabled'));
+  assert.ok(r.extRemoved.includes('igAutoplayMuted'));
+});
+
+test('removes the popup-use counter and donation-dismissal flag (4.4.3)', () => {
+  // These backed the threshold-triggered donation banner, which counted popup
+  // opens. That is user-activity tracking the single purpose did not need, so
+  // 4.4.3 removed the feature and deletes its keys from existing installs.
+  const r = run();
+  assert.ok(r.extRemoved.includes('useCount'),
+    'useCount must be deleted, not merely orphaned');
+  assert.ok(r.extRemoved.includes('supportDismissed'));
+});
+
+test('the removed-key list is exactly the four documented keys', () => {
+  const r = run();
+  assert.deepEqual(r.extRemoved.slice().sort(), [
+    'igAutoplayEnabled', 'igAutoplayMuted', 'supportDismissed', 'useCount'
+  ]);
 });
 
 test('does not touch keys it does not own', () => {

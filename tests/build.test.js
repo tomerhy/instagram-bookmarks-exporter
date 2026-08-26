@@ -25,6 +25,7 @@ const SOURCE_FILES = [
   'content.js',
   'capture-hook.js',
   'url-allowlist.js',
+  'library-sanitize.js',
   'legacy-cleanup.js',
   'popup.html',
   'popup.js',
@@ -43,6 +44,7 @@ const REQUIRED_IN_ZIP = [
   'content.js',
   'capture-hook.js',     // manifest content_scripts.js (MAIN world)
   'url-allowlist.js',    // manifest content_scripts.js (both worlds) + gallery
+  'library-sanitize.js', // isolated-world content_scripts.js + gallery.html
   'legacy-cleanup.js',   // <script> in popup.html and gallery.html
   'popup.html',
   'popup.js',
@@ -77,7 +79,7 @@ const FORBIDDEN_IN_ZIP = [
 // hardcoding — otherwise every version bump breaks this test.
 function zipName(dir) {
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
-  return 'saved-posts-backup-export-' + manifest.version + '.zip';
+  return 'saved-posts-library-export-' + manifest.version + '.zip';
 }
 
 function stage() {

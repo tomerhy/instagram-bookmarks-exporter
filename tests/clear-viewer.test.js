@@ -9,7 +9,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
 function makeMockElement(extra) {
   const el = Object.assign({
@@ -38,11 +38,11 @@ function loadGalleryWithMockedViewer(extraSetup) {
   // gallery.js queries these once at the top; reassigning the sandbox vars
   // updates the globals that resetViewer reads inside.
   sandbox.player = makeMockElement({
-    src: 'https://cdn/video.mp4',
+    src: 'https://scontent.cdninstagram.com/video.mp4',
     style: { display: 'block' }
   });
   sandbox.imageViewer = makeMockElement({
-    src: 'https://cdn/image.jpg',
+    src: 'https://scontent.cdninstagram.com/image.jpg',
     style: { display: 'block' }
   });
   sandbox.viewerPlaceholder = makeMockElement({
@@ -67,7 +67,7 @@ function loadGalleryWithMockedViewer(extraSetup) {
   };
 
   // Pretend a video item is selected so resetViewer has state to wipe.
-  sandbox.currentItem = { url: 'https://cdn/video.mp4', type: 'video' };
+  sandbox.currentItem = { url: 'https://scontent.cdninstagram.com/video.mp4', type: 'video' };
   sandbox.selectedCard = { _isMock: true };
   return sandbox;
 }
@@ -127,7 +127,7 @@ test('resetViewer: nulls the selection globals', () => {
 test('resetViewer: safe to call with missing DOM (defensive guards)', () => {
   // Load without our mock wiring — every viewer element will be null because
   // the test sandbox's getElementById returns null by default.
-  const g = loadTopLevel('gallery.js');
+  const g = sharedLoadGallery();
   assert.doesNotThrow(() => g.resetViewer(),
     'resetViewer should no-op gracefully when its DOM targets are missing');
 });

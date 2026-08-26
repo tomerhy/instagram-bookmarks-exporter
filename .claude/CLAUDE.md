@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Chrome Manifest V3 extension — **Saved Posts Backup & Export** — that lets a
+Chrome Manifest V3 extension — **Saved Posts Library & Export** — that lets a
 signed-in user back up their own Instagram saved posts locally. It reads the
 API/GraphQL responses the page has already received, while the user has capture
 explicitly running. No build system — plain JS/HTML/CSS loaded directly by the
@@ -23,8 +23,10 @@ material. Four test suites exist purely to keep those claims true — see
 
 - **Load for development**: open `chrome://extensions/` → enable Developer mode → "Load unpacked" → select repo root.
 - **Reload after edits**: hit the refresh icon on the extension card in `chrome://extensions/`. Then reload any open Instagram tab so the content scripts re-inject.
-- **Package for distribution**: `./build.sh` → produces `saved-posts-backup-export-<version>.zip` and prints its SHA-256.
+- **Package for distribution**: `./build.sh` → produces `saved-posts-library-export-<version>.zip` and prints its SHA-256.
 - **Bump version**: edit `manifest.json` → `version` field. Recent commits follow `Bump version to X.Y.Z` convention.
+- **Regenerate store screenshots**: `python3 tools/screenshot-harness/serve.py &`
+  then `./tools/screenshot-harness/capture.sh`. Requires the local Chrome.
 - **Regenerate icons**: `python3 tools/make-icons.py`. Requires Pillow. Writes the four manifest-referenced sizes plus a 512px master (`icon-source.png`, a build input that must NOT ship). The old `create-icons.html` generator was deleted in v4.4.1 — it drew Instagram's camera glyph on Instagram's gradient.
 - **Run unit tests**: `npm test` (uses `node --test`, no other npm deps). Tests live in `tests/` and exercise pure helpers (URL normalization, hashtag extraction, badge formatting, etc.) by importing source files behind a `globalThis.__IG_EXPORTER_TEST_HOOKS__` seam. They do **not** load the extension into a real browser — manual verification via `chrome://extensions/` is still required for content-script and UI changes.
 - **No linter, no bundler.** Debugging is done via `chrome://extensions/` → "service worker" / "Inspect views" links and `console.log` (every component logs with a `[SBE]` / `[Gallery]` / `[Cleanup]` prefix).
@@ -65,6 +67,13 @@ URLs from Instagram's CDN have ephemeral signing params, so raw-string compariso
 - `url-allowlist.js` — shared URL allowlist, loaded into both content-script worlds and into `gallery.html`. Exposed as `globalThis.SBE_URL`.
 - `legacy-cleanup.js` — one-time removal of `ga_client_id` / `ga_debug` / `ga_session_id` / `igAutoplayEnabled` / `igAutoplayMuted` left behind by features deleted in v4.4.1. Loaded first by both extension pages.
 - `tools/make-icons.py` — regenerates the icons. A build input; never shipped.
+- `tools/screenshot-harness/` — build/marketing only, never shipped. Serves the
+  real `popup.html` / `gallery.html` (and their real JS) against a stubbed
+  `chrome.*` and a synthetic library so the store screenshots can be captured
+  without a live account or anyone's real data. It widens **its own copy** of
+  `isAllowedMediaUrl` so local placeholder tiles render — `url-allowlist.js` is
+  never edited for this. `capture.sh` drives headless Chrome; the six frames land
+  in `assets/store-screenshots/`. See `SCREENSHOT_PLAN.md`.
 
 ### Storage shape
 

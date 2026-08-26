@@ -1,8 +1,12 @@
-# Saved Posts Backup & Export
+# Saved Posts Library & Export
 
-A Chrome extension that makes a local backup copy of the posts you have saved
-on instagram.com — images, videos, albums, and the post details that go with
-them.
+A Chrome extension that keeps a **local library** of the posts you have saved
+on instagram.com — the links and the post details — and downloads the media you
+choose to keep.
+
+> **Capture is not the same as download.** Capture records URLs and metadata.
+> Instagram's media URLs expire, so the library alone is not a permanent offline
+> copy; only media you explicitly download becomes a durable file.
 
 > **Independent third-party extension. Not affiliated with, authorized by,
 > endorsed by, or sponsored by Instagram or Meta.** "Instagram" is a trademark
@@ -18,7 +22,8 @@ them.
   in order.
 - **Post details preserved.** Author, caption, date, like count, hashtags.
 - **Library page.** Browse, search (caption / `@author` / `#tag`), and sort
-  what you captured. Works offline.
+  what you captured. Browsing and searching work offline; showing a preview or
+  downloading a file fetches the media from Instagram's CDN at that moment.
 - **Downloads.** Individual files, per-album ZIP, or a whole-library ZIP
   grouped by author.
 - **Portable.** JSON export/import round-trips all metadata; CSV export for
@@ -30,8 +35,22 @@ them.
 - **No analytics, no tracking, no advertising, no developer server.**
 - It never asks for, reads, or stores your password, cookies, session tokens,
   or two-factor codes. There is no login form anywhere in it.
-- Two permissions: `storage` (+ `unlimitedStorage` for the quota) and access to
-  `instagram.com`. Nothing else.
+- Three things requested, and nothing else: the `storage` permission, the
+  `unlimitedStorage` permission (quota only, no data access), and host access to
+  `instagram.com`. The CDN hosts are **not** requested as permissions.
+- The captured library is never sent to the developer. Two tiers of CDN traffic
+  do occur, and the difference matters: **automatically** when the library
+  renders a thumbnail or preview (displaying a stored image URL means fetching
+  it), and **explicitly** when you press Download or a ZIP button. Both go to
+  Instagram/Meta, not to us.
+- It never *reads* your clipboard. It *writes* to it only when you press Copy
+  URLs.
+- It does not request the `downloads` permission and cannot read your download
+  history; it does create the downloads you ask for.
+- Local interaction state is stored: a consent timestamp (which is what enforces
+  the consent gate) and a last-seen timestamp (which drives the "new items"
+  badge). Nothing else, and nothing transmitted. 4.4.3 removed the popup-use
+  counter that used to trigger a donation prompt.
 - *Clear all data* deletes the whole library immediately.
 
 Full details in [`privacy-policy.html`](privacy-policy.html). Versions up to and
@@ -46,7 +65,9 @@ over, in the policy's "Change history" section and in
 3. After editing a content script, hit refresh on the extension card **and**
    reload the Instagram tab so the scripts re-inject.
 
-Icons are generated, not hand-edited:
+Icons are generated, not hand-edited. The icon is the developer's own portrait
+on a neutral slate/teal plate — see `tools/make-icons.py` for the provenance and
+the reason the previous pink/magenta gradient is gone:
 
 ```bash
 python3 tools/make-icons.py
@@ -76,6 +97,7 @@ anything:
 | `background.js` | service worker | Gallery navigation and the toolbar badge. No DOM access. |
 | `popup.html/js` | extension page | The only place capture can be started. Owns the first-run disclosure. |
 | `gallery.html/js` | extension page | Reads `chrome.storage.local` directly; never talks to the content script. |
+| `library-sanitize.js` | isolated world + gallery page | **The** authoritative sanitiser. Rebuilds every stored record field by field, wherever the library enters the process — storage load, storage change, import. Added in 4.4.2 after a review found legacy records were loaded unvalidated. |
 | `legacy-cleanup.js` | extension pages | One-time removal of state left by the removed analytics and autoplay features. |
 
 The two worlds communicate **only** via `window.postMessage`, targeted at the
@@ -92,7 +114,20 @@ use `chrome.*`.
 - **Normalize before deduplicating.** Instagram CDN URLs carry ephemeral signing
   params, so `normalizeUrl()` (pathname + `ig_cache_key` + `stp`) is what goes
   into `state.seenUrls` — never the raw string.
-- **Escape before `innerHTML`.** Captions and usernames are untrusted.
+- **Sanitise the library at every entry point.** `adoptLibrary()` in gallery.js
+  is the only thing allowed to assign `allMedia.images` / `allMedia.videos`, and
+  it routes through `SBE_LIB.sanitizeLibrary`. `content.js#loadFromStorage` does
+  the same, so a legacy record can never be re-persisted.
+- **Validate at every sink, again.** `safeMediaUrl` / `safePostUrl` /
+  `safeExternalNavigationUrl` wrap every `.src`, `.href`, `window.open`,
+  `fetch`, clipboard and export use. `tests/url-sinks.test.js` enumerates the
+  sinks and fails on any new unguarded one, so this is not maintained by
+  vigilance alone.
+- **Prefer DOM construction over `innerHTML`.** Use `el()` + `textContent`.
+  Static internal markup is fine; interpolating a stored value into HTML is not.
+- **Media URLs and post URLs are different namespaces.** A permalink must never
+  reach `player.src`; a CDN asset must never become an "open original post"
+  link.
 - **Touching `manifest.json` or a `<script>`/`<link>` means updating
   `build.sh`** in the same change. `tests/build.test.js` enforces it.
 
@@ -102,14 +137,16 @@ use `chrome.*`.
 npm test
 ```
 
-323 tests, no dependencies beyond `node --test`. They load the real source into
+438 tests, no dependencies beyond `node --test`. They load the real source into
 a `vm` sandbox through a gated test seam (`globalThis.__SBE_TEST_HOOKS__`) that
 is a no-op in the browser.
 
-Four suites exist specifically as compliance evidence and are worth keeping
+Seven suites exist specifically as compliance evidence and are worth keeping
 green for that reason rather than only for correctness:
 `capture-gate.test.js`, `message-validation.test.js`, `compliance.test.js`,
-`legacy-cleanup.test.js`.
+`legacy-cleanup.test.js`, `legacy-storage.test.js`, `url-sinks.test.js`,
+`csp.test.js`, `import-flow.test.js`, `reproducible-build.test.js`,
+`disclosure-consistency.test.js`, `icon-branding.test.js`.
 
 They do **not** load the extension into Chrome. Content-script and UI changes
 still need manual verification via `chrome://extensions/` and the DevTools
@@ -121,8 +158,8 @@ console (everything logs with an `[SBE]` prefix).
 ./build.sh
 ```
 
-Produces `saved-posts-backup-export-<version>.zip` with `manifest.json` at the
-root and nothing but runtime files inside, and prints its SHA-256.
+Produces `saved-posts-library-export-<version>.zip` with `manifest.json` at the
+root, a byte-sorted entry list (so the hash is reproducible across machines), and nothing but runtime files inside, and prints its SHA-256.
 
 ## Third-party code
 

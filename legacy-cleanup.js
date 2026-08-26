@@ -10,6 +10,7 @@
  *   localStorage   ga_debug       analytics debug opt-in flag
  *   sessionStorage ga_session_id  per-session analytics ID
  *   chrome.storage igAutoplayEnabled / igAutoplayMuted   autoplay prefs
+ *   chrome.storage useCount / supportDismissed           popup-use counter
  *
  * This file deletes them. It is loaded first by popup.html and gallery.html —
  * the only two pages in the extension origin, and therefore the only places
@@ -25,7 +26,13 @@
 
   var LOCAL_STORAGE_KEYS = ['ga_client_id', 'ga_debug'];
   var SESSION_STORAGE_KEYS = ['ga_session_id'];
-  var EXTENSION_STORAGE_KEYS = ['igAutoplayEnabled', 'igAutoplayMuted'];
+  // igAutoplay* : the autoplay feature removed in 4.4.1.
+  // useCount / supportDismissed : the popup-use counter and donation-banner
+  //   dismissal flag removed in 4.4.3. Counting popup opens to trigger a
+  //   donation prompt was user-activity tracking that the extension's single
+  //   purpose did not need, so the keys are deleted rather than orphaned.
+  var EXTENSION_STORAGE_KEYS = ['igAutoplayEnabled', 'igAutoplayMuted',
+                                'useCount', 'supportDismissed'];
   var MARKER_KEY = 'sbeLegacyCleanupAt';
 
   var removed = [];

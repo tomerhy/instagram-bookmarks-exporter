@@ -18,6 +18,11 @@ __pycache__/
 *.zip
 dist/
 venv/
+# Review bundles are generated deliverables, not source. Rebuild them from the
+# working tree; they carry copies of the packaged ZIP and the tagged 4.3.10
+# source and would otherwise land in git twice.
+review-bundle-*/
+
 
 # Node
 node_modules/

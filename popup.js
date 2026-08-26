@@ -19,9 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
   
   let isCapturing = false;
   const captureBtn = document.getElementById('capture-btn');
-  const supportBanner = document.getElementById('support-banner');
-  const supportBtn = document.getElementById('support-btn');
-  const dismissBtn = document.getElementById('dismiss-btn');
   const coffeeLink = document.getElementById('coffee-link');
 
   // Frozen at popup-open time so the "+N new" stat delta compares against the
@@ -31,57 +28,24 @@ document.addEventListener('DOMContentLoaded', function() {
   let sessionSnapshot = null;
 
   const COFFEE_URL = 'https://buymeacoffee.com/thyproduction';
-  const USE_THRESHOLD = 15;
   
   // Set version
   try {
     versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
   } catch (e) {}
   
-  // Support banner logic
-  function checkSupportBanner() {
-    chrome.storage.local.get(['supportDismissed', 'useCount'], function(result) {
-      if (result.supportDismissed) return;
-      const useCount = result.useCount || 0;
-      if (useCount >= USE_THRESHOLD && supportBanner) {
-        supportBanner.classList.add('visible');
-      }
-    });
-  }
-  
-  function incrementUseCount() {
-    chrome.storage.local.get(['useCount'], function(result) {
-      const newCount = (result.useCount || 0) + 1;
-      chrome.storage.local.set({ useCount: newCount });
-    });
-  }
-  
+  // 4.4.3: the popup-use counter and the threshold-triggered donation banner
+  // were removed. Counting how many times a user opened the popup, in order to
+  // pop a donation prompt on the 15th, is user-activity tracking — and it is
+  // not needed for the extension's single purpose. It also made
+  // "User activity: No" indefensible on the Chrome Web Store privacy tab.
+  //
+  // What remains is a static support link that does nothing until clicked, and
+  // stores nothing at all. The `useCount` and `supportDismissed` keys are
+  // deleted from existing installs by legacy-cleanup.js.
+
   function openCoffeeLink() {
     chrome.tabs.create({ url: COFFEE_URL });
-  }
-  
-  function dismissBanner() {
-    chrome.storage.local.set({ supportDismissed: true });
-    if (supportBanner) supportBanner.classList.remove('visible');
-  }
-  
-  // Support button handlers
-  if (supportBtn) {
-    supportBtn.addEventListener('click', function() {
-      openCoffeeLink();
-      dismissBanner();
-    });
-  }
-  
-  if (dismissBtn) {
-    dismissBtn.addEventListener('click', dismissBanner);
-  }
-
-  if (coffeeLink) {
-    coffeeLink.addEventListener('click', function(e) {
-      e.preventDefault();
-      openCoffeeLink();
-    });
   }
 
   // Easter egg: clicking the logo opens an "About the maker" card.
@@ -122,9 +86,6 @@ document.addEventListener('DOMContentLoaded', function() {
       hideAbout('escape');
     }
   });
-
-  // Check if banner should show
-  checkSupportBanner();
 
   function setStatus(msg, capturing = false) {
     if (statusEl) {
@@ -334,7 +295,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // ---------------------------------------------------------------------------
 
   function beginCapture() {
-    incrementUseCount();
     sendToContent({ type: 'START_CAPTURE' }, function(response) {
       if (response && response.reason === 'consent_required') {
         // Consent was revoked (data cleared) between the check and the start.

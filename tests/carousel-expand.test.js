@@ -110,22 +110,27 @@ function mockEl(tag) {
 function loadGallery() {
   // Override createElement so gallery.js's internal element creation produces
   // richer mocks we can assert on. This must run *before* gallery.js executes.
+  //
+  // The dep list mirrors gallery.html's <script> order: without
+  // url-allowlist.js and library-sanitize.js, SBE_URL is absent, every URL
+  // fails closed, and img.src would come back as "" for reasons unrelated to
+  // what these tests are checking.
   return loadTopLevel('gallery.js', function (sandbox) {
     sandbox.document.createElement = function (tag) { return mockEl(tag); };
-  });
+  }, ['url-allowlist.js', 'library-sanitize.js']);
 }
 
 // ---------- getCarouselSlides ----------
 
 test('getCarouselSlides: returns the _carouselSlides array when present', () => {
   const g = loadGallery();
-  const slides = [{ url: 'a.jpg' }, { url: 'b.jpg' }];
+  const slides = [{ url: 'https://scontent.cdninstagram.com/a.jpg' }, { url: 'https://scontent.cdninstagram.com/b.jpg' }];
   assert.equal(g.getCarouselSlides({ _carouselSlides: slides }).length, 2);
 });
 
 test('getCarouselSlides: returns [] for non-album items', () => {
   const g = loadGallery();
-  assert.equal(g.getCarouselSlides({ url: 'a.jpg' }).length, 0);
+  assert.equal(g.getCarouselSlides({ url: 'https://scontent.cdninstagram.com/a.jpg' }).length, 0);
   assert.equal(g.getCarouselSlides(null).length, 0);
   assert.equal(g.getCarouselSlides(undefined).length, 0);
   assert.equal(g.getCarouselSlides({}).length, 0);
@@ -136,9 +141,9 @@ test('getCarouselSlides: returns [] for non-album items', () => {
 test('buildCarouselStrip: one button per slide in order', () => {
   const g = loadGallery();
   const slides = [
-    { thumbnail: 'a.jpg' },
-    { thumbnail: 'b.jpg' },
-    { thumbnail: 'c.jpg' }
+    { thumbnail: 'https://scontent.cdninstagram.com/a.jpg' },
+    { thumbnail: 'https://scontent.cdninstagram.com/b.jpg' },
+    { thumbnail: 'https://scontent.cdninstagram.com/c.jpg' }
   ];
   const strip = g.buildCarouselStrip(slides);
   // Each slide becomes a <button> child of the strip, with an inner <img>.
@@ -155,15 +160,15 @@ test('buildCarouselStrip: one button per slide in order', () => {
 test('buildCarouselStrip: prefers thumbnail over url for the <img>', () => {
   const g = loadGallery();
   const slides = [
-    { thumbnail: 'thumb-a.jpg', url: 'full-a.jpg' },
-    { url: 'only-b.jpg' }   // no thumbnail → falls back to url
+    { thumbnail: 'https://scontent.cdninstagram.com/thumb-a.jpg', url: 'https://scontent.cdninstagram.com/full-a.jpg' },
+    { url: 'https://scontent.cdninstagram.com/only-b.jpg' }   // no thumbnail → falls back to url
   ];
   const strip = g.buildCarouselStrip(slides);
   // strip > button > img — the img's src is set
   const imgA = strip.children[0].children[0];
   const imgB = strip.children[1].children[0];
-  assert.equal(imgA.src, 'thumb-a.jpg', 'thumbnail wins when present');
-  assert.equal(imgB.src, 'only-b.jpg',  'falls back to url when no thumbnail');
+  assert.equal(imgA.src, 'https://scontent.cdninstagram.com/thumb-a.jpg', 'thumbnail wins when present');
+  assert.equal(imgB.src, 'https://scontent.cdninstagram.com/only-b.jpg',  'falls back to url when no thumbnail');
 });
 
 test('buildCarouselStrip: empty slide list produces an empty strip', () => {
@@ -174,7 +179,7 @@ test('buildCarouselStrip: empty slide list produces an empty strip', () => {
 
 test('buildCarouselStrip: aria-label includes position and total', () => {
   const g = loadGallery();
-  const slides = [{ url: 'a.jpg' }, { url: 'b.jpg' }, { url: 'c.jpg' }];
+  const slides = [{ url: 'https://scontent.cdninstagram.com/a.jpg' }, { url: 'https://scontent.cdninstagram.com/b.jpg' }, { url: 'https://scontent.cdninstagram.com/c.jpg' }];
   const strip = g.buildCarouselStrip(slides);
   assert.equal(strip.children[1].getAttribute('aria-label'), 'Slide 2 of 3');
 });
@@ -184,7 +189,7 @@ test('buildCarouselStrip: aria-label includes position and total', () => {
 test('expandCarousel: sets the carousel-expanded class and tracks the global', () => {
   const g = loadGallery();
   const card = mockEl();
-  const item = { _carouselSlides: [{ url: 'a.jpg' }, { url: 'b.jpg' }] };
+  const item = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }, { url: 'https://scontent.cdninstagram.com/b.jpg' }] };
 
   g.expandCarousel(card, item);
 
@@ -196,7 +201,7 @@ test('expandCarousel: sets the carousel-expanded class and tracks the global', (
 test('expandCarousel: clicking the same card again triggers an animated close', () => {
   const g = loadGallery();
   const card = mockEl();
-  const item = { _carouselSlides: [{ url: 'a.jpg' }] };
+  const item = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }] };
 
   g.expandCarousel(card, item);
   const drawer = card.querySelector('.carousel-drawer');
@@ -223,8 +228,8 @@ test('expandCarousel: opening another card collapses the previous one (invariant
   const g = loadGallery();
   const cardA = mockEl();
   const cardB = mockEl();
-  const itemA = { _carouselSlides: [{ url: 'a.jpg' }] };
-  const itemB = { _carouselSlides: [{ url: 'b.jpg' }] };
+  const itemA = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }] };
+  const itemB = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/b.jpg' }] };
 
   g.expandCarousel(cardA, itemA);
   assert.equal(g.expandedCard, cardA);
@@ -251,7 +256,7 @@ test('expandCarousel: refuses to open a non-album item (no slides → no-op)', (
 test('collapseCarousel({ instant: true }): synchronous full cleanup, no animation', () => {
   const g = loadGallery();
   const card = mockEl();
-  const item = { _carouselSlides: [{ url: 'a.jpg' }, { url: 'b.jpg' }] };
+  const item = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }, { url: 'https://scontent.cdninstagram.com/b.jpg' }] };
 
   g.expandCarousel(card, item);
   const strip = card.querySelector('.carousel-strip');
@@ -271,7 +276,7 @@ test('collapseCarousel({ instant: true }): synchronous full cleanup, no animatio
 test('collapseCarousel: animated by default — drawer fades out before removal', () => {
   const g = loadGallery();
   const card = mockEl();
-  const item = { _carouselSlides: [{ url: 'a.jpg' }] };
+  const item = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }] };
   g.expandCarousel(card, item);
   const drawer = card.querySelector('.carousel-drawer');
 
@@ -304,7 +309,7 @@ test('collapseCarousel: safe to call when nothing is expanded (defensive)', () =
 test('expandCarousel: wraps the strip in a .carousel-drawer with a header + close button', () => {
   const g = loadGallery();
   const card = mockEl();
-  const item = { _carouselSlides: [{ url: 'a.jpg' }, { url: 'b.jpg' }, { url: 'c.jpg' }] };
+  const item = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }, { url: 'https://scontent.cdninstagram.com/b.jpg' }, { url: 'https://scontent.cdninstagram.com/c.jpg' }] };
   g.expandCarousel(card, item);
 
   const drawer = card.querySelector('.carousel-drawer');
@@ -319,7 +324,7 @@ test('expandCarousel: wraps the strip in a .carousel-drawer with a header + clos
 
 test('buildCarouselStrip: each slide sets a --i CSS var for stagger', () => {
   const g = loadGallery();
-  const slides = [{ url: 'a.jpg' }, { url: 'b.jpg' }, { url: 'c.jpg' }];
+  const slides = [{ url: 'https://scontent.cdninstagram.com/a.jpg' }, { url: 'https://scontent.cdninstagram.com/b.jpg' }, { url: 'https://scontent.cdninstagram.com/c.jpg' }];
   const strip = g.buildCarouselStrip(slides);
   // The mock style records setProperty calls; verify each slide got an --i.
   for (let i = 0; i < strip.children.length; i++) {
@@ -334,7 +339,7 @@ test('buildCarouselStrip: each slide sets a --i CSS var for stagger', () => {
 test('resetViewer: also collapses any expanded carousel (clearing data must reset everything)', () => {
   const g = loadGallery();
   const card = mockEl();
-  const item = { _carouselSlides: [{ url: 'a.jpg' }] };
+  const item = { _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }] };
   g.expandCarousel(card, item);
   assert.equal(g.expandedCard, card);
 

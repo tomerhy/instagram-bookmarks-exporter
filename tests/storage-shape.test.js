@@ -18,10 +18,10 @@ function freshContent() {
 
 test('buildItem: image without options has all expected fields', () => {
   const { buildItem } = freshContent();
-  const item = buildItem('image', 'https://cdn/x.jpg', null, 'https://cdn/x.jpg', null);
+  const item = buildItem('image', 'https://scontent.cdninstagram.com/x.jpg', null, 'https://scontent.cdninstagram.com/x.jpg', null);
   assert.equal(item.type, 'image');
-  assert.equal(item.url, 'https://cdn/x.jpg');
-  assert.equal(item.thumbnail, 'https://cdn/x.jpg');
+  assert.equal(item.url, 'https://scontent.cdninstagram.com/x.jpg');
+  assert.equal(item.thumbnail, 'https://scontent.cdninstagram.com/x.jpg');
   assert.equal(item.postUrl, null);
   assert.equal(item.postShortcode, null);
   assert.equal(item.carouselIndex, null);
@@ -33,32 +33,32 @@ test('buildItem: image without options has all expected fields', () => {
 
 test('buildItem: derives postUrl from postShortcode when not provided', () => {
   const { buildItem } = freshContent();
-  const item = buildItem('image', 'https://cdn/x.jpg', null, null, { postShortcode: 'Cabc' });
+  const item = buildItem('image', 'https://scontent.cdninstagram.com/x.jpg', null, null, { postShortcode: 'Cabc' });
   assert.equal(item.postUrl, 'https://www.instagram.com/p/Cabc/');
   assert.equal(item.postShortcode, 'Cabc');
 });
 
 test('buildItem: explicit postUrl wins over shortcode-derived', () => {
   const { buildItem } = freshContent();
-  const item = buildItem('video', 'https://cdn/v.mp4', 'https://www.instagram.com/explicit/', null, { postShortcode: 'Cabc' });
+  const item = buildItem('video', 'https://scontent.cdninstagram.com/v.mp4', 'https://www.instagram.com/explicit/', null, { postShortcode: 'Cabc' });
   assert.equal(item.postUrl, 'https://www.instagram.com/explicit/');
 });
 
 test('buildItem: video preserves null thumbnail (no fallback to URL)', () => {
   const { buildItem } = freshContent();
-  const item = buildItem('video', 'https://cdn/v.mp4', null, null, null);
+  const item = buildItem('video', 'https://scontent.cdninstagram.com/v.mp4', null, null, null);
   assert.equal(item.thumbnail, null);
 });
 
 test('buildItem: image falls back thumbnail to url when missing', () => {
   const { buildItem } = freshContent();
-  const item = buildItem('image', 'https://cdn/x.jpg', null, null, null);
-  assert.equal(item.thumbnail, 'https://cdn/x.jpg');
+  const item = buildItem('image', 'https://scontent.cdninstagram.com/x.jpg', null, null, null);
+  assert.equal(item.thumbnail, 'https://scontent.cdninstagram.com/x.jpg');
 });
 
 test('buildItem: carousel slide records its index', () => {
   const { buildItem } = freshContent();
-  const item = buildItem('image', 'https://cdn/2.jpg', null, null, {
+  const item = buildItem('image', '2.jpg', null, null, {
     postShortcode: 'Calbum', carouselIndex: 2, carouselSize: 5
   });
   assert.equal(item.carouselIndex, 2);
@@ -67,7 +67,7 @@ test('buildItem: carousel slide records its index', () => {
 
 test('buildItem: carouselIndex 0 (first slide) is preserved, not coerced to null', () => {
   const { buildItem } = freshContent();
-  const item = buildItem('image', 'https://cdn/0.jpg', null, null, {
+  const item = buildItem('image', '0.jpg', null, null, {
     postShortcode: 'C', carouselIndex: 0, carouselSize: 3
   });
   assert.equal(item.carouselIndex, 0);
@@ -80,10 +80,10 @@ test('addImage: returns true on first add, false on duplicate', () => {
   c.state.images.length = 0;
   c.state.seenUrls.clear();
 
-  assert.equal(c.addImage('https://cdn/a.jpg?ig_cache_key=K1&stp=p', null, null, null), true);
+  assert.equal(c.addImage('https://scontent.cdninstagram.com/a.jpg?ig_cache_key=K1&stp=p', null, null, null), true);
   assert.equal(c.state.images.length, 1);
   // Same logical URL with different signing params → still a dupe
-  assert.equal(c.addImage('https://cdn/a.jpg?ig_cache_key=K1&stp=p&_nc_ht=different', null, null, null), false);
+  assert.equal(c.addImage('https://scontent.cdninstagram.com/a.jpg?ig_cache_key=K1&stp=p&_nc_ht=different', null, null, null), false);
   assert.equal(c.state.images.length, 1);
 });
 
@@ -100,7 +100,7 @@ test('addImage: persists shortcode + carouselIndex from options', () => {
   const c = freshContent();
   c.state.images.length = 0;
   c.state.seenUrls.clear();
-  c.addImage('https://cdn/x.jpg', null, null, {
+  c.addImage('https://scontent.cdninstagram.com/x.jpg', null, null, {
     postShortcode: 'Cpost', carouselIndex: 1, carouselSize: 3,
     metadata: { caption: 'hi', owner: 'me', takenAt: null, likeCount: null, hashtags: [] }
   });
@@ -115,8 +115,8 @@ test('addVideo: dedup by URL works the same as addImage', () => {
   const c = freshContent();
   c.state.videos.length = 0;
   c.state.seenUrls.clear();
-  assert.equal(c.addVideo('https://cdn/v.mp4', null, null, null), true);
-  assert.equal(c.addVideo('https://cdn/v.mp4', null, null, null), false);
+  assert.equal(c.addVideo('https://scontent.cdninstagram.com/v.mp4', null, null, null), true);
+  assert.equal(c.addVideo('https://scontent.cdninstagram.com/v.mp4', null, null, null), false);
   assert.equal(c.state.videos.length, 1);
 });
 
@@ -145,8 +145,8 @@ test('addImage + addVideo: cross-type dedup for same logical URL', () => {
   c.state.images.length = 0;
   c.state.videos.length = 0;
   c.state.seenUrls.clear();
-  assert.equal(c.addImage('https://cdn/same.jpg', null, null, null), true);
-  assert.equal(c.addVideo('https://cdn/same.jpg', null, null, null), false);
+  assert.equal(c.addImage('https://scontent.cdninstagram.com/same.jpg', null, null, null), true);
+  assert.equal(c.addVideo('https://scontent.cdninstagram.com/same.jpg', null, null, null), false);
   assert.equal(c.state.images.length, 1);
   assert.equal(c.state.videos.length, 0);
 });

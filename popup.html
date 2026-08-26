@@ -392,53 +392,6 @@
     }
 
     /* ---------- Support banner (brand-aligned, was yellow) ---------- */
-    .support-banner {
-      background: linear-gradient(135deg, rgba(15, 139, 141, 0.15), rgba(15, 139, 141, 0.15));
-      border: 1px solid rgba(15, 139, 141, 0.25);
-      border-radius: var(--radius-md);
-      padding: var(--space-3);
-      margin-bottom: var(--space-3);
-      display: none;
-    }
-    .support-banner.visible {
-      display: block;
-    }
-    .support-banner-text {
-      font-size: 12px;
-      color: var(--text-secondary);
-      margin-bottom: var(--space-2);
-      line-height: 1.4;
-    }
-    .support-banner-actions {
-      display: flex;
-      gap: var(--space-2);
-    }
-    .support-banner-btn {
-      flex: 1;
-      min-height: var(--btn-h-sm);
-      padding: 0 var(--space-2);
-      border-radius: var(--radius-sm);
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-      border: none;
-      transition: background-color var(--t-fast), opacity var(--t-fast);
-    }
-    .support-banner-btn.primary {
-      background: linear-gradient(135deg, var(--accent-deep), var(--accent));
-      color: #fff;
-      font-weight: 600;
-    }
-    .support-banner-btn.primary:hover {
-      opacity: 0.92;
-    }
-    .support-banner-btn.secondary {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-muted);
-    }
-    .support-banner-btn.secondary:hover {
-      background: rgba(255, 255, 255, 0.14);
-    }
 
     /* Decorative emoji (the 👋 greeting on the about card etc.) */
     .emoji {
@@ -671,21 +624,12 @@
   </svg>
 
   <main id="main-content">
-    <div class="support-banner" id="support-banner" role="region" aria-label="Support the developer">
-      <div class="support-banner-text">Enjoying this extension? Consider buying me a coffee.</div>
-      <div class="support-banner-actions">
-        <button class="support-banner-btn primary" id="support-btn">
-          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-coffee"/></svg> Support
-        </button>
-        <button class="support-banner-btn secondary" id="dismiss-btn">Maybe later</button>
-      </div>
-    </div>
 
     <header class="header">
       <button class="logo-btn" id="about-toggle" aria-label="About this extension" title="About">
         <img class="logo" src="assets/icons/icon-128.png" alt="">
       </button>
-      <h1 class="title">Saved Posts Backup</h1>
+      <h1 class="title">Saved Posts Library</h1>
       <span class="version" id="version" aria-label="Extension version"></span>
     </header>
 
@@ -752,7 +696,7 @@
        role="dialog" aria-modal="true" aria-labelledby="about-name-label">
     <div class="about-card" role="document">
       <button class="about-close" id="about-close" aria-label="Close">×</button>
-      <div class="about-name" id="about-name-label">Saved Posts Backup &amp; Export</div>
+      <div class="about-name" id="about-name-label">Saved Posts Library &amp; Export</div>
       <p class="about-disclaimer">
         Independent third-party extension. Not affiliated with, authorized by,
         endorsed by, or sponsored by Instagram or Meta.

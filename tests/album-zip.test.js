@@ -16,10 +16,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { loadTopLevel } = require('./_setup');
+const { loadTopLevel, loadGallery: sharedLoadGallery } = require('./_setup');
 
+// Uses the shared loader so url-allowlist.js and library-sanitize.js are
+// evaluated first, exactly as gallery.html declares them. Without them
+// SBE_URL is absent, every URL fails closed, and these tests would be
+// measuring the fail-closed path instead of their actual subject.
 function loadGallery() {
-  return loadTopLevel('gallery.js');
+  return sharedLoadGallery();
 }
 
 // Cross-realm safe deepEqual via JSON round-trip.
@@ -35,39 +39,39 @@ function deepEq(actual, expected, msg) {
 
 test('_slideExtension: known image extensions in the URL pass through', () => {
   const g = loadGallery();
-  assert.equal(g._slideExtension({ url: 'https://cdn/a.jpg' }), 'jpg');
-  assert.equal(g._slideExtension({ url: 'https://cdn/a.png' }), 'png');
-  assert.equal(g._slideExtension({ url: 'https://cdn/a.webp' }), 'webp');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/a.jpg' }), 'jpg');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/a.png' }), 'png');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/a.webp' }), 'webp');
 });
 
 test('_slideExtension: .jpeg normalized to .jpg', () => {
   const g = loadGallery();
-  assert.equal(g._slideExtension({ url: 'https://cdn/a.jpeg' }), 'jpg');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/a.jpeg' }), 'jpg');
 });
 
 test('_slideExtension: query strings and signed-URL params are stripped first', () => {
   const g = loadGallery();
   assert.equal(
-    g._slideExtension({ url: 'https://cdn/a.jpg?stp=dst-jpg_e35&ig_cache_key=xyz' }),
+    g._slideExtension({ url: 'https://scontent.cdninstagram.com/a.jpg?stp=dst-jpg_e35&ig_cache_key=xyz' }),
     'jpg'
   );
-  assert.equal(g._slideExtension({ url: 'https://cdn/a.mp4#fragment' }), 'mp4');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/a.mp4#fragment' }), 'mp4');
 });
 
 test('_slideExtension: video type falls back to mp4 when URL lacks an extension', () => {
   const g = loadGallery();
-  assert.equal(g._slideExtension({ url: 'https://cdn/no-ext', type: 'video' }), 'mp4');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/no-ext', type: 'video' }), 'mp4');
 });
 
 test('_slideExtension: image type falls back to jpg when URL lacks an extension', () => {
   const g = loadGallery();
-  assert.equal(g._slideExtension({ url: 'https://cdn/no-ext', type: 'image' }), 'jpg');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/no-ext', type: 'image' }), 'jpg');
 });
 
 test('_slideExtension: unknown extension in URL defers to type-based fallback', () => {
   const g = loadGallery();
   // .xyz isn't on our allowlist → ignore it; type is image → "jpg"
-  assert.equal(g._slideExtension({ url: 'https://cdn/a.xyz', type: 'image' }), 'jpg');
+  assert.equal(g._slideExtension({ url: 'https://scontent.cdninstagram.com/a.xyz', type: 'image' }), 'jpg');
 });
 
 test('_slideExtension: nothing usable → .bin (never nameless)', () => {
@@ -81,30 +85,30 @@ test('_slideExtension: nothing usable → .bin (never nameless)', () => {
 test('albumFilename: zero-pads to the width of the total count', () => {
   const g = loadGallery();
   // 5 slides → single digit
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 0, 5), '1.jpg');
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 4, 5), '5.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 0, 5), '1.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 4, 5), '5.jpg');
 
   // 12 slides → 2-digit padding
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 0, 12),  '01.jpg');
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 9, 12),  '10.jpg');
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 11, 12), '12.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 0, 12),  '01.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 9, 12),  '10.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 11, 12), '12.jpg');
 
   // 100 slides → 3-digit padding
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 0, 100), '001.jpg');
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 99, 100), '100.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 0, 100), '001.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 99, 100), '100.jpg');
 });
 
 test('albumFilename: index is 1-based in the output (UI consistency)', () => {
   const g = loadGallery();
-  // idx=0 → "1.jpg" because humans count from 1
-  assert.equal(g.albumFilename({ url: 'a.jpg' }, 0, 3), '1.jpg');
+  // idx=0 → "https://scontent.cdninstagram.com/1.jpg" because humans count from 1
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg' }, 0, 3), '1.jpg');
 });
 
 test('albumFilename: extension follows the slide, not the position', () => {
   const g = loadGallery();
   // Mixed-media album (rare but possible for reels-mixed posts)
-  assert.equal(g.albumFilename({ url: 'a.jpg', type: 'image' }, 0, 3), '1.jpg');
-  assert.equal(g.albumFilename({ url: 'b.mp4', type: 'video' }, 1, 3), '2.mp4');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/a.jpg', type: 'image' }, 0, 3), '1.jpg');
+  assert.equal(g.albumFilename({ url: 'https://scontent.cdninstagram.com/b.mp4', type: 'video' }, 1, 3), '2.mp4');
 });
 
 // ---------- buildAlbumManifest ----------
@@ -119,7 +123,7 @@ test('buildAlbumManifest: minimal item with no carousel yields a single-slide ma
   const g = loadGallery();
   const item = {
     type: 'image',
-    url: 'https://cdn/x.jpg',
+    url: 'https://scontent.cdninstagram.com/x.jpg',
     postShortcode: 'ABC'
   };
   const manifest = g.buildAlbumManifest(item, '4.4.0');
@@ -129,7 +133,7 @@ test('buildAlbumManifest: minimal item with no carousel yields a single-slide ma
   assert.equal(manifest.shortcode, 'ABC');
   assert.equal(manifest.slides.length, 1);
   assert.equal(manifest.slides[0].filename, '1.jpg');
-  assert.equal(manifest.slides[0].url, 'https://cdn/x.jpg');
+  assert.equal(manifest.slides[0].url, 'https://scontent.cdninstagram.com/x.jpg');
 });
 
 test('buildAlbumManifest: preserves metadata for the post (caption, owner, etc.)', () => {
@@ -145,8 +149,8 @@ test('buildAlbumManifest: preserves metadata for the post (caption, owner, etc.)
       hashtags: ['travel', 'beach']
     },
     _carouselSlides: [
-      { url: 'https://cdn/1.jpg', type: 'image', carouselIndex: 0 },
-      { url: 'https://cdn/2.jpg', type: 'image', carouselIndex: 1 }
+      { url: 'https://scontent.cdninstagram.com/1.jpg', type: 'image', carouselIndex: 0 },
+      { url: 'https://scontent.cdninstagram.com/2.jpg', type: 'image', carouselIndex: 1 }
     ]
   };
   const manifest = g.buildAlbumManifest(item);
@@ -163,9 +167,9 @@ test('buildAlbumManifest: slides list contains an entry per carousel slide, in o
   const item = {
     postShortcode: 'XYZ',
     _carouselSlides: [
-      { url: 'https://cdn/1.jpg', type: 'image', carouselIndex: 0 },
-      { url: 'https://cdn/2.mp4', type: 'video', carouselIndex: 1 },
-      { url: 'https://cdn/3.jpg', type: 'image', carouselIndex: 2 }
+      { url: 'https://scontent.cdninstagram.com/1.jpg', type: 'image', carouselIndex: 0 },
+      { url: 'https://scontent.cdninstagram.com/2.mp4', type: 'video', carouselIndex: 1 },
+      { url: 'https://scontent.cdninstagram.com/3.jpg', type: 'image', carouselIndex: 2 }
     ]
   };
   const manifest = g.buildAlbumManifest(item);
@@ -186,7 +190,7 @@ test('buildAlbumManifest: hashtags returns a copy so mutating it doesn\'t poison
 
 test('buildAlbumManifest: missing metadata → null fields, not undefined', () => {
   const g = loadGallery();
-  const item = { postShortcode: 'X', _carouselSlides: [{ url: 'a.jpg', type: 'image' }] };
+  const item = { postShortcode: 'X', _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg', type: 'image' }] };
   const manifest = g.buildAlbumManifest(item);
   assert.equal(manifest.owner, null);
   assert.equal(manifest.caption, null);
@@ -200,7 +204,7 @@ test('buildAlbumManifest: non-numeric likeCount drops to null (not "0", not NaN)
   const item = {
     postShortcode: 'X',
     metadata: { likeCount: '1000' }, // string
-    _carouselSlides: [{ url: 'a.jpg' }]
+    _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }]
   };
   const manifest = g.buildAlbumManifest(item);
   assert.equal(manifest.likeCount, null,
@@ -212,7 +216,7 @@ test('buildAlbumManifest: result is JSON-serializable end-to-end (no cycles, no 
   const item = {
     postShortcode: 'X',
     metadata: { owner: 'a', caption: 'b with "quotes" and a comma,' },
-    _carouselSlides: [{ url: 'a.jpg', type: 'image' }]
+    _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg', type: 'image' }]
   };
   const manifest = g.buildAlbumManifest(item);
   assert.doesNotThrow(() => JSON.stringify(manifest));
@@ -222,7 +226,7 @@ test('buildAlbumManifest: result is JSON-serializable end-to-end (no cycles, no 
 
 test('buildAlbumManifest: exportedAt is a valid ISO timestamp', () => {
   const g = loadGallery();
-  const manifest = g.buildAlbumManifest({ postShortcode: 'X', _carouselSlides: [{ url: 'a.jpg' }] });
+  const manifest = g.buildAlbumManifest({ postShortcode: 'X', _carouselSlides: [{ url: 'https://scontent.cdninstagram.com/a.jpg' }] });
   assert.ok(manifest.exportedAt && !isNaN(new Date(manifest.exportedAt).getTime()),
     'exportedAt should parse as a valid Date');
 });

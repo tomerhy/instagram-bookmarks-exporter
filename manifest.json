@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Saved Posts Backup & Export",
-  "version": "4.4.1",
-  "description": "Back up your own saved posts to your computer: images, videos, albums, captions. Independent tool, not affiliated with Instagram.",
+  "name": "Saved Posts Library & Export",
+  "version": "4.4.3",
+  "description": "Capture links and details from posts you saved, browse a local library, and download selected media. Not affiliated with Instagram.",
   "icons": {
     "16": "assets/icons/icon-16.png",
     "32": "assets/icons/icon-32.png",
@@ -26,7 +26,10 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
-      "js": ["url-allowlist.js", "capture-hook.js"],
+      "js": [
+        "url-allowlist.js",
+        "capture-hook.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
@@ -35,7 +38,11 @@
         "https://www.instagram.com/*",
         "https://instagram.com/*"
       ],
-      "js": ["url-allowlist.js", "content.js"],
+      "js": [
+        "url-allowlist.js",
+        "library-sanitize.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -47,5 +54,8 @@
       "48": "assets/icons/icon-48.png",
       "128": "assets/icons/icon-128.png"
     }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; connect-src 'self' https://*.cdninstagram.com https://*.fbcdn.net; img-src 'self' data: https://*.cdninstagram.com https://*.fbcdn.net; media-src 'self' blob: https://*.cdninstagram.com https://*.fbcdn.net"
   }
 }

@@ -46,6 +46,13 @@
     // parser strips or tolerates some of them and we do not want to depend
     // on which. Hyphens, dots and percent-escapes are of course fine.
     if (/[\s\u0000-\u001f\u007f]/.test(value)) return null;
+    // Reject characters that only ever appear in a URL string because someone
+    // is trying to break out of an HTML attribute or inject markup. A real CDN
+    // URL never contains a literal <, >, quote or backslash — those would be
+    // percent-encoded. Checking the RAW string matters: new URL() silently
+    // percent-encodes them, so parsing first and inspecting the result would
+    // let the original hostile string through to the clipboard and the exports.
+    if (/[<>"'`\\]/.test(value)) return null;
     var u;
     try {
       u = new URL(value);
@@ -62,7 +69,14 @@
     return host === suffix || host.endsWith('.' + suffix);
   }
 
-  // Is this a URL we are willing to store as, and later fetch as, media?
+  // Is this a URL we are willing to store as, and later fetch as, media —
+  // i.e. assign to img.src / video.src / player.src, or hand to fetch()?
+  //
+  // CDN hosts ONLY. instagram.com is deliberately excluded even though it is
+  // allowlisted for permalinks: a permalink is an HTML page, not media, and
+  // 4.4.1 accepting it here produced a real type confusion in which a
+  // post URL could be assigned to player.src. Media and pages are now
+  // strictly separate namespaces.
   function isAllowedMediaUrl(value) {
     var u = parse(value);
     if (!u) return false;
@@ -70,9 +84,7 @@
     for (var i = 0; i < MEDIA_HOST_SUFFIXES.length; i++) {
       if (hostMatchesSuffix(host, MEDIA_HOST_SUFFIXES[i])) return true;
     }
-    // Instagram itself also serves some media paths; allow the same exact
-    // hosts we allow for permalinks, nothing wider.
-    return POST_HOSTS.indexOf(host) !== -1;
+    return false;
   }
 
   // Is this a URL we are willing to store as a post permalink and later open
