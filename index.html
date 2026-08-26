@@ -191,22 +191,11 @@
     
     .hero-screenshot img {
       width: 100%;
+      height: auto;
+      display: block;
       border-radius: 16px;
       box-shadow: var(--card-shadow);
       border: 1px solid rgba(0,0,0,0.05);
-    }
-    
-    .screenshot-placeholder {
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border-radius: 16px;
-      padding: 60px 40px;
-      color: white;
-      text-align: center;
-    }
-    
-    .screenshot-placeholder h3 {
-      margin-bottom: 8px;
-      color: var(--primary);
     }
     
     /* Features */
@@ -440,18 +429,14 @@
       </p>
 
       <div class="hero-screenshot">
-        <!-- Neutral placeholder. The previous image here was
-             the old screenshot-2-gallery.png marketing capture, which shows real
-             third-party Instagram usernames and identifiable people and is
-             disqualified (COMPLIANCE_EVIDENCE.md, finding OF-3). It must not be
-             republished. Replace this block only with a synthetic screenshot
-             produced per SCREENSHOT_PLAN.md. -->
-        <div class="screenshot-placeholder" role="img"
-             aria-label="Screenshot placeholder: a synthetic screenshot will go here">
-          <span>Screenshot pending</span>
-          <small>A synthetic screenshot, using placeholder accounts and no real
-          posts, will replace this.</small>
-        </div>
+        <img src="assets/store-screenshots/03-library.png"
+             width="1280" height="800"
+             alt="The extension&rsquo;s Library page: a grid of saved posts with
+                  placeholder accounts such as &commat;example_account, a search box for
+                  captions, accounts and hashtags, a sort control, Images and
+                  Videos tabs, a preview pane with the selected post&rsquo;s account,
+                  date and caption, and Download, Export All and Export CSV
+                  buttons.">
       </div>
     </div>
   </section>
