@@ -6,7 +6,7 @@
 // out of manifest.json and assert on its directives. They do NOT load the
 // extension into Chrome, so they cannot prove Chrome accepts the policy, nor
 // that CDN thumbnails and ZIP downloads still work under it. Those two are
-// manual blockers — MANUAL_CHROME_TEST_PLAN.md sections 7 and 8.
+// manual blockers — docs/MANUAL_CHROME_TEST_PLAN.md sections 7 and 8.
 
 'use strict';
 

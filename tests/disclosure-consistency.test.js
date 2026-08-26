@@ -37,9 +37,9 @@ const flat = (f) => read(f)
   .replace(/&ldquo;|&rdquo;|&quot;/g, '"')
   .replace(/\s+/g, ' ');
 
-const DOCS = ['privacy-policy.html', 'CWS_PRIVACY_DISCLOSURES.md',
-              'CWS_STORE_LISTING.md', 'README.md', 'COMPLIANCE_EVIDENCE.md',
-              'MANUAL_CHROME_TEST_PLAN.md'];
+const DOCS = ['privacy-policy.html', 'docs/CWS_PRIVACY_DISCLOSURES.md',
+              'docs/CWS_STORE_LISTING.md', 'README.md', 'docs/COMPLIANCE_EVIDENCE.md',
+              'docs/MANUAL_CHROME_TEST_PLAN.md'];
 const UI = ['popup.html', 'gallery.html'];
 const VERSION = JSON.parse(read('manifest.json')).version;
 
@@ -127,7 +127,7 @@ test('the code writes no storage key outside the documented inventory', () => {
   assert.deepEqual(unexpected, [],
     'undocumented storage key(s): ' + unexpected.join(', ') +
     '\nAdd them to EXPECTED_KEYS here AND to the inventory in ' +
-    'privacy-policy.html and COMPLIANCE_EVIDENCE.md.');
+    'privacy-policy.html and docs/COMPLIANCE_EVIDENCE.md.');
 });
 
 test('the removed 4.4.3 keys are only referenced by legacy-cleanup.js', () => {
@@ -183,7 +183,7 @@ test('the privacy policy does not inventory a "sort order" it never persists', (
 // ---------------------------------------------------------------------------
 
 test('CWS_PRIVACY_DISCLOSURES does not claim User activity: No', () => {
-  const d = flat('CWS_PRIVACY_DISCLOSURES.md');
+  const d = flat('docs/CWS_PRIVACY_DISCLOSURES.md');
   assert.equal(/User activity\s*\|\s*\*\*No\*\*/.test(d), false,
     'consent and last-seen timestamps are local interaction state; ' +
     'answering No is indefensible');
@@ -253,8 +253,8 @@ test('no document says CDN requests happen only on Download', () => {
 });
 
 test('policy, listing and manual plan all disclose thumbnail-time CDN loads', () => {
-  for (const f of ['privacy-policy.html', 'CWS_STORE_LISTING.md',
-                   'MANUAL_CHROME_TEST_PLAN.md', 'CWS_PRIVACY_DISCLOSURES.md']) {
+  for (const f of ['privacy-policy.html', 'docs/CWS_STORE_LISTING.md',
+                   'docs/MANUAL_CHROME_TEST_PLAN.md', 'docs/CWS_PRIVACY_DISCLOSURES.md']) {
     const t = flat(f);
     assert.ok(/thumbnail/i.test(t) && /(CDN|cdninstagram)/i.test(t),
       f + ' must disclose that thumbnails/previews load from the CDN');
@@ -263,7 +263,7 @@ test('policy, listing and manual plan all disclose thumbnail-time CDN loads', ()
 
 test('the accurate non-transmission sentence appears in policy and disclosures', () => {
   const REQUIRED = /does not transmit the captured library to the developer/i;
-  for (const f of ['privacy-policy.html', 'CWS_PRIVACY_DISCLOSURES.md']) {
+  for (const f of ['privacy-policy.html', 'docs/CWS_PRIVACY_DISCLOSURES.md']) {
     assert.ok(REQUIRED.test(flat(f)),
       f + ' must carry the scoped non-transmission statement');
   }
@@ -293,7 +293,7 @@ test('COMPLIANCE_EVIDENCE final-package section describes the current version', 
   // 4.4.2 left a "Final package" section describing 4.4.1 — wrong filename,
   // wrong hash, wrong test count, and a stale open-finding caveat. A reviewer
   // must not have to read an appendix to discover the headline is obsolete.
-  const t = read('COMPLIANCE_EVIDENCE.md');
+  const t = read('docs/COMPLIANCE_EVIDENCE.md');
   const idx = t.indexOf('## 2. Final package');
   assert.ok(idx > 0, 'the Final package section must exist');
   // Bound the section at the next heading, not at a fixed character count —
@@ -321,7 +321,7 @@ test('COMPLIANCE_EVIDENCE reports the real test count', () => {
   }
   // Some suites generate tests in a loop, so the runtime total is >= declared.
   // The document must name a number at least as large as the static count.
-  const t = read('COMPLIANCE_EVIDENCE.md');
+  const t = read('docs/COMPLIANCE_EVIDENCE.md');
   const numbers = (t.match(/\b(\d{3,4}) (?:tests|passing)\b/g) || [])
     .map(m => parseInt(m, 10));
   assert.ok(numbers.length > 0, 'no test total stated in the evidence document');
@@ -332,7 +332,7 @@ test('COMPLIANCE_EVIDENCE reports the real test count', () => {
 });
 
 test('v4.3.10 is still labelled as tagged source, never as the uploaded ZIP', () => {
-  const t = flat('COMPLIANCE_EVIDENCE.md');
+  const t = flat('docs/COMPLIANCE_EVIDENCE.md');
   assert.match(t, /not a byte-verified copy of the (package|ZIP) uploaded/i,
     'the v4.3.10 limitation label must remain');
   assert.equal(/the published 4\.3\.10 (ZIP|package) was (audited|inspected|verified)/i.test(t), false,

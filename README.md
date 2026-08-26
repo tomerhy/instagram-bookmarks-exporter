@@ -56,7 +56,7 @@ choose to keep.
 Full details in [`privacy-policy.html`](privacy-policy.html). Versions up to and
 including 4.4.0 contained Google Analytics; that is documented, not glossed
 over, in the policy's "Change history" section and in
-[`COMPLIANCE_EVIDENCE.md`](COMPLIANCE_EVIDENCE.md).
+[`COMPLIANCE_EVIDENCE.md`](docs/COMPLIANCE_EVIDENCE.md).
 
 ## Install for development
 

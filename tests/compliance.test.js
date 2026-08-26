@@ -3,7 +3,7 @@
 // silently re-introduce something the Chrome Web Store removal was about.
 //
 // Every assertion here corresponds to a claim made in privacy-policy.html,
-// CWS_STORE_LISTING.md or CWS_PRIVACY_DISCLOSURES.md. If one of these fails,
+// docs/CWS_STORE_LISTING.md or docs/CWS_PRIVACY_DISCLOSURES.md. If one of these fails,
 // a published claim has become untrue — fix the code, or fix the claim.
 
 'use strict';
@@ -125,7 +125,7 @@ test('the specific GA credentials that shipped through 4.4.0 are gone', () => {
   // reader to lift out of a public repository. This does NOT undo the exposure:
   // both values are already in this repository's git history and still need to
   // be revoked in the Google Analytics console by the property owner. See
-  // COMPLIANCE_EVIDENCE.md §19.
+  // docs/COMPLIANCE_EVIDENCE.md §19.
   const MEASUREMENT_ID = 'G-' + 'PX8PH' + '6ZQED';
   const API_SECRET = 'XsR9' + 'YFyZQY2' + '_gJdKY' + '939Lw';
   for (const secret of [MEASUREMENT_ID, API_SECRET]) {
@@ -348,7 +348,7 @@ test('no shipped code loads or evaluates remote script', () => {
 
 // Every external host the shipped code may contact or link to. If a new host
 // appears, this test fails and the outbound-domain table in
-// COMPLIANCE_EVIDENCE.md has to be updated in the same change.
+// docs/COMPLIANCE_EVIDENCE.md has to be updated in the same change.
 const DOCUMENTED_HOSTS = new Set([
   'www.instagram.com',       // host permission + post permalinks
   'instagram.com',           // host permission
@@ -377,7 +377,7 @@ test('only documented external hosts appear in shipped source', () => {
   const undocumented = [...found.entries()].filter(([h]) => !DOCUMENTED_HOSTS.has(h));
   assert.deepEqual(undocumented.map(([h, where]) => h + ' (' + where + ')'), [],
     'undocumented external host(s) found — update DOCUMENTED_HOSTS and ' +
-    'COMPLIANCE_EVIDENCE.md together');
+    'docs/COMPLIANCE_EVIDENCE.md together');
 });
 
 test('the CDN hosts we fetch media from are exactly the allowlisted ones', () => {
@@ -481,5 +481,5 @@ test('every HTML sink in shipped code is escaped, static, or internal', () => {
 
   assert.deepEqual(offenders, [],
     'Unescaped dynamic value(s) reaching an HTML sink:\n  ' + offenders.join('\n  ') +
-    '\n\nSee COMPLIANCE_EVIDENCE.md section 15, open finding OF-1.');
+    '\n\nSee docs/COMPLIANCE_EVIDENCE.md section 15, open finding OF-1.');
 });
