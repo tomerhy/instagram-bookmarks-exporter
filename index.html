@@ -3,20 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IG Exporter - Export Instagram Saved Posts & Media | Chrome Extension</title>
-  <meta name="description" content="Export and download your Instagram saved posts, images, and videos with one click. Free Chrome extension for backing up your Instagram bookmarks.">
+  <title>Saved Posts Library &amp; Export | Chrome Extension</title>
+  <meta name="description" content="Keep a local library of links and details from posts you saved on instagram.com, and download selected media. Independent third-party extension, not affiliated with Instagram or Meta.">
   
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="IG Exporter - Export Instagram Saved Posts & Media">
-  <meta property="og:description" content="Export and download your Instagram saved posts, images, and videos with one click. Free Chrome extension.">
-  <meta property="og:image" content="https://raw.githubusercontent.com/tomerhy/instagram-bookmarks-exporter/main/assets/og-image.png">
+  <meta property="og:title" content="Saved Posts Library &amp; Export">
+  <meta property="og:description" content="Keep a local library of the posts you saved and download selected media. Independent third-party extension, not affiliated with Instagram or Meta.">
   <meta property="og:url" content="https://tomerhy.github.io/instagram-bookmarks-exporter/">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="IG Exporter - Export Instagram Saved Posts">
-  <meta name="twitter:description" content="Export and download your Instagram saved posts with one click.">
+  <meta name="twitter:title" content="Saved Posts Library &amp; Export">
+  <meta name="twitter:description" content="Keep a local library of the posts you saved and download selected media.">
   
   <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32.png">
@@ -25,9 +24,9 @@
   
   <style>
     :root {
-      --primary: #E1306C;
-      --primary-dark: #c13584;
-      --gradient: linear-gradient(135deg, #833ab4 0%, #E1306C 50%, #fd1d1d 100%);
+      --primary: #0F8B8D;
+      --primary-dark: #0B6E70;
+      --gradient: linear-gradient(135deg, #0B6E70 0%, #0F8B8D 100%);
       --text: #1a1a2e;
       --text-light: #666;
       --bg: #ffffff;
@@ -114,7 +113,7 @@
     
     .nav-cta:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 15px rgba(225, 48, 108, 0.4);
+      box-shadow: 0 4px 15px rgba(15, 139, 141, 0.4);
     }
     
     /* Hero */
@@ -127,7 +126,7 @@
     
     .hero-badge {
       display: inline-block;
-      background: rgba(225, 48, 108, 0.1);
+      background: rgba(15, 139, 141, 0.1);
       color: var(--primary);
       padding: 8px 16px;
       border-radius: 50px;
@@ -170,7 +169,7 @@
     
     .hero-cta:hover {
       transform: translateY(-3px);
-      box-shadow: 0 8px 25px rgba(225, 48, 108, 0.4);
+      box-shadow: 0 8px 25px rgba(15, 139, 141, 0.4);
     }
     
     .hero-cta svg {
@@ -296,66 +295,6 @@
     }
     
     /* Social Proof */
-    .social-proof {
-      background: var(--bg);
-    }
-    
-    .social-proof-header {
-      text-align: center;
-      margin-bottom: 60px;
-    }
-    
-    .testimonials {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 32px;
-    }
-    
-    .testimonial {
-      background: var(--bg-alt);
-      padding: 32px;
-      border-radius: 16px;
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-    
-    .testimonial-stars {
-      color: #ffc107;
-      margin-bottom: 16px;
-      font-size: 18px;
-    }
-    
-    .testimonial-text {
-      font-style: italic;
-      margin-bottom: 20px;
-    }
-    
-    .testimonial-author {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .author-avatar {
-      width: 44px;
-      height: 44px;
-      background: var(--gradient);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 600;
-    }
-    
-    .author-name {
-      font-weight: 600;
-      color: var(--text);
-    }
-    
-    .author-role {
-      font-size: 14px;
-      color: var(--text-light);
-    }
     
     /* Feedback Section */
     .feedback-section {
@@ -380,83 +319,6 @@
       color: rgba(255,255,255,0.7);
       margin-bottom: 40px;
       font-size: 1.1rem;
-    }
-    
-    .feedback-form {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    
-    .feedback-form select,
-    .feedback-form input,
-    .feedback-form textarea {
-      width: 100%;
-      padding: 18px 20px;
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 12px;
-      font-size: 16px;
-      font-family: inherit;
-      outline: none;
-      background: rgba(255,255,255,0.05);
-      color: white;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    
-    .feedback-form select {
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(255,255,255,0.5)' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 20px center;
-      cursor: pointer;
-    }
-    
-    .feedback-form select option {
-      background: #1a1a2e;
-      color: white;
-    }
-    
-    .feedback-form input::placeholder,
-    .feedback-form textarea::placeholder {
-      color: rgba(255,255,255,0.4);
-    }
-    
-    .feedback-form select:focus,
-    .feedback-form input:focus,
-    .feedback-form textarea:focus {
-      border-color: rgba(255,255,255,0.3);
-      background: rgba(255,255,255,0.08);
-    }
-    
-    .feedback-form textarea {
-      resize: vertical;
-      min-height: 120px;
-    }
-    
-    .feedback-form button {
-      background: linear-gradient(135deg, #a78bfa 0%, #818cf8 100%);
-      color: #1a1a2e;
-      border: none;
-      padding: 18px 32px;
-      border-radius: 12px;
-      font-weight: 600;
-      font-size: 16px;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 8px;
-    }
-    
-    .feedback-form button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(167, 139, 250, 0.35);
-    }
-    
-    .feedback-form button span {
-      font-size: 14px;
     }
     
     /* Final CTA */
@@ -547,11 +409,12 @@
   <nav>
     <div class="container">
       <a href="#" class="logo">
-        <img src="assets/icons/icon-128.png" alt="IG Exporter">
-        IG Exporter
+        <img src="assets/icons/icon-128.png" alt="">
+        Saved Posts Library
       </a>
-      <a href="#" class="nav-cta" onclick="alert('Coming soon to Chrome Web Store!'); return false;">
-        Add to Chrome — Free
+      <a href="https://github.com/tomerhy/instagram-bookmarks-exporter"
+         class="nav-cta" target="_blank" rel="noopener noreferrer">
+        View source on GitHub
       </a>
     </div>
   </nav>
@@ -559,20 +422,36 @@
   <!-- Hero Section -->
   <section class="hero">
     <div class="container">
-      <span class="hero-badge">🚀 Free Chrome Extension</span>
-      <h1>Export Your <span>Instagram Saved Posts</span> in Seconds</h1>
+      <span class="hero-badge">Free &amp; open source Chrome extension</span>
+      <h1>A Local <span>Library</span> of the Posts You Saved</h1>
       <p class="hero-subtitle">
-        Finally backup and download all your Instagram saved posts, images, and videos. 
-        Never lose your favorite content again.
+        Capture stores the links and post details from your saved posts on your
+        own computer, so you can browse and search them. Media links can expire —
+        only the files you explicitly download become durable local copies.
       </p>
-      <a href="https://github.com/tomerhy/instagram-bookmarks-exporter" class="hero-cta" target="_blank">
+      <a href="https://github.com/tomerhy/instagram-bookmarks-exporter" class="hero-cta" target="_blank" rel="noopener noreferrer">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        View on GitHub
+        View source on GitHub
       </a>
-      <p class="hero-note">⚡️ Free & Open Source • Chrome Extension</p>
-      
+      <p class="hero-note">
+        Version 4.4.3 &middot; Manifest V3 &middot; no analytics, no remote code.
+        Not currently listed on the Chrome Web Store. Read the source before you
+        trust it.
+      </p>
+
       <div class="hero-screenshot">
-        <img src="assets/screenshots/screenshot-2-gallery.png" alt="IG Exporter Gallery View - Browse and download your saved Instagram media">
+        <!-- Neutral placeholder. The previous image here was
+             the old screenshot-2-gallery.png marketing capture, which shows real
+             third-party Instagram usernames and identifiable people and is
+             disqualified (COMPLIANCE_EVIDENCE.md, finding OF-3). It must not be
+             republished. Replace this block only with a synthetic screenshot
+             produced per SCREENSHOT_PLAN.md. -->
+        <div class="screenshot-placeholder" role="img"
+             aria-label="Screenshot placeholder: a synthetic screenshot will go here">
+          <span>Screenshot pending</span>
+          <small>A synthetic screenshot, using placeholder accounts and no real
+          posts, will replace this.</small>
+        </div>
       </div>
     </div>
   </section>
@@ -581,21 +460,27 @@
   <section class="features">
     <div class="container">
       <div class="features-header">
-        <h2>Everything You Need to Export Instagram Media</h2>
-        <p>Simple, fast, and reliable. No more screenshots or manual downloads.</p>
+        <h2>What It Does</h2>
+        <p>Two steps: capture builds a local library of links and details;
+           download saves the files you choose.</p>
       </div>
       
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">🎠</div>
-          <h3>Capture Carousels & Reels</h3>
-          <p>Automatically captures all slides from carousels and video reels. No content left behind.</p>
+          <h3>Carousels &amp; Reels</h3>
+          <p>Album structure is preserved, so slides stay grouped and in order.
+             Instagram usually sends only the cover image for a carousel in the
+             feed — opening the post is what makes the remaining slides
+             available to capture. Yield is not guaranteed.</p>
         </div>
         
         <div class="feature-card">
           <div class="feature-icon">🔄</div>
           <h3>Smart Deduplication</h3>
-          <p>Automatically detects and skips duplicate content, ensuring you only get unique media files.</p>
+          <p>The same post seen twice is recorded once. Media links carry
+             expiring signatures, so they are normalised before comparison
+             rather than matched as raw text.</p>
         </div>
         
         <div class="feature-card">
@@ -612,14 +497,20 @@
         
         <div class="feature-card">
           <div class="feature-icon">🔒</div>
-          <h3>100% Private</h3>
-          <p>Everything runs locally in your browser. No data is ever sent to external servers.</p>
+          <h3>Stays on your computer</h3>
+          <p>Your library is stored locally. It is not sent to the developer, and
+             there is no analytics. When you view a preview or download a file,
+             your browser fetches that media from Instagram&rsquo;s CDN.</p>
         </div>
         
         <div class="feature-card">
           <div class="feature-icon">⚡</div>
-          <h3>Lightning Fast</h3>
-          <p>Optimized for speed. Capture hundreds of posts in minutes, not hours.</p>
+          <h3>Runs only when you start it</h3>
+          <p>Nothing is read until you press Start capture and accept the
+             disclosure. While it runs, the page scrolls for you so a large
+             collection is recorded without clicking through every post.
+             Pressing Stop ends it, and it never resumes on its own — not on a
+             new tab, not after a browser restart.</p>
         </div>
       </div>
     </div>
@@ -629,15 +520,22 @@
   <section class="how-it-works">
     <div class="container">
       <div class="how-it-works-header">
-        <h2>Export in 3 Simple Steps</h2>
-        <p>No technical knowledge required. Just click, scroll, and download.</p>
+        <h2>How it works</h2>
+        <p>
+          Two separate things happen, and the difference matters:
+          <strong>capture</strong> records links and post details into a local
+          library, and <strong>download</strong> saves actual media files when
+          you ask for them. Captured links can expire, so only what you download
+          is yours to keep offline.
+        </p>
       </div>
       
       <div class="steps">
         <div class="step">
           <div class="step-number">1</div>
           <h3>Install the Extension</h3>
-          <p>Add IG Exporter to Chrome with one click. Takes less than 5 seconds.</p>
+          <p>Load it from source in Chrome &mdash; it is not currently listed on
+             the Chrome Web Store.</p>
         </div>
         
         <div class="step">
@@ -648,85 +546,33 @@
         
         <div class="step">
           <div class="step-number">3</div>
-          <h3>Capture & Download</h3>
-          <p>Click "Start Capture" to automatically scan posts, then open Gallery to view and download.</p>
+          <h3>Capture &amp; Download</h3>
+          <p>Press <strong>Start capture</strong>. A disclosure appears the first
+             time, listing exactly what gets recorded; capture begins only after
+             you accept it. Then open the Library to browse, search and
+             download.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- Social Proof -->
-  <section class="social-proof">
-    <div class="container">
-      <div class="social-proof-header">
-        <h2>Loved by Instagram Users</h2>
-        <p>Join thousands who've saved their favorite content</p>
-      </div>
-      
-      <div class="testimonials">
-        <div class="testimonial">
-          <div class="testimonial-stars">★★★★★</div>
-          <p class="testimonial-text">"Finally! I've been looking for something like this for years. Saved all my bookmarks in under 10 minutes."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar">S</div>
-            <div>
-              <div class="author-name">Sarah M.</div>
-              <div class="author-role">Content Creator</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="testimonial">
-          <div class="testimonial-stars">★★★★★</div>
-          <p class="testimonial-text">"Super easy to use. The selection feature is amazing — I can pick exactly what I want to download."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar">J</div>
-            <div>
-              <div class="author-name">Jake T.</div>
-              <div class="author-role">Photographer</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="testimonial">
-          <div class="testimonial-stars">★★★★★</div>
-          <p class="testimonial-text">"Works exactly as advertised. Clean interface, fast downloads. This should be built into Instagram!"</p>
-          <div class="testimonial-author">
-            <div class="author-avatar">M</div>
-            <div>
-              <div class="author-name">Maria L.</div>
-              <div class="author-role">Social Media Manager</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- Feedback Section -->
-  <section class="feedback-section">
+  <section class="feedback">
     <div class="container">
       <div class="feedback-content">
-        <h2>We'd Love Your Feedback</h2>
-        <p>Found a bug or have a feature request? Let us know!</p>
-        
-        <form class="feedback-form" action="https://formspree.io/f/mdalorok" method="POST">
-          <select name="feedback_type" required>
-            <option value="" disabled selected>Select feedback type...</option>
-            <option value="bug">🐛 Bug Report</option>
-            <option value="feature">✨ Feature Request</option>
-            <option value="question">❓ Question</option>
-            <option value="other">💬 Other</option>
-          </select>
-          
-          <input type="email" name="email" placeholder="Your email (optional)">
-          
-          <textarea name="message" placeholder="Tell us more..." rows="5" required></textarea>
-          
-          <button type="submit">
-            <span>➤</span> Send Feedback
-          </button>
-        </form>
+        <h2>Feedback and bug reports</h2>
+        <p>
+          Found a bug, or want to suggest something? Open an issue on GitHub.
+          There is no form here on purpose: a form would mean collecting your
+          email address and message through a third-party service, and this
+          project does not collect anything it does not need.
+        </p>
+        <p>
+          <a class="btn-link" href="https://github.com/tomerhy/instagram-bookmarks-exporter/issues"
+             target="_blank" rel="noopener noreferrer">Open an issue on GitHub</a>
+        </p>
       </div>
     </div>
   </section>
@@ -734,27 +580,38 @@
   <!-- Final CTA -->
   <section class="final-cta">
     <div class="container">
-      <h2>Ready to Export Your Saved Posts?</h2>
-      <p>Stop losing your favorite Instagram content. Start backing up today.</p>
-      <a href="https://github.com/tomerhy/instagram-bookmarks-exporter" class="hero-cta" target="_blank">
+      <h2>Keep a local library of the posts you saved</h2>
+      <p>
+        The source is public so you can read exactly what it does before you
+        trust it.
+      </p>
+      <a href="https://github.com/tomerhy/instagram-bookmarks-exporter" class="hero-cta" target="_blank" rel="noopener noreferrer">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        Get It Free on GitHub
+        View Source on GitHub
       </a>
     </div>
   </section>
 
   <!-- Footer -->
-  <footer>
+  <div class="container" style="max-width:900px;margin:0 auto;padding:24px 20px;">
+      <p style="font-size:13px;line-height:1.6;color:#666;border-left:3px solid var(--primary);padding-left:14px;">
+        <strong>Independent third-party extension.</strong> Not affiliated with,
+        authorized by, endorsed by, or sponsored by Instagram or Meta.
+        &ldquo;Instagram&rdquo; is a trademark of Meta Platforms, Inc., used only
+        to describe factually where this extension works.
+      </p>
+    </div>
+    <footer>
     <div class="container">
       <div class="footer-content">
         <div class="footer-logo">
-          <img src="assets/icons/icon-128.png" alt="IG Exporter">
-          IG Exporter
+          <img src="assets/icons/icon-128.png" alt="">
+          Saved Posts Library
         </div>
         <div class="footer-links">
           <a href="privacy-policy.html">Privacy Policy</a>
-          <a href="https://formspree.io/f/mdalorok" target="_blank">Contact</a>
-          <a href="https://github.com/tomerhy/instagram-bookmarks-exporter" target="_blank">GitHub</a>
+          <a href="https://github.com/tomerhy/instagram-bookmarks-exporter/issues" target="_blank" rel="noopener noreferrer">Report an issue</a>
+          <a href="https://github.com/tomerhy/instagram-bookmarks-exporter" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
       </div>
     </div>
