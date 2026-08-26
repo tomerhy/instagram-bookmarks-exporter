@@ -1,28 +1,64 @@
-# Landing page — deployment checklist (v4.4.2)
+# Landing page — deployment checklist (v4.4.3)
 
-> ## ⚠ Deployment is NOT part of this task
+> ## ⚠ Still not deployed — and the mechanism is now known exactly
 >
-> `index.html` was remediated **in this repository only**. Nothing has been
-> deployed, published, or pushed to a hosting provider as part of the
-> compliance work, and this checklist must not be automated. A human has to run
-> it deliberately.
+> `index.html` is remediated **in this repository only**, on the release branch.
+> Nothing has been published. What changed on 2026-08-26 is that the hosting
+> setup was read from the GitHub API instead of inferred, so this is no longer
+> guesswork — see §1.
 >
-> Until someone does, **the public page still serves the old branding and the
-> fabricated testimonials.** That is the single highest-value outstanding
-> action after the extension package itself: the page is public, indexed, and
-> directly contradicts what the appeal will claim.
+> **GitHub Pages serves `main` at the repository root.** The release work is on
+> `v4.4.1-cws-remediation`. Therefore the remediated page is *not* live and will
+> not become live until `index.html` reaches `main`.
+>
+> The live page was checked by reading `origin/main:index.html` — no external
+> request needed. It still contains **18 testimonial references, one named
+> fabricated reviewer, three star glyphs, an install/user count, an "Add to
+> Chrome" call to action for an extension that is not listed, a stale
+> `og:image`, and four "Export Instagram…" headlines.**
+>
+> This is the single highest-value outstanding action after the extension
+> package itself. The page is public, indexed, and directly contradicts what the
+> appeal will claim. It was deliberately **not** published by the compliance
+> work: pushing to `main` publishes public content, which is a decision for the
+> repository owner to make and to time against the appeal.
 
 ---
 
 ## 1. The deployed URL
 
+Read from the GitHub API on 2026-08-26
+(`gh api repos/tomerhy/instagram-bookmarks-exporter/pages`), not inferred:
+
 | | |
 |---|---|
-| Believed live URL | `https://tomerhy.github.io/instagram-bookmarks-exporter/` |
-| Evidence | `index.html` `<meta property="og:url">` names this exact URL |
-| Hosting | GitHub Pages, inferred from the URL shape and the `raw.githubusercontent.com` OG image reference |
-| Verified live by this audit | **No.** No external request was made — contacting third parties was out of scope. **Confirm it resolves before assuming it needs work, and confirm it after deploying.** |
-| Source branch/folder serving it | **Unknown.** Check the repository's Pages settings. If it serves `main`, the remediated `index.html` will not go live until the work is merged there. |
+| Live URL | `https://tomerhy.github.io/instagram-bookmarks-exporter/` |
+| Hosting | GitHub Pages, `build_type: legacy` |
+| Source | **branch `main`, path `/`** |
+| Status | `built` |
+| HTTPS enforced | yes |
+| Custom domain | none (`cname: null`) |
+| Public | yes |
+
+**So deployment means: get the remediated files onto `main`.** There is no
+CI workflow, no `gh-pages` branch, no Netlify/Vercel config, and no `CNAME` —
+Pages rebuilds by itself when `main` changes. Nothing else to configure.
+
+The page-relevant files that differ between `origin/main` and the v4.4.3 release
+commit:
+
+```
+index.html
+privacy-policy.html
+manifest.json
+assets/icons/icon-{16,32,48,128}.png
+assets/icons/icon-source.png
+assets/icons/portrait-source.png
+```
+
+`index.html` references `assets/icons/icon-128.png` for the nav and footer
+logos, so the icons must land on `main` in the same change or the deployed page
+will show the old artwork — or a broken image.
 
 Also note: the **repository name itself** (`instagram-bookmarks-exporter`)
 appears in the public URL and in the OG image URL. Renaming the repository
@@ -240,9 +276,29 @@ grep -c 'Saved Posts Library' index.html                  # expect >= 1
 
 Deployment interacts with the appeal, so sequence matters:
 
-1. Recapture screenshots and regenerate the OG image (both still show old UI).
-2. Host `privacy-policy.html` publicly; add the link to the landing page.
-3. Deploy the landing page. Run §7.
+1. ~~Recapture screenshots~~ — **done.** Six compliant frames are in
+   `assets/store-screenshots/`; see `SCREENSHOT_PLAN.md`. The OG image was
+   removed rather than regenerated, because the tag pointed at a file that never
+   existed. Add one only if it is actually wanted.
+2. `privacy-policy.html` is already in the repository root, so it deploys with
+   the page and the existing in-page link resolves. Nothing extra to host.
+3. **Deploy: put the remediated files on `main`.** Then run §7 against the live
+   URL. Two ways, both ordinary:
+
+   ```bash
+   # merge the release branch (brings the whole v4.4.3 release with it)
+   git checkout main && git merge --no-ff v4.4.1-cws-remediation && git push origin main
+   ```
+
+   ```bash
+   # or take only the page-facing files, if main should not receive the release yet
+   git checkout main
+   git checkout v4.4.1-cws-remediation -- index.html privacy-policy.html assets/icons
+   git commit -m "landing page: publish the v4.4.3 remediated page" && git push origin main
+   ```
+
+   The second form is the safer one if the appeal timing matters: it fixes the
+   public page without moving the extension release onto `main`.
 4. Only then contact the store or respond to the report — so that anyone who
    follows a link finds the remediated page, not the old one.
 

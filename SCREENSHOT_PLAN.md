@@ -74,8 +74,8 @@ and `compose_screenshots.py` were **removed from the repository** in this
 change. They are not merely unused:
 
 1. **They contained real third-party personal data.** `screenshot-2-gallery.png`
-   alone showed at least three identifiable Instagram usernames (`@deezee`,
-   `@emma.joyce.model`, `@lola.belle.bb`), photographs of identifiable people,
+   alone showed at least three identifiable Instagram usernames (`@d****e`,
+   `@e***a.j***e.m***l`, `@l**a.b***e.bb`), photographs of identifiable people,
    and real post captions. Those people never consented to appearing in a store
    listing for a third-party extension. This was finding OF-3, and leaving the
    files in a public git repository was itself the problem — excluding them from
