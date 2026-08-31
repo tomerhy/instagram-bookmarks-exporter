@@ -146,8 +146,14 @@ PRIVACY
 • Three things are requested and nothing else: the "storage" permission, the
   "unlimitedStorage" permission, and access to instagram.com.
 • Delete everything at any time with "Clear all data".
+• Every URL is re-checked against a fixed allowlist of Instagram/Meta addresses
+  before it is shown, fetched, opened, copied or exported — including anything
+  restored from a JSON import.
+• The extension's own pages run under a Content Security Policy, and contain no
+  remotely loaded code.
 
-Full privacy policy: [YOUR PRIVACY POLICY URL]
+Full privacy policy:
+https://tomerhy.github.io/saved-posts-library-export/privacy-policy.html
 
 
 WHAT THIS IS NOT
@@ -168,20 +174,6 @@ You are responsible for your own use of instagram.com, including its Terms of
 Use.
 
 
-WHAT THIS VERSION DOES
-
-• Records loaded from storage are sanitised on the way in, not just on import,
-  so a URL saved by an older build cannot reach the gallery unvalidated. The
-  cleaned library is written back, so unsafe values are removed permanently.
-• Every place a URL is displayed, fetched, opened, copied or exported
-  re-checks it against a fixed allowlist of Instagram/Meta addresses.
-• The video fallback view is built with DOM methods instead of assembled HTML,
-  so no stored value can become markup.
-• Added a Content Security Policy restricting the extension's own pages.
-• Renamed for accuracy: it maintains a library and downloads on request, rather
-  than making a complete backup by itself.
-• Corrected the store description and privacy policy where they overstated what
-  capture produces.
 ```
 
 
