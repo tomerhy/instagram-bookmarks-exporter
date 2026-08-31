@@ -201,7 +201,7 @@ Every line below was in it.
 |---|---|
 | `"@deezee shoes #sale"` as a search example | A **real third-party username**. Finding OF-3. Must never be republished in any form. |
 | "IG Exporter — Export Your Instagram Saved Posts" | Old product name, and uses the mark as a product descriptor rather than descriptively. This is the substance of the trademark complaint. |
-| "100% Private — No data is ever sent to external servers" | False as an absolute: previews and downloads fetch from Instagram's CDN. The version that said it also shipped Google Analytics. |
+| "100% Private", followed by an absolute denial that anything is sent to outside servers *(paraphrased deliberately — `tests/disclosure-consistency.test.js` forbids that sentence verbatim in any document, including this one, and it is right to: quoting it is how it creeps back)* | False as an absolute: previews and downloads fetch from Instagram's CDN. The version that said it also shipped Google Analytics. |
 | "★ NEW in v4.3" | Star glyph, scrubbed from every surface. |
 | "backups that survive across browsers" | Capture stores links, not files, and links expire. |
 | "Download videos and reels at full quality" | Video download opens a tab; the CDN does not send permissive CORS headers (`gallery.js`, the `isVideo` branch). |
