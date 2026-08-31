@@ -76,81 +76,104 @@ reviewer will diff them.
 
 ## Full description
 
+Rewritten for the new listing. It keeps the scannability of the old copy and
+drops everything that made the old copy a liability — see "What the previous
+description got wrong" below, which is kept as a checklist so none of it creeps
+back.
+
 ```
-Saved Posts Library & Export keeps a local library of the posts you have saved
-on instagram.com — the links and the details — and lets you download the media
-you choose to keep.
+Keep a searchable local library of the posts you saved, and download the ones
+you want to keep.
 
-Independent third-party extension. Not affiliated with, authorized by,
-endorsed by, or sponsored by Instagram or Meta.
-
-
-WHAT IT ACTUALLY DOES
-
-Two separate steps, and the difference matters:
-
-1. CAPTURE builds a local library of links and details — media URLs, post
-   links, usernames, captions, dates, like counts, hashtags, album structure.
-   This is stored on your computer. It is not the media files themselves.
-
-2. DOWNLOAD saves actual files. When you press Download, or build a ZIP, the
-   extension requests those media files from Instagram's CDN and saves them to
-   your computer. Only files you download this way are yours to keep offline.
-
-Captured links can stop working. Instagram's media URLs expire, and a deleted
-post stops resolving. A captured library is therefore not a permanent backup of
-the media on its own — download what you want to keep.
+Independent third-party extension. Not affiliated with, authorized by, endorsed
+by, or sponsored by Instagram or Meta.
 
 
 HOW IT WORKS
 
-1. Open your saved posts on instagram.com and sign in as you normally would.
-2. Click the extension icon and press "Start capture".
-3. The extension scrolls the page so more of your saved posts load, and records
-   the links and details it sees.
-4. Press "Stop capture" when you have enough — or just close the tab.
-5. Open the Library to browse and search, then download what you want.
+Open your saved posts on instagram.com, signed in as you normally are. Press
+Start capture. The extension scrolls the page so more of your saved posts load,
+and records what it sees into a library on your computer. Press Stop when you
+have enough.
 
 Capture is off until you press Start. Opening instagram.com does not start it,
-and reloading the page turns it off again.
+and reloading the page turns it off again. The first time you press Start, a
+dialog tells you exactly what gets recorded and waits for you to accept.
+
+
+TWO STEPS, AND THE DIFFERENCE MATTERS
+
+CAPTURE records links and details — media URLs, post links, usernames,
+captions, dates, like counts, hashtags, album structure. Stored locally. Not the
+media files themselves.
+
+DOWNLOAD saves actual files, when you ask for them. Only what you download this
+way is yours to keep offline.
+
+Media links expire, and a deleted post stops resolving — so a captured library
+is a searchable index, not a permanent copy of the media. Download what you
+want to keep.
 
 
 WHAT YOU GET
 
-• A searchable local library of the posts you saved
-• Post details kept with each item: author, caption, date, like count, hashtags
-• Multi-image albums kept together, in order
-• Download individual images and videos as files
-• ZIP download for a whole album, or for your library grouped by author
-• Search by caption, @author, or #hashtag; sort by date or author
-• JSON export and import, so your library is portable between browsers
-• CSV export for spreadsheets
-• Browsing and searching your library works offline. Viewing a preview or
-  downloading a file needs a connection, because the media is fetched from
-  Instagram's CDN at that moment.
+Search that works
+  Search by caption text, @account or #hashtag, and mix them — "@demo_photos
+  linen #summer" narrows to items matching all three. Filters as you type.
+
+Albums stay together
+  Every slide of a multi-image post is kept in order. Click the album badge on
+  a card to expand the whole set inline, without leaving the grid.
+
+Details kept with every item
+  Author, caption, date, like count and hashtags travel with each item, which
+  is what makes the search useful.
+
+Videos and reels
+  Captured with the rest, with inline playback and a slideshow at 2, 3 or 5
+  seconds. Note: video files are usually served without the headers a browser
+  needs to save them directly, so Download opens the video in a tab for you to
+  save yourself.
+
+Downloads and exports
+  Single images, a ZIP of one album, or your whole library zipped and grouped
+  by author. Export as JSON and import it back, so your library moves between
+  browsers. Export as CSV for a spreadsheet.
+
+A badge that means something
+  The toolbar badge counts what is new since you last opened the library, not a
+  running total.
+
+No duplicates
+  Media links carry expiring signatures, so the same post looks different every
+  time it reloads. Links are normalised before comparison, so one post is
+  recorded once.
 
 
 PRIVACY
 
-• Your library is stored on your own computer, in Chrome's local extension
-  storage. It is not uploaded anywhere.
-• No analytics. No tracking. No advertising. No developer server.
-• The extension never asks for, reads, or stores your password, your cookies,
-  your session tokens, or your two-factor codes. There is no login form
-  anywhere in it.
-• It uses the session you are already signed into, only by reading the page you
-  are already looking at.
-• When the Library shows a preview, or when you download, your browser requests
-  that media from Instagram/Meta CDN addresses. That is the only outbound
-  traffic, and it goes to Instagram, not to the developer.
-• Three things are requested and nothing else: the "storage" permission, the
-  "unlimitedStorage" permission, and access to instagram.com.
-• Delete everything at any time with "Clear all data".
-• Every URL is re-checked against a fixed allowlist of Instagram/Meta addresses
-  before it is shown, fetched, opened, copied or exported — including anything
-  restored from a JSON import.
-• The extension's own pages run under a Content Security Policy, and contain no
-  remotely loaded code.
+Your library is stored on your own computer, in Chrome's local extension
+storage. It is not uploaded anywhere.
+
+No analytics. No tracking. No advertising. No developer server. No account.
+
+The extension never asks for, reads or stores your password, cookies, session
+tokens or two-factor codes. There is no login form anywhere in it. It reads the
+page you are already looking at, using the session you are already signed into.
+
+One kind of outbound request exists: when the library shows you a preview, or
+when you download, your browser fetches that media from Instagram/Meta CDN
+addresses. That traffic goes to Instagram, not to the developer.
+
+Three things are requested and nothing else: the "storage" permission, the
+"unlimitedStorage" permission, and access to instagram.com.
+
+Every URL is re-checked against a fixed allowlist of Instagram/Meta addresses
+before it is shown, fetched, opened, copied or exported — including anything
+restored from a JSON import. The extension's own pages run under a Content
+Security Policy and load no remote code.
+
+Delete everything at any time with "Clear all data".
 
 Full privacy policy:
 https://tomerhy.github.io/saved-posts-library-export/privacy-policy.html
@@ -158,24 +181,36 @@ https://tomerhy.github.io/saved-posts-library-export/privacy-policy.html
 
 WHAT THIS IS NOT
 
-This extension does not work around any login, paywall, or content restriction,
-and it cannot see anything you could not already see yourself in your own
-browser. It never accesses content you are not already authorised to view.
+It does not work around any login, paywall or content restriction, and it
+cannot see anything you could not already see yourself. If you follow a private
+account, posts you saved from it are visible to you, so the extension can
+process them — it gains you no access you did not already have.
 
-If you follow a private account, posts you saved from it are visible to you, and
-the extension can therefore process them — because you already have access. It
-gains you no access you did not already have.
-
-The content itself still belongs to whoever posted it. Saving a copy for
-yourself is not the same as owning it, and redistributing it is your
-responsibility, not the extension's.
-
+The content belongs to whoever posted it. Saving a copy for yourself is not the
+same as owning it, and what you do with it afterwards is your responsibility.
 You are responsible for your own use of instagram.com, including its Terms of
 Use.
-
-
 ```
 
+### What the previous description got wrong
+
+The listing on the removed item is quoted here as a checklist, not for reuse.
+Every line below was in it.
+
+| In the old copy | Why it cannot be reused |
+|---|---|
+| `"@deezee shoes #sale"` as a search example | A **real third-party username**. Finding OF-3. Must never be republished in any form. |
+| "IG Exporter — Export Your Instagram Saved Posts" | Old product name, and uses the mark as a product descriptor rather than descriptively. This is the substance of the trademark complaint. |
+| "100% Private — No data is ever sent to external servers" | False as an absolute: previews and downloads fetch from Instagram's CDN. The version that said it also shipped Google Analytics. |
+| "★ NEW in v4.3" | Star glyph, scrubbed from every surface. |
+| "backups that survive across browsers" | Capture stores links, not files, and links expire. |
+| "Download videos and reels at full quality" | Video download opens a tab; the CDN does not send permissive CORS headers (`gallery.js`, the `isVideo` branch). |
+| "Lightning Fast — scan hundreds of posts in minutes" | Unsupported performance claim. |
+| "Click Capture All" | The button is **Start capture**. |
+| "premium" ×2, "Beautiful", "Smart", "no limits" | Superlatives and absolutes. |
+| v4.3.x changelog, and the "Optional bonus:" note | History the new item does not have, plus instructions-to-self that would be pasted in by accident. |
+| Non-affiliation as a "Note:" in last place | It belongs in the first screenful. |
+| No mention that capture is off until you press Start | The central compliance point, and now the third paragraph. |
 
 ---
 
