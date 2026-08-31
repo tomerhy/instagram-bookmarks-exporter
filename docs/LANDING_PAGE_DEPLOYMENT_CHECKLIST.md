@@ -28,11 +28,11 @@
 ## 1. The deployed URL
 
 Read from the GitHub API on 2026-08-26
-(`gh api repos/tomerhy/instagram-bookmarks-exporter/pages`), not inferred:
+(`gh api repos/tomerhy/saved-posts-library-export/pages`), not inferred:
 
 | | |
 |---|---|
-| Live URL | `https://tomerhy.github.io/instagram-bookmarks-exporter/` |
+| Live URL | `https://tomerhy.github.io/saved-posts-library-export/` |
 | Hosting | GitHub Pages, `build_type: legacy` |
 | Source | **branch `main`, path `/`** |
 | Status | `built` |
@@ -60,11 +60,18 @@ assets/icons/portrait-source.png
 logos, so the icons must land on `main` in the same change or the deployed page
 will show the old artwork — or a broken image.
 
-Also note: the **repository name itself** (`instagram-bookmarks-exporter`)
-appears in the public URL and in the OG image URL. Renaming the repository
-would remove that last piece of branding from the address, at the cost of
-breaking every existing inbound link. That is a judgement call, not a
-requirement.
+**The repository rename is done.** This paragraph used to argue for it as a
+judgement call; it was carried out on 2026-08-31 —
+`instagram-bookmarks-exporter` → `saved-posts-library-export` — so the public
+URL no longer contains the mark. See `COMPLIANCE_EVIDENCE.md` §20.6.
+
+The cost was real and was accepted: **the old Pages URL now returns HTTP 404.**
+GitHub redirects a renamed repository's repo URLs but not a project site's Pages
+address, so every inbound link to
+`tomerhy.github.io/instagram-bookmarks-exporter/` is dead. If a redirect ever
+matters, the only mechanism is a separate repository at the old name serving a
+meta-refresh page — which would reintroduce the mark into a URL, and is
+therefore probably not worth it.
 
 ---
 
@@ -109,7 +116,7 @@ Already done in the working tree — verify each is present in what you deploy.
 ### Verify these are gone from the deployed page
 
 ```bash
-URL=https://tomerhy.github.io/instagram-bookmarks-exporter/
+URL=https://tomerhy.github.io/saved-posts-library-export/
 curl -s "$URL" > live.html
 
 # All must return nothing:
@@ -136,7 +143,7 @@ Check the **deployed** page, not just the repository. Run these against the live
 HTML once it is up.
 
 ```bash
-URL=https://tomerhy.github.io/instagram-bookmarks-exporter/
+URL=https://tomerhy.github.io/saved-posts-library-export/
 curl -s "$URL" > live.html
 
 # Must all return nothing:

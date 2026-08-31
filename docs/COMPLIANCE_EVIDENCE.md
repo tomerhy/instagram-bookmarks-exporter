@@ -484,7 +484,7 @@ Numbering follows the brief. Severity is this audit's own judgement.
 | **`postMessage` used `'*'` as the target origin**, broadcasting extracted media to any listener in the page. | 4.3.10 + 4.4.0 | Medium | Both directions now post to `window.location.origin` |
 | **Recursion had a depth limit but no result cap and no cycle protection** in `extractMediaFromData`. | 4.3.10 + 4.4.0 | Low | Depth lowered to 12, result cap of 400 per response added, cycle safety tested |
 | **`assets/screenshots/*.png` are real captures of Instagram's UI**, used as store listing assets. | 4.3.10 + 4.4.0 | Medium — listing risk | Not shipped in the zip (never were), but flagged: they must be recaptured before resubmission. See §13. |
-| **`index.html` is a live GitHub Pages landing page** (`og:url` = `https://tomerhy.github.io/instagram-bookmarks-exporter/`) carrying the old product name, Instagram's pink/purple gradient, and a screenshot of Instagram's UI. It is outside the extension package, but it is publicly reachable and findable by the same scanners that produced the report. | 4.3.10 + 4.4.0 | **High — live trademark exposure** | Renamed, repalletted to the extension's teal/slate, disclaimer added in the footer, alt text de-branded. **The deployed copy must be republished — see §13.** |
+| **`index.html` is a live GitHub Pages landing page** (`og:url` = `https://tomerhy.github.io/saved-posts-library-export/`) carrying the old product name, Instagram's pink/purple gradient, and a screenshot of Instagram's UI. It is outside the extension package, but it is publicly reachable and findable by the same scanners that produced the report. | 4.3.10 + 4.4.0 | **High — live trademark exposure** | Renamed, repalletted to the extension's teal/slate, disclaimer added in the footer, alt text de-branded. **The deployed copy must be republished — see §13.** |
 | **`index.html` published three fabricated testimonials as genuine user reviews** — named authors ("Sarah M.", "Jake T.", "Maria L."), job titles, five-star ratings, under the heading "Loved by Instagram Users" and "Join thousands who've saved their favorite content". One of them praised a "selection feature" that was **unreachable dead code in every shipped version**, so it cannot have been real user feedback. | 4.3.10 + 4.4.0 | **High — deceptive practice, independent of the trademark issue** | Section removed, with an HTML comment in place recording why. This was a judgement call made during remediation, not something the brief asked for: publishing invented reviews is its own policy problem and would undermine any appeal that argues the developer is acting in good faith. If any quote is genuine, restore it with real attribution. |
 
 ---
@@ -557,11 +557,11 @@ more.
 
 6a. **The landing page must be redeployed.** `index.html` was remediated in this
    repository, but the *published* GitHub Pages copy at
-   `https://tomerhy.github.io/instagram-bookmarks-exporter/` still serves the
+   `https://tomerhy.github.io/saved-posts-library-export/` still serves the
    old branding and the fabricated testimonials until it is republished. This is
    the single highest-value remaining action after the package itself: it is
    public, indexed, and directly contradicts the appeal. Note also that the
-   repository name itself (`instagram-bookmarks-exporter`) appears in the URL
+   repository name itself (`saved-posts-library-export`) appears in the URL
    and in `og:image`; renaming the repository would remove that too, at the cost
    of breaking existing links.
 
@@ -1650,6 +1650,45 @@ Unchanged from §17.8 and §19 except where noted:
   still deferred. The reason for deferring it — preserving the approved 4.4.3
   hash — **no longer applies**, since 4.4.4 already changes the package. It is
   now simply an open cosmetic item.
-- **The repository name.** `instagram-bookmarks-exporter` drove the public
+- **The repository name.** `saved-posts-library-export` drove the public
   landing-page URL and was the most prominent remaining use of the mark. See
   §20.6 for what was done about it.
+
+### 20.6 The repository was renamed
+
+`instagram-bookmarks-exporter` → **`saved-posts-library-export`**, done on
+2026-08-31 via the GitHub API.
+
+Why it mattered enough to accept the cost: the repository name was the most
+prominent surviving use of the mark. It appeared in the public clone URL, in the
+GitHub project page, and — because GitHub Pages derives a project site's address
+from the repository name — in the landing-page URL that the store listing links
+to. Every other use inside the extension is either absent (the product name has
+no "Instagram" in it) or functional and unavoidable (host permissions,
+content-script match patterns, CSP CDN hosts, and one descriptive sentence
+carrying an explicit non-affiliation disclaimer). The repository name was the one
+piece that was purely nominal, and it sat in front of a complainant who had
+already objected once, against a reply that warned about account suspension.
+
+| | Before | After |
+|---|---|---|
+| Repository | `github.com/tomerhy/instagram-bookmarks-exporter` | `github.com/tomerhy/saved-posts-library-export` |
+| Landing page | `tomerhy.github.io/instagram-bookmarks-exporter/` | `tomerhy.github.io/saved-posts-library-export/` |
+
+**What this broke, stated rather than glossed:** the old Pages URL now returns
+**HTTP 404**. GitHub redirects a renamed repository's *repo* URLs, but it does
+not redirect a project site's Pages address. Every inbound link to the old
+landing page — anything in the removed store listing, any bookmark, any search
+result — is dead. That was the price of the rename and it was accepted
+deliberately, not discovered afterwards.
+
+References updated in the same change: `index.html` (the `og:url` and six GitHub
+links), this document, and
+`LANDING_PAGE_DEPLOYMENT_CHECKLIST.md`.
+
+**Deliberately not updated:** `.claude/settings.local.json`. Its seventeen
+occurrences of the old string are local filesystem paths
+(`/Users/…/Development/instagram-bookmarks-exporter/…`). Renaming a GitHub
+repository does not move the working directory on disk, so rewriting them would
+have produced paths that do not exist. If the local folder is ever renamed to
+match, that file needs updating then — not now.
