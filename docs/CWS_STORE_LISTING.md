@@ -1,4 +1,4 @@
-# Chrome Web Store listing — Saved Posts Library & Export v4.4.4
+# Chrome Web Store listing — Saved Posts Library & Export v4.4.5
 
 Copy-ready listing text. **Nothing here is submitted automatically.**
 
@@ -12,7 +12,7 @@ Copy-ready listing text. **Nothing here is submitted automatically.**
 > That has concrete consequences for how this listing is filed:
 >
 > - **Create a new item in the dashboard and upload
->   `saved-posts-library-export-4.4.4.zip` to it.** Do not attempt to update
+>   `saved-posts-library-export-4.4.5.zip` to it.** Do not attempt to update
 >   item `hllpcahjefcijlmlnhlmhjemcgkgdghh`; it is permanently removed. The new
 >   item gets a new extension ID.
 > - **Do not re-appeal the old item.** The stated bar is that a removal is
@@ -410,8 +410,8 @@ control.
 ## Screenshots
 
 **Upload these six, in this order.** They are in `assets/store-screenshots/`,
-generated from the real 4.4.4 UI with synthetic data (the version badge in
-frames 1 and 3 reads `v4.4.4`):
+generated from the real 4.4.5 UI with synthetic data (the version badge in
+frames 1 and 3 reads `v4.4.5`):
 
 | # | File | Caption to use (optional) |
 |---|---|---|

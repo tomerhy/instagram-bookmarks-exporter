@@ -1495,7 +1495,12 @@ any user's Instagram account or to any Google account.
 
 ---
 
-## 20. Version 4.4.4 — the appeal outcome, and the package that follows from it
+## 20. Version 4.4.4 — the appeal outcome; package superseded by §21
+
+> **The package described here is superseded.** §21 (4.4.5) is authoritative for
+> the current artifact and its hash. Everything else in this section stands —
+> §20.1, the appeal outcome and the new-item route, is not repeated in §21 and
+> is still the operative account of where the submission stands.
 
 ### 20.1 Google denied the appeal and named the only remaining route
 
@@ -1692,3 +1697,116 @@ occurrences of the old string are local filesystem paths
 repository does not move the working directory on disk, so rewriting them would
 have produced paths that do not exist. If the local folder is ever renamed to
 match, that file needs updating then — not now.
+
+---
+
+## 21. Version 4.4.5 — OF-4 closed, and the current package
+
+### 21.1 What changed
+
+One thing: the donation button's colour. `gallery.html` styled `#donate` with
+`linear-gradient(135deg, #f5af19, var(--accent))` and two amber box-shadows.
+
+`#f5af19` is **not** an Instagram brand colour, it is not in the brand-hex list
+`tests/compliance.test.js` scans for, and that test passed throughout. So this
+was never a trade-dress problem and it had no bearing on the removal. It was an
+**internal inconsistency**: several documents here state the palette is
+"teal/slate, no pink, magenta, orange or purple anywhere", and an amber gradient
+contradicted that in writing. It was also visible in store screenshot 6, so a
+reviewer comparing the screenshots against the claim would have found it before
+we did.
+
+It is now `linear-gradient(135deg, var(--accent-deep), var(--accent-bright))`
+with teal shadows. The button stays visually distinct from the flat `--accent`
+Download button by being a *gradient*, not by being a different hue.
+
+`#f5af19` still appears once in `gallery.html`, inside the comment that records
+what the value used to be and why it changed — the same convention as the
+`tokens.css` comment listing the Instagram brand hexes the palette once had.
+The compliance scan strips comments, which is why that convention is safe.
+
+**Finding OF-4 (§19.4) is closed.**
+
+### 21.2 Why this needed a version bump rather than a rebuild
+
+4.4.4 was tagged, and the tag annotation states its package SHA-256. Changing a
+shipped file and rebuilding under the same version number would have produced
+two different artifacts both calling themselves 4.4.4 — which is precisely the
+class of inconsistency §20.3 exists to prevent. So: 4.4.5.
+
+**4.4.4 was never published anywhere.** No user ever received it, and the new
+Chrome Web Store item had not been created. Tag `v4.4.4` is retained as the
+record of that build; 4.4.5 supersedes it before first release.
+
+### 21.3 The package
+
+| | |
+|---|---|
+| Path | `saved-posts-library-export-4.4.5.zip` (repository root) |
+| Size | 144960 bytes |
+| **SHA-256** | `b7c690f0de043514ce6a3b7d702de25a802226465f1e8a77373efd67c6fb81e7` |
+| Files | 18 (no directory entries) |
+| Built by | `./build.sh` |
+| Reproducible | Yes — repeated builds produce the same hash |
+| Test suite | **441 tests, 441 passing, 0 failing** |
+
+**Exactly two files differ from the 4.4.4 package:** `gallery.html` (the
+recolour) and `manifest.json` (the version field). Everything else — including
+all four icons — is byte-identical.
+
+Superseded hashes, listed so nobody mistakes one for current:
+
+| Version | SHA-256 | Status |
+|---|---|---|
+| 4.4.3 | `91373ce6…975a90` | superseded; the build the reviewer approved and the manual run tested |
+| 4.4.4 | `f912a736…19eed6` | superseded; never published |
+| **4.4.5** | **`b7c690f0…fb81e7`** | **current** |
+
+Per-file SHA-256:
+
+```
+203f43a11a68efc3cd50a77548e3b52ebdcf5bd8f29dd6e8bf2d687ea9184b8d  assets/icons/icon-128.png
+2b5de0e290f36a6cf3559f10a89e0829ee52f9964d95f3640da33935f9c911e3  assets/icons/icon-16.png
+df7c937842f622ecd3f8058c3878cbb48ac88a2dd20f96b802eef1467c3bc7ed  assets/icons/icon-32.png
+8df413315dd4da280570d238ea185a74e7a5b24fd56875ef3c064da993a174b8  assets/icons/icon-48.png
+50bd3f8a612c18e321f6585404482aa5224ca2fd77886c2da764f592d795ac30  background.js
+fb24d1d5ab9f74bc677976a5b84460913a7060b84dc97ae5bd2eb5c4131d22e7  capture-hook.js
+207e65e90be1d709329f554674d2539c210e8bfc657fbcb3a656b688fc9b73d4  content.js
+79a60fd4ed9f63e3fbfc6a3f6479d8933d93627d37c8ab16b1f3ad5307078c61  gallery.html
+b6d3e6ce9dd9d0d9426b2dd6cab4eb5bc0e13d8c19bb1895fb9582a4abefd719  gallery.js
+b24af7e2af122dcbfb16739d4841c271253d938f9b4940d06092cdb9f5b4c1b7  legacy-cleanup.js
+acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e  lib/jszip.min.js
+5911b3bbb9c45abe9d9b17b895d4647d49e0b2ac2030a3e43ec5bfb01f2a29f0  library-sanitize.js
+4d80fa36e32a865efa214a6daaf9cf26d434392853e5666d4d3e6995e9afc2d6  manifest.json
+521df2af71eb9f715e6503ac2d26fe6254f07a3ee80f19c7da03a89326f689e1  popup.html
+ccc64996e8ed62055f614bd93379af9253dfd909658c01171ea6920520ef25fa  popup.js
+9a95061b41a43599c473dd312d002d0717b91c5dba4a10ed14f3e5eed35fdb5a  privacy-policy.html
+7ba96e7f53dcabae3ebfad6ef71e950d768e5f37e9382ce0748889256a08871f  tokens.css
+578b3a513c055ea4e5ac7f9139df7e16e6908d541648b02d0fd29ddfd5185834  url-allowlist.js
+```
+
+### 21.4 Effect on the manual Chrome validation
+
+Unchanged from §20.4 in substance. The 2026-08-26 run was against 4.4.3.
+
+- **Still transfers:** every behavioural check. `gallery.html` changed by three
+  CSS declarations; no script, no markup structure, no logic.
+- **Still needs eyes once:** §1 step 4, the icon's visual check, carried over
+  from 4.4.4.
+- **Newly worth a glance, though not a blocker:** §13 step 3, "confirm the
+  palette is teal/slate — no pink, magenta, orange, or purple anywhere". That
+  assertion is now actually true of the whole UI, which it was not before.
+
+### 21.5 Still open
+
+Unchanged from §20.5, minus OF-4 which is closed above. Restated because it is
+the list that matters before submission:
+
+- **Instagram Terms of Use risk** (§13) — unresolved, and one of the two
+  conditions Google attached to republishing.
+- **Publisher account standing** — unverified. Requires the Developer Dashboard.
+- **The trademark complaint** — Google recused itself. Between the developer and
+  the complainant. Not legal advice.
+- **The GA4 API secret** in public git history, still not revoked. No shipped
+  code references it; analytics was deleted in 4.4.1. Console action only.
+- **Netcraft report 91984778** — separate track, no record of resolution.

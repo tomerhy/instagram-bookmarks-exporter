@@ -31,15 +31,20 @@ Items 7, 8 and 10 were new in 4.4.2; items 11 and 12 are new in 4.4.3.
 > document for exactly what was reported, by whom, and what was *not* reported.
 > The plan below is retained unchanged as the reusable procedure.
 >
-> **The current package is 4.4.4 and this plan has not been re-run against it.**
-> It does not need to be re-run in full: exactly five files differ from 4.4.3 —
-> the four icons and `manifest.json`'s version field — and **every JavaScript,
-> HTML and CSS file in the package is byte-identical**, so the code exercised by
-> every behavioural check is unchanged. See `COMPLIANCE_EVIDENCE.md` §20.2.
+> **The current package is 4.4.5 and this plan has not been re-run against it.**
+> It does not need to be re-run in full. Six files differ from 4.4.3: the four
+> icons, `manifest.json`'s version field, and three CSS declarations in
+> `gallery.html` that recoloured the donation button. **No script, no markup
+> structure and no logic changed**, so the code exercised by every behavioural
+> check is unchanged. See `COMPLIANCE_EVIDENCE.md` §20.2 and §21.1.
 >
 > **One step does need redoing: §1 step 4**, the visual check of the icon on the
 > `chrome://extensions/` card and at 16px in the toolbar. The icon is the thing
-> that changed, and step 4 has been updated to describe the 4.4.4 artwork.
+> that changed, and step 4 has been updated to describe the current artwork.
+>
+> §13 step 3 — "the palette is teal/slate, no pink, magenta, orange, or purple
+> anywhere" — is worth a glance too. It is now true of the entire UI; 4.4.4 and
+> earlier had an amber donation button that contradicted it.
 
 Items 11 and 12 exist because 4.4.2 shipped a `ReferenceError` in the JSON
 import handler — import updated the library in memory and silently never
@@ -766,7 +771,7 @@ reported"*, not *"was independently verified"*.
 | Build under test | `saved-posts-library-export-4.4.3.zip`, SHA-256 `91373ce6d3ce81e32d8d231de33105119dd416ef63b363bb972e358dcb975a90` |
 | Extension version | 4.4.3 |
 | Independently reproduced | No |
-| Still current? | **No — the package is now 4.4.4.** This row set is the accurate record of what was tested and is deliberately not rewritten to the newer hash. See the Status note at the top of this document for which checks carry over. |
+| Still current? | **No — the package is now 4.4.5.** This row set is the accurate record of what was tested and is deliberately not rewritten to the newer hash. See the Status note at the top of this document for which checks carry over. |
 
 ### Reported outcome
 

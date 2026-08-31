@@ -78,15 +78,16 @@ Every frame satisfies, and was checked against, the rules below.
   search, sort, album expansion, CSV/JSON export and ZIP download are real.
 - **No claim of permanence or offline availability** anywhere in frame.
 
-### One honest blemish, deliberately not hidden
+### The Donate button, previously a blemish — now fixed
 
-Frame 06 shows the **Donate** button with an amber→teal gradient
-(`#donate { background: linear-gradient(135deg, #f5af19, var(--accent)) }` in
-`gallery.html`). `#f5af19` is not an Instagram brand colour and
-`tests/compliance.test.js` passes, but it *is* a warm hue, which contradicts the
-"teal/slate, no warm hues anywhere" wording used elsewhere in this repo. It is
-left visible rather than cropped out. See `COMPLIANCE_EVIDENCE.md` finding OF-4:
-the fix is a recolour in the next version, not an edited screenshot.
+Earlier versions of this set showed the **Donate** button with an amber→teal
+gradient (`#f5af19`), which was not an Instagram brand colour but did contradict
+the "teal/slate, no warm hues" wording used elsewhere. It was left visible
+rather than cropped out, and recorded as finding OF-4.
+
+**Closed in 4.4.5.** The button is now a teal gradient
+(`var(--accent-deep)` → `var(--accent-bright)`) and frame 6 shows it. There is
+no warm hue anywhere in the frames.
 
 ---
 
