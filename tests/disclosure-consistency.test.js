@@ -289,23 +289,59 @@ test('the product name is consistent across manifest, UI and docs', () => {
   }
 });
 
-test('COMPLIANCE_EVIDENCE final-package section describes the current version', () => {
+test('COMPLIANCE_EVIDENCE names the current package authoritatively', () => {
   // 4.4.2 left a "Final package" section describing 4.4.1 — wrong filename,
   // wrong hash, wrong test count, and a stale open-finding caveat. A reviewer
   // must not have to read an appendix to discover the headline is obsolete.
+  //
+  // The section that carries the current package moves as releases are added, so
+  // this does not hardcode a heading. It requires two things instead: that some
+  // section names the current artifact, and that any EARLIER package section
+  // still in the document says so about itself. That is the property the test
+  // was always really about.
   const t = read('docs/COMPLIANCE_EVIDENCE.md');
-  const idx = t.indexOf('## 2. Final package');
-  assert.ok(idx > 0, 'the Final package section must exist');
-  // Bound the section at the next heading, not at a fixed character count —
-  // a fixed window bleeds into the following section and reads its content.
-  const after = t.indexOf('\n## ', idx + 1);
-  const section = after === -1 ? t.slice(idx) : t.slice(idx, after);
-  assert.ok(section.includes('saved-posts-library-export-' + VERSION + '.zip'),
-    'the Final package section must name the current artifact, not a superseded one');
-  assert.equal(/saved-posts-backup-export-4\.4\.1\.zip/.test(section), false,
-    'the superseded 4.4.1 filename must not appear as the final package');
-  assert.equal(/1ade0a8db533d5a38e578ed7ac32627805d4d887879c812e7aec52feca51ab1e/.test(section), false,
-    'the superseded 4.4.1 hash must not be presented as final');
+  const zip = 'saved-posts-library-export-' + VERSION + '.zip';
+
+  assert.ok(t.includes(zip),
+    'the evidence document must name the current artifact ' + zip);
+
+  // Split into sections on level-2 headings so each can be judged on its own.
+  const parts = t.split(/\n(?=## )/);
+  const pkg = parts.filter(p => /^## \d+[a-z]?\. .*(?:Final )?[Pp]ackage/.test(p));
+  assert.ok(pkg.length > 0, 'there must be a package section');
+
+  const current = pkg.filter(p => p.includes(zip));
+  assert.ok(current.length > 0,
+    'a package section must name the current artifact ' + zip +
+    ' — found package sections: ' +
+    pkg.map(p => p.split('\n')[0]).join(' | '));
+
+  // Every package section that does NOT describe the current build must say so
+  // IN ITS OWN HEADING, so a reviewer scanning the table of contents cannot
+  // mistake a stale hash for the live one.
+  //
+  // The marker is required in the heading specifically, not in the opening
+  // lines: an earlier draft of this assertion scanned the first 12 lines and
+  // passed on the word "historical" appearing in §2's body, where it referred
+  // to sections 1-15 rather than to §2 itself. A mutation check caught that —
+  // stripping the real marker still passed. The heading is the one place the
+  // word can only be about this section.
+  for (const p of pkg) {
+    if (p.includes(zip)) continue;
+    const heading = p.split('\n')[0];
+    assert.ok(/supersed/i.test(heading),
+      'a package section that does not describe the current build must say ' +
+      '"superseded" in its heading — offending heading: ' + heading);
+  }
+
+  // Named superseded artifacts must never be presented as the current one.
+  for (const stale of ['saved-posts-backup-export-4.4.1.zip',
+                       '1ade0a8db533d5a38e578ed7ac32627805d4d887879c812e7aec52feca51ab1e']) {
+    for (const p of current) {
+      assert.equal(p.includes(stale), false,
+        'the superseded ' + stale + ' appears in the current package section');
+    }
+  }
 });
 
 test('COMPLIANCE_EVIDENCE reports the real test count', () => {

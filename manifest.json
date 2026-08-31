@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Saved Posts Library & Export",
-  "version": "4.4.3",
+  "version": "4.4.4",
   "description": "Capture links and details from posts you saved, browse a local library, and download selected media. Not affiliated with Instagram.",
   "icons": {
     "16": "assets/icons/icon-16.png",

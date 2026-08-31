@@ -26,10 +26,20 @@ A static test cannot substitute for any of them.
 
 Items 7, 8 and 10 were new in 4.4.2; items 11 and 12 are new in 4.4.3.
 
-> **Status: this plan was executed on 2026-08-26.** Every ⚠ BLOCKER was
-> reported as passing. See **Recorded result** at the end of this document for
-> exactly what was reported, by whom, and what was *not* reported. The plan
-> below is retained unchanged as the reusable procedure.
+> **Status: this plan was executed on 2026-08-26 against 4.4.3.** Every
+> ⚠ BLOCKER was reported as passing. See **Recorded result** at the end of this
+> document for exactly what was reported, by whom, and what was *not* reported.
+> The plan below is retained unchanged as the reusable procedure.
+>
+> **The current package is 4.4.4 and this plan has not been re-run against it.**
+> It does not need to be re-run in full: exactly five files differ from 4.4.3 —
+> the four icons and `manifest.json`'s version field — and **every JavaScript,
+> HTML and CSS file in the package is byte-identical**, so the code exercised by
+> every behavioural check is unchanged. See `COMPLIANCE_EVIDENCE.md` §20.2.
+>
+> **One step does need redoing: §1 step 4**, the visual check of the icon on the
+> `chrome://extensions/` card and at 16px in the toolbar. The icon is the thing
+> that changed, and step 4 has been updated to describe the 4.4.4 artwork.
 
 Items 11 and 12 exist because 4.4.2 shipped a `ReferenceError` in the JSON
 import handler — import updated the library in memory and silently never
@@ -76,9 +86,14 @@ documented behaviour, not a failure.
 4. Confirm the card shows:
    - Name **Saved Posts Library & Export** (no "Instagram" in the name)
    - Version **4.4.3**
-   - The **portrait icon**: the developer's photograph on a neutral slate
-     plate with a teal ring. No camera glyph, no pink/orange/purple gradient,
-     no verification badge. Check it is recognisable in the toolbar at 16px.
+   - The **portrait icon** (4.4.4 design): the developer's photograph,
+     aspect-fit into a rounded square on a neutral slate plate with a
+     rounded-rectangle teal border. The whole head is visible — hair, glasses,
+     beard and shoulders — with no part of the face cut. No camera glyph, no
+     pink/orange/purple gradient, no verification badge. Check it is
+     recognisable in the toolbar at 16px.
+     *4.4.3 and earlier used a circular crop; if you see a circle, you have
+     loaded the wrong build.*
    - **No errors** and **no warnings**
 5. Click **Details** → confirm the permission list reads only:
    *"Read and change your data on instagram.com and www.instagram.com"*.
@@ -751,6 +766,7 @@ reported"*, not *"was independently verified"*.
 | Build under test | `saved-posts-library-export-4.4.3.zip`, SHA-256 `91373ce6d3ce81e32d8d231de33105119dd416ef63b363bb972e358dcb975a90` |
 | Extension version | 4.4.3 |
 | Independently reproduced | No |
+| Still current? | **No — the package is now 4.4.4.** This row set is the accurate record of what was tested and is deliberately not rewritten to the newer hash. See the Status note at the top of this document for which checks carry over. |
 
 ### Reported outcome
 

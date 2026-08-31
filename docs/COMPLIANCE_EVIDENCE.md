@@ -69,11 +69,15 @@ it**. They are fixed only in 4.4.1.
 
 ---
 
-## 2. Final package (v4.4.3)
+## 2. Package (v4.4.3) — superseded by §20
 
-> Sections 1–15 of this document were written for earlier releases and are
-> retained as **historical record**. Where a fact has changed, this section and
-> §17 are authoritative. Anything below that names 4.4.1 or 4.4.2 as "final" is
+> **Superseded.** The current package is **4.4.4** and **§20 is authoritative**
+> for its hash, contents and provenance. This section is kept because 4.4.3 is
+> the build the independent reviewer approved and the build the manual Chrome run
+> was performed against, so its numbers still have to be readable.
+>
+> Sections 1–15 were written for earlier releases and are retained as
+> **historical record**. Anything below that names 4.4.1 or 4.4.2 as "final" is
 > superseded.
 
 | | |
@@ -1488,3 +1492,164 @@ Until step 2 is done, anyone reading the public history can write events into
 that property. That is the whole of the exposure — the secret grants Measurement
 Protocol *write* access, not read access to collected data, and not access to
 any user's Instagram account or to any Google account.
+
+---
+
+## 20. Version 4.4.4 — the appeal outcome, and the package that follows from it
+
+### 20.1 Google denied the appeal and named the only remaining route
+
+Chrome Web Store Developer Support replied on **2026-08-27** about item
+`hllpcahjefcijlmlnhlmhjemcgkgdghh` ("Instagram Saved Media Exporter"):
+
+- **Reinstatement refused.** The stated standard for the appeal form is that
+  "a removal decision will only be reversed on appeal if an error was made".
+  Not "if the developer fixed it". The remediation in this document is therefore
+  irrelevant to reinstatement: the removed build genuinely did carry Instagram's
+  gradient, a camera glyph and "Instagram" in its name, so the original removal
+  was not an error. **Re-appealing is not a viable route** and the reply closes
+  with a warning that further violations may suspend the publisher account.
+- **Google recused itself on the trademark question** — "resolve this matter
+  with the complainant directly… address them directly to the complainant
+  identified in the Trademark Infringement Notice". Whether the extension's
+  remaining descriptive use of the mark is defensible is a legal question
+  between the developer and the complainant. It is not assessed here, and
+  nothing in this document should be read as legal advice.
+- **The route Google did name:** "you may consider releasing a new,
+  non-infringing version of your item on the Chrome Web Store under a new
+  package name." That means a **new item with a new extension ID**, not an
+  update to the removed one. Everything in §16–§19 is the prerequisite for it.
+
+Two conditions are attached to that sentence and both are outside this
+repository's reach:
+
+| Condition | Status |
+|---|---|
+| "if your account is still in good standing" | **Unverified.** Needs a look at the Developer Dashboard. If the account is already flagged, a new submission risks the suspension the reply warns about. |
+| "the nature of your item allows for republishing" | **Unresolved.** This is the Instagram Terms of Use risk in §13, which no amount of testing closes. |
+
+### 20.2 What changed in 4.4.4
+
+Two things, and nothing else.
+
+1. **The icon.** The 4.4.3 icon composited the portrait into a circle using a
+   tight 136×136 face crop. A circle inscribed in a square clips the corners,
+   and because the head sits above and left of centre it was clipping hair and
+   shoulder. The developer rejected it and asked for an aspect-fit portrait that
+   does not cut his face. The circle is gone: the portrait is now aspect-fit
+   (contain) into a rounded square with a rounded-rectangle teal border, and
+   `CROP` trims empty background only — box (55, 5, 265, 215), with the whole
+   head inside it on every side. See `tools/make-icons.py`, which carries the
+   full design history.
+2. **The version string**, 4.4.3 → 4.4.4, in `manifest.json` and
+   `package.json`.
+
+**Exactly five files differ from the 4.4.3 package**, and this is worth stating
+precisely because of what it implies for the manual validation:
+
+| File | 4.4.3 | 4.4.4 |
+|---|---|---|
+| `assets/icons/icon-16.png` | `104a81f2…` | `2b5de0e2…` |
+| `assets/icons/icon-32.png` | `f6e31c6d…` | `df7c9378…` |
+| `assets/icons/icon-48.png` | `d5f9d74a…` | `8df41331…` |
+| `assets/icons/icon-128.png` | `5dcbb236…` | `203f43a1…` |
+| `manifest.json` | `e4d0cb54…` | `2581231e…` (version field only) |
+
+**Every JavaScript, HTML and CSS file in the package is byte-identical to
+4.4.3.** No behaviour changed. `background.js`, `content.js`, `capture-hook.js`,
+`gallery.js`, `popup.js`, `legacy-cleanup.js`, `library-sanitize.js`,
+`url-allowlist.js`, `gallery.html`, `popup.html`, `privacy-policy.html`,
+`tokens.css` and the vendored `lib/jszip.min.js` all carry the same hashes as
+§2.
+
+### 20.3 The package
+
+| | |
+|---|---|
+| Path | `saved-posts-library-export-4.4.4.zip` (repository root) |
+| Size | 144797 bytes |
+| **SHA-256** | `f912a7367a4ba22ea6a86657f4be1e0f3546c6aaa856d5de4f75f401af19eed6` |
+| Files | 18 (no directory entries) |
+| Built by | `./build.sh` |
+| Reproducible | Yes — repeated builds produce the same hash; the mechanism is asserted by `tests/reproducible-build.test.js` |
+| Test suite | **441 tests, 441 passing, 0 failing** |
+
+The 4.4.3 hash `91373ce6d3ce81e32d8d231de33105119dd416ef63b363bb972e358dcb975a90`
+**no longer describes any build from this tree.** Where it still appears in this
+document (§18.5, §19) and in `MANUAL_CHROME_TEST_PLAN.md`, it is scoped to the
+build it actually refers to and is left alone deliberately: those are statements
+about 4.4.3, and rewriting them to the new hash would falsify a record rather
+than update it.
+
+Per-file SHA-256:
+
+```
+203f43a11a68efc3cd50a77548e3b52ebdcf5bd8f29dd6e8bf2d687ea9184b8d  assets/icons/icon-128.png
+2b5de0e290f36a6cf3559f10a89e0829ee52f9964d95f3640da33935f9c911e3  assets/icons/icon-16.png
+df7c937842f622ecd3f8058c3878cbb48ac88a2dd20f96b802eef1467c3bc7ed  assets/icons/icon-32.png
+8df413315dd4da280570d238ea185a74e7a5b24fd56875ef3c064da993a174b8  assets/icons/icon-48.png
+50bd3f8a612c18e321f6585404482aa5224ca2fd77886c2da764f592d795ac30  background.js
+fb24d1d5ab9f74bc677976a5b84460913a7060b84dc97ae5bd2eb5c4131d22e7  capture-hook.js
+207e65e90be1d709329f554674d2539c210e8bfc657fbcb3a656b688fc9b73d4  content.js
+f379b8ff5d735c4fc2832f005f78b7439fd93035fdb62a3d5252347596291339  gallery.html
+b6d3e6ce9dd9d0d9426b2dd6cab4eb5bc0e13d8c19bb1895fb9582a4abefd719  gallery.js
+b24af7e2af122dcbfb16739d4841c271253d938f9b4940d06092cdb9f5b4c1b7  legacy-cleanup.js
+acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e  lib/jszip.min.js
+5911b3bbb9c45abe9d9b17b895d4647d49e0b2ac2030a3e43ec5bfb01f2a29f0  library-sanitize.js
+2581231e45d7f09d9875498c4818ee923c2edac47c8f464a5f156414c2ff42c1  manifest.json
+521df2af71eb9f715e6503ac2d26fe6254f07a3ee80f19c7da03a89326f689e1  popup.html
+ccc64996e8ed62055f614bd93379af9253dfd909658c01171ea6920520ef25fa  popup.js
+9a95061b41a43599c473dd312d002d0717b91c5dba4a10ed14f3e5eed35fdb5a  privacy-policy.html
+7ba96e7f53dcabae3ebfad6ef71e950d768e5f37e9382ce0748889256a08871f  tokens.css
+578b3a513c055ea4e5ac7f9139df7e16e6908d541648b02d0fd29ddfd5185834  url-allowlist.js
+```
+
+### 20.4 What the manual Chrome validation covers, and what it does not
+
+The manual run recorded in `MANUAL_CHROME_TEST_PLAN.md` was performed against
+**4.4.3**, and it has **not** been repeated for 4.4.4.
+
+How much of it transfers is decidable rather than a matter of opinion, because
+§20.2 establishes that no executable file changed:
+
+- **Transfers.** Every check that exercises behaviour — §3 and §4 (nothing
+  collected or intercepted before Start), §5 (consent), §7 and §8 (capture
+  yield), §11 (teardown), §12 (popup tab detection), §17 (console, service
+  worker, network), §20 and §21 (CSP and downloads), §22 (hostile legacy
+  storage), §23 and §24 (import). The code executing in all of those is
+  byte-identical.
+- **Does not transfer.** §1 step 4, which is a visual check of the icon on the
+  `chrome://extensions/` card and at 16px in the toolbar. That is precisely
+  what changed. It needs eyes on it once before submission, and it is the only
+  manual step 4.4.4 invalidates.
+
+Recorded rather than implied: the icon was **not** re-approved by the
+independent reviewer who approved the 4.4.3 design. It was changed at the
+developer's own instruction after that approval.
+
+### 20.5 Still open
+
+Unchanged from §17.8 and §19 except where noted:
+
+- **Instagram Terms of Use risk** (§13). Unresolved external risk, and now also
+  one of the two conditions Google attached to republishing.
+- **Publisher account standing.** Unverified; see §20.1.
+- **The trademark complaint itself.** Now explicitly Google's non-problem.
+  Between the developer and the complainant.
+- **The GA4 API secret** remains in this repository's public git history and
+  **is not revoked**. Nothing in the shipped code references it — analytics was
+  deleted in 4.4.1 and the working tree holds no copy of either credential — so
+  this blocks nothing, but the secret grants Measurement Protocol write access
+  to that property until an Analytics admin deletes it under
+  **Admin → Data Streams → (stream) → Measurement Protocol API secrets**.
+- **Netcraft report 91984778** is a separate track from the trademark complaint
+  and the 2026-08-27 reply says nothing about it. No record of resolution
+  exists here.
+- **OF-4**, the Donate button's amber→teal gradient (§19.4). Still not an
+  Instagram brand colour, still a contradiction of the "no warm hues" wording,
+  still deferred. The reason for deferring it — preserving the approved 4.4.3
+  hash — **no longer applies**, since 4.4.4 already changes the package. It is
+  now simply an open cosmetic item.
+- **The repository name.** `instagram-bookmarks-exporter` drove the public
+  landing-page URL and was the most prominent remaining use of the mark. See
+  §20.6 for what was done about it.

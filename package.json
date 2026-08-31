@@ -1,6 +1,6 @@
 {
   "name": "saved-posts-library-export",
-  "version": "4.4.3",
+  "version": "4.4.4",
   "private": true,
   "description": "Chrome extension \"Saved Posts Library & Export\" — see manifest.json. This package.json exists only so `npm test` works; the extension itself ships zero npm dependencies, which is why there is no lockfile.",
   "scripts": {

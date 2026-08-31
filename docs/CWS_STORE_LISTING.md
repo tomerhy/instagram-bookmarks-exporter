@@ -1,6 +1,35 @@
-# Chrome Web Store listing — Saved Posts Library & Export v4.4.3
+# Chrome Web Store listing — Saved Posts Library & Export v4.4.4
 
 Copy-ready listing text. **Nothing here is submitted automatically.**
+
+> ## This is a NEW ITEM, not a resubmission
+>
+> Chrome Web Store Developer Support refused to reinstate the removed item on
+> **2026-08-27** and named the only remaining route: *"you may consider
+> releasing a new, non-infringing version of your item on the Chrome Web Store
+> under a new package name."* See `COMPLIANCE_EVIDENCE.md` §20.1.
+>
+> That has concrete consequences for how this listing is filed:
+>
+> - **Create a new item in the dashboard and upload
+>   `saved-posts-library-export-4.4.4.zip` to it.** Do not attempt to update
+>   item `hllpcahjefcijlmlnhlmhjemcgkgdghh`; it is permanently removed. The new
+>   item gets a new extension ID.
+> - **Do not re-appeal the old item.** The stated bar is that a removal is
+>   reversed "only if an error was made", and the removed build genuinely did
+>   carry Instagram's gradient, a camera glyph and "Instagram" in its name. The
+>   reply also warns that further violations may suspend the publisher account.
+> - **Check two things first**, both outside this repository: that the publisher
+>   account is still in good standing, and that the Instagram Terms of Use
+>   question (`COMPLIANCE_EVIDENCE.md` §13) is one you are willing to submit
+>   under. Google made both a condition of republishing.
+> - **The trademark complaint is not resolved by any of this.** Google recused
+>   itself and directed the developer to the complainant. Nothing in this
+>   document is legal advice, and filing a new item does not answer the
+>   complaint.
+>
+> There is no install base, no review history and no rating to carry over. The
+> listing should read as a first release, because for this item it is one.
 
 Deliberately absent, because the previous listing's problems were partly
 linguistic: no "official", no "approved", no "best", no "#1", no "the only",
@@ -139,13 +168,12 @@ You are responsible for your own use of instagram.com, including its Terms of
 Use.
 
 
-VERSION 4.4.2
+WHAT THIS VERSION DOES
 
-• Records saved by older versions are now sanitised when they are loaded, not
-  just when they are imported. An earlier version could load an unvalidated URL
-  from storage into the gallery; that is fixed, and the cleaned library is
-  written back so the unsafe values are removed permanently.
-• Every place a URL is displayed, fetched, opened, copied or exported now
+• Records loaded from storage are sanitised on the way in, not just on import,
+  so a URL saved by an older build cannot reach the gallery unvalidated. The
+  cleaned library is written back, so unsafe values are removed permanently.
+• Every place a URL is displayed, fetched, opened, copied or exported
   re-checks it against a fixed allowlist of Instagram/Meta addresses.
 • The video fallback view is built with DOM methods instead of assembled HTML,
   so no stored value can become markup.
@@ -382,7 +410,8 @@ control.
 ## Screenshots
 
 **Upload these six, in this order.** They are in `assets/store-screenshots/`,
-generated on 2026-08-26 from the real 4.4.3 UI with synthetic data:
+generated from the real 4.4.4 UI with synthetic data (the version badge in
+frames 1 and 3 reads `v4.4.4`):
 
 | # | File | Caption to use (optional) |
 |---|---|---|

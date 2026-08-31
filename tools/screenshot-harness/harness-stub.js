@@ -28,7 +28,7 @@
     runtime: {
       lastError: null,
       getManifest: function () {
-        return { version: '4.4.3', name: 'Saved Posts Library & Export' };
+        return { version: '4.4.4', name: 'Saved Posts Library & Export' };
       },
       getURL: function (p) { return location.origin + '/' + p; },
       sendMessage: function (_m, cb) { if (cb) cb({ ok: true }); },
